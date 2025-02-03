@@ -50,17 +50,22 @@ export async function getIPFSCredentials(address: string): Promise<string> {
     return PINATA_JWT;
   }
 
-  const [user] = await db.select()
-    .from(users)
-    .where(eq(users.address, address.toLowerCase()))
-    .limit(1);
+  try {
+    const [user] = await db.select()
+      .from(users)
+      .where(eq(users.address, address.toLowerCase()))
+      .limit(1);
 
-  if (!user?.ipfsSecret) {
-    throw new Error('IPFS credentials not found for user');
+    if (!user?.ipfsSecret) {
+      throw new Error('IPFS credentials not found for user');
+    }
+
+    const credentials = decryptCredentials(user.ipfsSecret);
+    return credentials.jwt;
+  } catch (error) {
+    console.error('Error getting IPFS credentials:', error);
+    throw new Error('Failed to retrieve IPFS credentials');
   }
-
-  const credentials = decryptCredentials(user.ipfsSecret);
-  return credentials.jwt;
 }
 
 export async function createIPFSAccount(address: string): Promise<void> {
@@ -69,6 +74,8 @@ export async function createIPFSAccount(address: string): Promise<void> {
   }
 
   try {
+    console.log(`Creating IPFS account for address: ${address}`);
+
     // Create a submarine key with restricted access for the user
     const response = await fetch(`${PINATA_API}/users/generateApiKey`, {
       method: 'POST',
@@ -93,10 +100,13 @@ export async function createIPFSAccount(address: string): Promise<void> {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to create Pinata API key: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({ error: response.statusText }));
+      console.error('Pinata API key creation failed:', errorData);
+      throw new Error(`Failed to create Pinata API key: ${errorData.error || response.statusText}`);
     }
 
     const { JWT, pinata_api_key } = await response.json();
+    console.log(`Successfully created Pinata API key for: ${address}`);
 
     const credentials: IPFSCredentials = {
       jwt: JWT,
@@ -111,6 +121,7 @@ export async function createIPFSAccount(address: string): Promise<void> {
       })
       .where(eq(users.address, address.toLowerCase()));
 
+    console.log(`Successfully stored IPFS credentials for: ${address}`);
   } catch (error) {
     console.error('Error creating IPFS account:', error);
     throw new Error('Failed to create IPFS account');
