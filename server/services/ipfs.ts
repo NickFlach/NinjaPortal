@@ -12,7 +12,21 @@ interface IPFSCredentials {
   account: string;
 }
 
-// Use modern crypto methods
+// Verify Pinata JWT is valid
+async function verifyPinataJWT(jwt: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${PINATA_API}/data/testAuthentication`, {
+      headers: {
+        'Authorization': `Bearer ${jwt}`
+      }
+    });
+    return response.ok;
+  } catch (error) {
+    console.error('Failed to verify Pinata JWT:', error);
+    return false;
+  }
+}
+
 function encryptCredentials(credentials: IPFSCredentials): string {
   const algorithm = 'aes-256-gcm';
   const key = crypto.scryptSync(process.env.REPL_ID || 'default-key', 'salt', 32);
@@ -23,7 +37,6 @@ function encryptCredentials(credentials: IPFSCredentials): string {
   encrypted += cipher.final('hex');
   const authTag = cipher.getAuthTag();
 
-  // Return IV + Auth Tag + Encrypted data
   return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
 }
 
@@ -44,9 +57,20 @@ function decryptCredentials(encrypted: string): IPFSCredentials {
 }
 
 export async function getIPFSCredentials(address: string): Promise<string> {
+  if (!PINATA_JWT) {
+    console.error('Pinata JWT not configured');
+    throw new Error('Pinata configuration missing');
+  }
+
+  // First verify the main JWT is valid
+  const isValid = await verifyPinataJWT(PINATA_JWT);
+  if (!isValid) {
+    console.error('Main Pinata JWT is invalid');
+    throw new Error('Invalid Pinata configuration');
+  }
+
   // Treasury address always uses the main PINATA_JWT
   if (address.toLowerCase() === TREASURY_ADDRESS.toLowerCase()) {
-    if (!PINATA_JWT) throw new Error('Pinata JWT not configured');
     return PINATA_JWT;
   }
 
@@ -57,10 +81,27 @@ export async function getIPFSCredentials(address: string): Promise<string> {
       .limit(1);
 
     if (!user?.ipfsSecret) {
+      console.error('No IPFS credentials found for address:', address);
       throw new Error('IPFS credentials not found for user');
     }
 
     const credentials = decryptCredentials(user.ipfsSecret);
+
+    // Verify the user's JWT is still valid
+    const isUserJwtValid = await verifyPinataJWT(credentials.jwt);
+    if (!isUserJwtValid) {
+      console.error('User JWT invalid, attempting to recreate IPFS account');
+      await createIPFSAccount(address);
+      const [updatedUser] = await db.select()
+        .from(users)
+        .where(eq(users.address, address.toLowerCase()))
+        .limit(1);
+      if (!updatedUser?.ipfsSecret) {
+        throw new Error('Failed to recreate IPFS credentials');
+      }
+      return decryptCredentials(updatedUser.ipfsSecret).jwt;
+    }
+
     return credentials.jwt;
   } catch (error) {
     console.error('Error getting IPFS credentials:', error);
@@ -92,7 +133,9 @@ export async function createIPFSAccount(address: string): Promise<void> {
               unpin: true
             },
             data: {
-              pinList: true
+              pinList: true,
+              userPinnedDataTotal: true,
+              testAuthentication: true
             }
           }
         }

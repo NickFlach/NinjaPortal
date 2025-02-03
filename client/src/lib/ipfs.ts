@@ -5,12 +5,11 @@ if (typeof window !== 'undefined') {
   window.Buffer = window.Buffer || Buffer;
 }
 
-const PINATA_API_URL = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
 const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs';
 
 export async function uploadToIPFS(file: File): Promise<string> {
   try {
-    console.log('Starting Pinata upload...');
+    console.log('Starting IPFS upload process...');
 
     // Validate file size (max 100MB)
     const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB in bytes
@@ -18,52 +17,66 @@ export async function uploadToIPFS(file: File): Promise<string> {
       throw new Error('File size exceeds 100MB limit');
     }
 
+    // Get JWT from backend
+    console.log('Fetching IPFS credentials...');
+    const credentialsResponse = await fetch('/api/ipfs/credentials');
+    if (!credentialsResponse.ok) {
+      const error = await credentialsResponse.json();
+      throw new Error(error.message || 'Failed to get IPFS credentials');
+    }
+    const { jwt } = await credentialsResponse.json();
+    console.log('Successfully obtained IPFS credentials');
+
+    // Create form data
     const formData = new FormData();
     formData.append('file', file);
 
-    // Get JWT from backend to avoid exposing it in client code
-    const credentialsResponse = await fetch('/api/ipfs/credentials');
-    if (!credentialsResponse.ok) {
-      throw new Error('Failed to get IPFS credentials');
-    }
-    const { jwt } = await credentialsResponse.json();
-
-    const response = await fetch(PINATA_API_URL, {
+    // Upload to Pinata
+    console.log('Uploading to Pinata...');
+    const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${jwt}`,
+        'Authorization': `Bearer ${jwt}`
       },
-      body: formData,
+      body: formData
     });
 
     if (!response.ok) {
-      throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      const error = await response.json();
+      console.error('Pinata upload failed:', error);
+      throw new Error(error.error?.details || 'Upload failed');
     }
 
     const data = await response.json();
+    console.log('Upload successful:', data);
+
     if (!data.IpfsHash) {
       throw new Error('No IPFS hash received from Pinata');
     }
 
-    console.log('Upload successful:', data.IpfsHash);
     return data.IpfsHash;
   } catch (error) {
-    console.error('Upload failed:', error);
+    console.error('IPFS upload error:', error);
     throw error;
   }
 }
 
 export async function getFromIPFS(hash: string): Promise<ArrayBuffer> {
   try {
-    console.log('Fetching from Pinata:', hash);
+    console.log('Starting IPFS fetch process for hash:', hash);
 
-    // Get JWT from backend to avoid exposing it in client code
+    // Get JWT from backend
+    console.log('Fetching IPFS credentials...');
     const credentialsResponse = await fetch('/api/ipfs/credentials');
     if (!credentialsResponse.ok) {
-      throw new Error('Failed to get IPFS credentials');
+      const error = await credentialsResponse.json();
+      throw new Error(error.message || 'Failed to get IPFS credentials');
     }
     const { jwt } = await credentialsResponse.json();
+    console.log('Successfully obtained IPFS credentials');
 
+    // Fetch from Pinata gateway
+    console.log('Fetching from Pinata gateway...');
     const response = await fetch(`${PINATA_GATEWAY}/${hash}`, {
       headers: {
         'Authorization': `Bearer ${jwt}`
@@ -71,12 +84,14 @@ export async function getFromIPFS(hash: string): Promise<ArrayBuffer> {
     });
 
     if (!response.ok) {
+      console.error('Pinata fetch failed:', response.status, response.statusText);
       throw new Error(`Failed to fetch from IPFS: ${response.status} ${response.statusText}`);
     }
 
+    console.log('Successfully fetched file from IPFS');
     return await response.arrayBuffer();
   } catch (error) {
-    console.error('IPFS fetch failed:', error);
+    console.error('IPFS fetch error:', error);
     throw error;
   }
 }
