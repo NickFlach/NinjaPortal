@@ -2,8 +2,7 @@ import { Request, Response } from 'express';
 import { Buffer } from 'buffer';
 import fetch from 'node-fetch';
 
-const PINATA_JWT = process.env.VITE_PINATA_JWT;
-const GATEWAY_URL = 'https://gateway.pinata.cloud/ipfs';
+const IPFS_GATEWAY = 'https://ipfs.io/ipfs';
 
 export async function streamAudio(req: Request, res: Response) {
   try {
@@ -13,16 +12,9 @@ export async function streamAudio(req: Request, res: Response) {
       return res.status(400).json({ error: 'IPFS hash is required' });
     }
 
-    if (!PINATA_JWT) {
-      return res.status(500).json({ error: 'Pinata configuration missing' });
-    }
-
     // Fetch audio metadata first to get content length
-    const response = await fetch(`${GATEWAY_URL}/${ipfsHash}`, {
-      method: 'HEAD',
-      headers: {
-        'Authorization': `Bearer ${PINATA_JWT}`
-      }
+    const response = await fetch(`${IPFS_GATEWAY}/${ipfsHash}`, {
+      method: 'HEAD'
     });
 
     if (!response.ok) {
@@ -46,18 +38,14 @@ export async function streamAudio(req: Request, res: Response) {
     res.setHeader('Cache-Control', 'public, max-age=3600');
 
     // Fetch and stream the actual audio data
-    const audioResponse = await fetch(`${GATEWAY_URL}/${ipfsHash}`, {
-      headers: {
-        'Authorization': `Bearer ${PINATA_JWT}`
-      }
-    });
+    const audioResponse = await fetch(`${IPFS_GATEWAY}/${ipfsHash}`);
 
     if (!audioResponse.ok) {
       throw new Error(`Failed to fetch audio stream: ${audioResponse.statusText}`);
     }
 
     if (!audioResponse.body) {
-      throw new Error('No response body received from Pinata');
+      throw new Error('No response body received from IPFS gateway');
     }
 
     // Stream the response directly to the client

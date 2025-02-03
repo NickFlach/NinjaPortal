@@ -5,7 +5,7 @@ if (typeof window !== 'undefined') {
   window.Buffer = window.Buffer || Buffer;
 }
 
-const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs';
+const IPFS_GATEWAY = 'https://ipfs.io/ipfs';
 
 export async function uploadToIPFS(file: File): Promise<string> {
   try {
@@ -17,44 +17,34 @@ export async function uploadToIPFS(file: File): Promise<string> {
       throw new Error('File size exceeds 100MB limit');
     }
 
-    // Get JWT from backend
-    console.log('Fetching IPFS credentials...');
-    const credentialsResponse = await fetch('/api/ipfs/credentials');
-    if (!credentialsResponse.ok) {
-      const error = await credentialsResponse.json();
-      throw new Error(error.message || 'Failed to get IPFS credentials');
-    }
-    const { jwt } = await credentialsResponse.json();
-    console.log('Successfully obtained IPFS credentials');
-
     // Create form data
     const formData = new FormData();
     formData.append('file', file);
 
-    // Upload to Pinata
-    console.log('Uploading to Pinata...');
-    const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+    // Upload to IPFS using Infura's IPFS API
+    console.log('Uploading to IPFS...');
+    const response = await fetch('https://ipfs.infura.io:5001/api/v0/add', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${jwt}`
+        'Authorization': `Basic ${btoa(`${import.meta.env.VITE_INFURA_PROJECT_ID}:${import.meta.env.VITE_INFURA_PROJECT_SECRET}`)}`
       },
       body: formData
     });
 
     if (!response.ok) {
       const error = await response.json();
-      console.error('Pinata upload failed:', error);
-      throw new Error(error.error?.details || 'Upload failed');
+      console.error('IPFS upload failed:', error);
+      throw new Error(error.message || 'Upload failed');
     }
 
     const data = await response.json();
     console.log('Upload successful:', data);
 
-    if (!data.IpfsHash) {
-      throw new Error('No IPFS hash received from Pinata');
+    if (!data.Hash) {
+      throw new Error('No IPFS hash received');
     }
 
-    return data.IpfsHash;
+    return data.Hash;
   } catch (error) {
     console.error('IPFS upload error:', error);
     throw error;
@@ -65,26 +55,12 @@ export async function getFromIPFS(hash: string): Promise<ArrayBuffer> {
   try {
     console.log('Starting IPFS fetch process for hash:', hash);
 
-    // Get JWT from backend
-    console.log('Fetching IPFS credentials...');
-    const credentialsResponse = await fetch('/api/ipfs/credentials');
-    if (!credentialsResponse.ok) {
-      const error = await credentialsResponse.json();
-      throw new Error(error.message || 'Failed to get IPFS credentials');
-    }
-    const { jwt } = await credentialsResponse.json();
-    console.log('Successfully obtained IPFS credentials');
-
-    // Fetch from Pinata gateway
-    console.log('Fetching from Pinata gateway...');
-    const response = await fetch(`${PINATA_GATEWAY}/${hash}`, {
-      headers: {
-        'Authorization': `Bearer ${jwt}`
-      }
-    });
+    // Fetch directly from IPFS gateway
+    console.log('Fetching from IPFS gateway...');
+    const response = await fetch(`${IPFS_GATEWAY}/${hash}`);
 
     if (!response.ok) {
-      console.error('Pinata fetch failed:', response.status, response.statusText);
+      console.error('IPFS fetch failed:', response.status, response.statusText);
       throw new Error(`Failed to fetch from IPFS: ${response.status} ${response.statusText}`);
     }
 
