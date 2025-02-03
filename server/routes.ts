@@ -143,24 +143,29 @@ export function registerRoutes(app: Express) {
   app.get("/api/songs/recent", async (req, res) => {
     const treasuryAddress = getTreasuryAddress();
 
-    const recentSongs = await db.query.recentlyPlayed.findMany({
-      orderBy: desc(recentlyPlayed.playedAt),
-      limit: 20,
-      with: {
-        song: true,
-      }
-    });
+    try {
+      const recentSongs = await db.query.recentlyPlayed.findMany({
+        orderBy: desc(recentlyPlayed.playedAt),
+        limit: 20,
+        with: {
+          song: true,
+        }
+      });
 
-    // Filter for songs from treasury account only
-    const uniqueSongs = Array.from(
-      new Map(
-        recentSongs
-          .filter(item => item.song.ipfsAccount === treasuryAddress.toLowerCase())
-          .map(item => [item.songId, item.song])
-      ).values()
-    );
+      // Filter for songs from treasury account only
+      const uniqueSongs = Array.from(
+        new Map(
+          recentSongs
+            .filter(item => item.song && item.song.ipfsAccount === treasuryAddress.toLowerCase())
+            .map(item => [item.songId, item.song])
+        ).values()
+      );
 
-    res.json(uniqueSongs);
+      res.json(uniqueSongs);
+    } catch (error) {
+      console.error('Error fetching recent songs:', error);
+      res.status(500).json({ message: "Failed to fetch recent songs" });
+    }
   });
 
   app.post("/api/songs/play/:id", async (req, res) => {
@@ -290,7 +295,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Add diagnostic route for IPFS connectivity
+  // Modified IPFS status endpoint for better error handling
   app.get("/api/ipfs/status", async (req, res) => {
     const address = req.headers['x-wallet-address'] as string;
 
@@ -301,6 +306,7 @@ export function registerRoutes(app: Express) {
     try {
       // First verify the main JWT
       const mainJwtValid = await verifyPinataJWT(process.env.VITE_PINATA_JWT || '');
+      console.log('Main JWT validation result:', mainJwtValid);
 
       // Get user's JWT if it exists
       let userJwt = null;
@@ -309,6 +315,7 @@ export function registerRoutes(app: Express) {
       try {
         userJwt = await getIPFSCredentials(address);
         userJwtValid = await verifyPinataJWT(userJwt);
+        console.log('User JWT validation result:', userJwtValid, 'for address:', address);
       } catch (error) {
         console.error('Error getting user JWT:', error);
       }
@@ -321,7 +328,10 @@ export function registerRoutes(app: Express) {
       });
     } catch (error) {
       console.error('IPFS status check failed:', error);
-      res.status(500).json({ message: "Failed to check IPFS status" });
+      res.status(500).json({ 
+        message: "Failed to check IPFS status",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
   return httpServer;

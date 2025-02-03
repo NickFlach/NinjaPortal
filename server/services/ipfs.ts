@@ -14,12 +14,15 @@ interface IPFSCredentials {
 
 export async function verifyPinataJWT(jwt: string): Promise<boolean> {
   try {
+    console.log('Verifying Pinata JWT...');
     const response = await fetch(`${PINATA_API}/data/testAuthentication`, {
       headers: {
         'Authorization': `Bearer ${jwt}`
       }
     });
-    return response.ok;
+    const isValid = response.ok;
+    console.log('JWT verification result:', isValid);
+    return isValid;
   } catch (error) {
     console.error('Failed to verify Pinata JWT:', error);
     return false;
@@ -74,6 +77,7 @@ export async function getIPFSCredentials(address: string): Promise<string> {
   }
 
   try {
+    console.log('Fetching IPFS credentials for address:', address);
     const [user] = await db.select()
       .from(users)
       .where(eq(users.address, address.toLowerCase()))
@@ -85,6 +89,7 @@ export async function getIPFSCredentials(address: string): Promise<string> {
     }
 
     const credentials = decryptCredentials(user.ipfsSecret);
+    console.log('Successfully decrypted credentials for:', address);
 
     // Verify the user's JWT is still valid
     const isUserJwtValid = await verifyPinataJWT(credentials.jwt);
