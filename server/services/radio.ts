@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import { Buffer } from 'buffer';
 import fetch from 'node-fetch';
 
 const IPFS_GATEWAY = 'https://ipfs.io/ipfs';

@@ -1,10 +1,4 @@
-import { Buffer } from 'buffer';
-
-// Ensure Buffer is available in the browser environment
-if (typeof window !== 'undefined') {
-  window.Buffer = window.Buffer || Buffer;
-}
-
+// Simplified IPFS interactions without Buffer/process dependencies
 const IPFS_GATEWAY = 'https://ipfs.io/ipfs';
 
 export async function uploadToIPFS(file: File): Promise<string> {
@@ -32,9 +26,7 @@ export async function uploadToIPFS(file: File): Promise<string> {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      console.error('IPFS upload failed:', error);
-      throw new Error(error.message || 'Upload failed');
+      throw new Error('Upload failed: ' + response.statusText);
     }
 
     const data = await response.json();
