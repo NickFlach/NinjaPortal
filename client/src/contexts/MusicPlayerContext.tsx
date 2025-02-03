@@ -34,6 +34,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { address } = useAccount();
+  const defaultWallet = "REDACTED_WALLET_ADDRESS"; // Default wallet for landing page
+  const landingAddress = address || defaultWallet;
   const isLandingPage = !address;
 
   // Fetch landing page feed (recent songs)
@@ -46,8 +48,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         };
 
         // Add wallet address header if available
-        if (address) {
-          headers['X-Wallet-Address'] = address;
+        if (landingAddress) {
+          headers['X-Wallet-Address'] = landingAddress;
         }
 
         const response = await fetch("/api/songs/recent", {
