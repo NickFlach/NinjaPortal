@@ -4,7 +4,7 @@ import { db } from "@db";
 import { songs, users, recentlyPlayed } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
 import radioRouter from './routes/radio';
-import { createIPFSAccount, getIPFSCredentials, getTreasuryAddress } from './services/ipfs';
+import { verifyPinataJWT, getIPFSCredentials, createIPFSAccount, getTreasuryAddress } from './services/ipfs';
 
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
@@ -287,6 +287,41 @@ export function registerRoutes(app: Express) {
     } catch (error) {
       console.error('Error getting IPFS credentials:', error);
       res.status(500).json({ message: "Failed to get IPFS credentials" });
+    }
+  });
+
+  // Add diagnostic route for IPFS connectivity
+  app.get("/api/ipfs/status", async (req, res) => {
+    const address = req.headers['x-wallet-address'] as string;
+
+    if (!address) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    try {
+      // First verify the main JWT
+      const mainJwtValid = await verifyPinataJWT(process.env.VITE_PINATA_JWT || '');
+
+      // Get user's JWT if it exists
+      let userJwt = null;
+      let userJwtValid = false;
+
+      try {
+        userJwt = await getIPFSCredentials(address);
+        userJwtValid = await verifyPinataJWT(userJwt);
+      } catch (error) {
+        console.error('Error getting user JWT:', error);
+      }
+
+      res.json({
+        mainJwtValid,
+        userJwtValid,
+        hasUserJwt: !!userJwt,
+        address
+      });
+    } catch (error) {
+      console.error('IPFS status check failed:', error);
+      res.status(500).json({ message: "Failed to check IPFS status" });
     }
   });
   return httpServer;

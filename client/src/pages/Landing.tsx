@@ -6,18 +6,20 @@ import { Volume2, VolumeX, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from 'react';
 import { OnboardingDialog } from "@/components/OnboardingDialog";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Landing() {
   const { address, isConnecting } = useAccount();
   const [, setLocation] = useLocation();
   const { currentSong, isPlaying, togglePlay } = useMusicPlayer();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const { toast } = useToast();
 
-  // Simple IPFS status check after wallet connection
+  // IPFS status check after wallet connection
   const { data: ipfsStatus } = useQuery({
-    queryKey: ["/api/user/ipfs-status"],
+    queryKey: ["/api/ipfs/status", address],
     queryFn: async () => {
-      const response = await fetch("/api/user/ipfs-status", {
+      const response = await fetch("/api/ipfs/status", {
         headers: { 'X-Wallet-Address': address! }
       });
       if (!response.ok) throw new Error('Failed to check IPFS status');
@@ -25,11 +27,31 @@ export default function Landing() {
     },
     enabled: !!address && !isConnecting,
     onSuccess: (data) => {
-      if (data && !data.ipfsAccount) {
+      if (!data.mainJwtValid) {
+        toast({
+          title: "IPFS Configuration Error",
+          description: "There's an issue with the IPFS configuration. Please try again later.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!data.hasUserJwt) {
         setShowOnboarding(true);
-      } else if (data?.ipfsAccount) {
+      } else if (!data.userJwtValid) {
+        // If user has invalid JWT, recreate their account
+        setShowOnboarding(true);
+      } else {
         setLocation("/home");
       }
+    },
+    onError: (error) => {
+      console.error('IPFS status check failed:', error);
+      toast({
+        title: "Connection Error",
+        description: "Failed to verify IPFS connection. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 

@@ -12,8 +12,7 @@ interface IPFSCredentials {
   account: string;
 }
 
-// Verify Pinata JWT is valid
-async function verifyPinataJWT(jwt: string): Promise<boolean> {
+export async function verifyPinataJWT(jwt: string): Promise<boolean> {
   try {
     const response = await fetch(`${PINATA_API}/data/testAuthentication`, {
       headers: {
