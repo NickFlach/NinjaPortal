@@ -8,7 +8,7 @@ if (typeof window !== 'undefined') {
 const PINATA_API_URL = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
 const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs';
 
-export async function uploadToIPFS(file: File, jwt: string): Promise<string> {
+export async function uploadToIPFS(file: File): Promise<string> {
   try {
     console.log('Starting Pinata upload...');
 
@@ -20,6 +20,13 @@ export async function uploadToIPFS(file: File, jwt: string): Promise<string> {
 
     const formData = new FormData();
     formData.append('file', file);
+
+    // Get JWT from backend to avoid exposing it in client code
+    const credentialsResponse = await fetch('/api/ipfs/credentials');
+    if (!credentialsResponse.ok) {
+      throw new Error('Failed to get IPFS credentials');
+    }
+    const { jwt } = await credentialsResponse.json();
 
     const response = await fetch(PINATA_API_URL, {
       method: 'POST',
@@ -46,9 +53,17 @@ export async function uploadToIPFS(file: File, jwt: string): Promise<string> {
   }
 }
 
-export async function getFromIPFS(hash: string, jwt: string): Promise<ArrayBuffer> {
+export async function getFromIPFS(hash: string): Promise<ArrayBuffer> {
   try {
     console.log('Fetching from Pinata:', hash);
+
+    // Get JWT from backend to avoid exposing it in client code
+    const credentialsResponse = await fetch('/api/ipfs/credentials');
+    if (!credentialsResponse.ok) {
+      throw new Error('Failed to get IPFS credentials');
+    }
+    const { jwt } = await credentialsResponse.json();
+
     const response = await fetch(`${PINATA_GATEWAY}/${hash}`, {
       headers: {
         'Authorization': `Bearer ${jwt}`

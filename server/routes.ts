@@ -31,7 +31,7 @@ export function registerRoutes(app: Express) {
         return res.json({ ipfsAccount: null });
       }
 
-      return res.json({ 
+      return res.json({
         ipfsAccount: user.ipfsAccount,
         isAdmin: user.isAdmin
       });
@@ -270,6 +270,23 @@ export function registerRoutes(app: Express) {
     } catch (error) {
       console.error('Error deleting song:', error);
       res.status(500).json({ message: "Failed to delete song" });
+    }
+  });
+
+  // Add new route to get IPFS credentials
+  app.get("/api/ipfs/credentials", async (req, res) => {
+    const address = req.headers['x-wallet-address'] as string;
+
+    if (!address) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    try {
+      const jwt = await getIPFSCredentials(address);
+      res.json({ jwt });
+    } catch (error) {
+      console.error('Error getting IPFS credentials:', error);
+      res.status(500).json({ message: "Failed to get IPFS credentials" });
     }
   });
   return httpServer;
