@@ -12,6 +12,35 @@ export function registerRoutes(app: Express) {
   // Register radio routes
   app.use(radioRouter);
 
+  // Add endpoint to check user's IPFS status
+  app.get("/api/user/ipfs-status", async (req, res) => {
+    const address = req.headers['x-wallet-address'] as string;
+
+    if (!address) {
+      return res.status(400).json({ message: "Wallet address is required" });
+    }
+
+    try {
+      // Check if user exists and has IPFS account
+      const [user] = await db.select()
+        .from(users)
+        .where(eq(users.address, address.toLowerCase()))
+        .limit(1);
+
+      if (!user) {
+        return res.json({ ipfsAccount: null });
+      }
+
+      return res.json({ 
+        ipfsAccount: user.ipfsAccount,
+        isAdmin: user.isAdmin
+      });
+    } catch (error) {
+      console.error('Error checking user IPFS status:', error);
+      res.status(500).json({ message: "Failed to check user status" });
+    }
+  });
+
   // Modified route to handle user registration with IPFS account creation
   app.post("/api/users/register", async (req, res) => {
     const address = req.headers['x-wallet-address'] as string;
@@ -74,7 +103,7 @@ export function registerRoutes(app: Express) {
         ipfsHash,
         uploadedBy: uploadedBy.toLowerCase(),
         ipfsAccount: uploadedBy.toLowerCase(),
-         albumArtIpfsHash,
+        albumArtIpfsHash,
         albumName,
         genre,
         releaseYear,
