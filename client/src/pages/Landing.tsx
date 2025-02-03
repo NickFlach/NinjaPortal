@@ -4,48 +4,34 @@ import { useLocation } from 'wouter';
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { Volume2, VolumeX, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { OnboardingDialog } from "@/components/OnboardingDialog";
 
 export default function Landing() {
-  const { address, isConnecting, isReconnecting } = useAccount();
+  const { address, isConnecting } = useAccount();
   const [, setLocation] = useLocation();
   const { currentSong, isPlaying, togglePlay } = useMusicPlayer();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  // Only check IPFS status after wallet is connected
-  const { data: ipfsStatus, isLoading: isCheckingStatus } = useQuery({
-    queryKey: ["/api/user/ipfs-status", address],
+  // Simple IPFS status check after wallet connection
+  const { data: ipfsStatus } = useQuery({
+    queryKey: ["/api/user/ipfs-status"],
     queryFn: async () => {
-      if (!address) return null;
-
       const response = await fetch("/api/user/ipfs-status", {
-        headers: {
-          'X-Wallet-Address': address
-        }
+        headers: { 'X-Wallet-Address': address! }
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch user status');
-      }
-
+      if (!response.ok) throw new Error('Failed to check IPFS status');
       return response.json();
     },
-    enabled: !!address && !isConnecting && !isReconnecting,
-    retry: 1
-  });
-
-  useEffect(() => {
-    // Only proceed when wallet is fully connected and not in any connecting state
-    if (address && !isConnecting && !isReconnecting && !isCheckingStatus) {
-      console.log('Wallet connected, checking IPFS status:', { address, ipfsStatus });
-      if (!ipfsStatus?.ipfsAccount) {
+    enabled: !!address && !isConnecting,
+    onSuccess: (data) => {
+      if (data && !data.ipfsAccount) {
         setShowOnboarding(true);
-      } else {
+      } else if (data?.ipfsAccount) {
         setLocation("/home");
       }
-    }
-  }, [address, ipfsStatus, isCheckingStatus, isConnecting, isReconnecting, setLocation]);
+    },
+  });
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -77,7 +63,7 @@ export default function Landing() {
           <WalletConnect />
         </div>
 
-        {/* Centered Logo with Link and Music Controls */}
+        {/* Centered Logo with Music Controls */}
         <div className="flex flex-col items-center justify-center mt-24 space-y-6">
           <button 
             onClick={togglePlay}
@@ -114,13 +100,13 @@ export default function Landing() {
         </div>
       </div>
 
-      {/* Only show onboarding when wallet is connected and IPFS is not set up */}
+      {/* Onboarding Dialog */}
       {showOnboarding && address && (
         <OnboardingDialog 
           isOpen={true}
-          onClose={() => {
+          onClose={(hasAccount) => {
             setShowOnboarding(false);
-            setLocation("/home");
+            setLocation(hasAccount ? "/home" : "/");
           }}
           walletAddress={address}
         />

@@ -1,36 +1,30 @@
-import * as React from "react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ExternalLink, ArrowRight, Loader2, CloudCog } from "lucide-react";
+import { CloudCog, Loader2 } from "lucide-react";
+import { useState } from "react";
 
 interface OnboardingDialogProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (hasAccount: boolean) => void;
   walletAddress: string;
 }
 
 export function OnboardingDialog({ isOpen, onClose, walletAddress }: OnboardingDialogProps) {
-  const [isLoading, setIsLoading] = React.useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
 
-  const handleSkip = () => {
-    onClose();
-  };
+  const createIPFSAccount = async () => {
+    if (isCreating || !walletAddress) return;
 
-  const handleCreateAccount = async () => {
-    if (isLoading || !walletAddress) return;
-
-    setIsLoading(true);
+    setIsCreating(true);
     try {
-      console.log('Creating IPFS account for wallet:', walletAddress);
       const response = await fetch("/api/users/register", {
         method: 'POST',
         headers: {
@@ -39,37 +33,36 @@ export function OnboardingDialog({ isOpen, onClose, walletAddress }: OnboardingD
         }
       });
 
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || 'Failed to create IPFS account');
-      }
-
       const data = await response.json();
-      console.log('Registration response:', data);
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to create IPFS account');
+      }
 
       if (!data.ipfsAccount) {
-        throw new Error('IPFS account creation failed - no account returned');
+        throw new Error('IPFS account creation failed');
       }
 
       toast({
-        title: "Success!",
-        description: "Your Pinata IPFS account has been created.",
+        title: "Welcome to Music Portal!",
+        description: "Your IPFS account has been created successfully.",
       });
-      onClose();
+
+      onClose(true);
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('IPFS account creation failed:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create your IPFS account. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create IPFS account",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsCreating(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => !isLoading && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !isCreating && !open && onClose(false)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -77,17 +70,17 @@ export function OnboardingDialog({ isOpen, onClose, walletAddress }: OnboardingD
             Welcome to Music Portal
           </DialogTitle>
           <DialogDescription>
-            Create your personal IPFS storage account powered by Pinata to upload and manage your music library.
+            Create your personal IPFS storage account to upload and manage your music library.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="rounded-lg bg-muted p-4 space-y-2">
-            <h4 className="font-semibold">With a Pinata Account:</h4>
+            <h4 className="font-semibold">With an IPFS Account:</h4>
             <ul className="text-sm space-y-1 text-muted-foreground">
-              <li>• Upload and manage your own music library</li>
+              <li>• Upload and manage your own music</li>
               <li>• Create and share playlists</li>
-              <li>• Access the global music discovery feed</li>
+              <li>• Access the global music feed</li>
             </ul>
           </div>
 
@@ -95,49 +88,36 @@ export function OnboardingDialog({ isOpen, onClose, walletAddress }: OnboardingD
             <h4 className="font-semibold">Without an Account:</h4>
             <ul className="text-sm space-y-1 text-muted-foreground">
               <li>• Listen to music from the discovery feed</li>
-              <li>• Limited to discovery feed features only</li>
+              <li>• Limited to basic features only</li>
             </ul>
           </div>
         </div>
 
-        <DialogFooter className="flex-col sm:flex-col gap-2">
-          <Button 
-            onClick={handleCreateAccount} 
-            className="w-full" 
-            disabled={isLoading || !walletAddress}
+        <div className="flex flex-col gap-2">
+          <Button
+            onClick={createIPFSAccount}
+            disabled={isCreating}
+            className="w-full"
           >
-            {isLoading ? (
+            {isCreating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Creating Account...
               </>
             ) : (
-              <>
-                Create IPFS Account
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </>
+              'Create IPFS Account'
             )}
           </Button>
 
-          <Button 
-            variant="outline" 
-            onClick={handleSkip} 
-            className="w-full" 
-            disabled={isLoading}
+          <Button
+            variant="outline"
+            onClick={() => onClose(false)}
+            disabled={isCreating}
+            className="w-full"
           >
             Skip for Now
           </Button>
-
-          <a 
-            href="https://www.pinata.cloud/" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors mt-2"
-          >
-            Learn more about Pinata IPFS
-            <ExternalLink className="h-3 w-3" />
-          </a>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
