@@ -26,6 +26,8 @@ export function OnboardingDialog({ isOpen, onClose, walletAddress }: OnboardingD
   };
 
   const handleCreateAccount = async () => {
+    if (isLoading) return;
+
     setIsLoading(true);
     try {
       const response = await fetch("/api/users/register", {
@@ -37,7 +39,14 @@ export function OnboardingDialog({ isOpen, onClose, walletAddress }: OnboardingD
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create IPFS account');
+        const error = await response.text();
+        throw new Error(error || 'Failed to create IPFS account');
+      }
+
+      const data = await response.json();
+
+      if (!data.ipfsAccount) {
+        throw new Error('IPFS account creation failed');
       }
 
       toast({
@@ -49,7 +58,7 @@ export function OnboardingDialog({ isOpen, onClose, walletAddress }: OnboardingD
       console.error('Registration error:', error);
       toast({
         title: "Error",
-        description: "Failed to create your IPFS account. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create your IPFS account. Please try again.",
         variant: "destructive",
       });
     } finally {

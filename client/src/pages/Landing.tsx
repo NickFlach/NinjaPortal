@@ -3,10 +3,9 @@ import { WalletConnect } from "@/components/WalletConnect";
 import { useLocation } from 'wouter';
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { Volume2, VolumeX, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from 'react';
 import { OnboardingDialog } from "@/components/OnboardingDialog";
-import { useQuery } from "@tanstack/react-query";
 
 export default function Landing() {
   const { address } = useAccount();
@@ -15,30 +14,36 @@ export default function Landing() {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Check if user has IPFS account
-  const { data: user, isLoading: isCheckingUser } = useQuery({
+  const { data: ipfsStatus, isLoading: isCheckingStatus } = useQuery({
     queryKey: ["/api/user/ipfs-status", address],
     queryFn: async () => {
       if (!address) return null;
+
       const response = await fetch("/api/user/ipfs-status", {
         headers: {
           'X-Wallet-Address': address
         }
       });
-      if (!response.ok) throw new Error('Failed to fetch user status');
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch user status');
+      }
+
       return response.json();
     },
     enabled: !!address,
+    retry: 1
   });
 
   useEffect(() => {
-    if (address && !isCheckingUser) {
-      if (!user?.ipfsAccount) {
+    if (address && !isCheckingStatus) {
+      if (!ipfsStatus?.ipfsAccount) {
         setShowOnboarding(true);
       } else {
         setLocation("/home");
       }
     }
-  }, [address, user, isCheckingUser, setLocation]);
+  }, [address, ipfsStatus, isCheckingStatus, setLocation]);
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -107,14 +112,16 @@ export default function Landing() {
         </div>
       </div>
 
-      <OnboardingDialog 
-        isOpen={showOnboarding}
-        onClose={() => {
-          setShowOnboarding(false);
-          setLocation("/home");
-        }}
-        walletAddress={address || ''}
-      />
+      {showOnboarding && address && (
+        <OnboardingDialog 
+          isOpen={true}
+          onClose={() => {
+            setShowOnboarding(false);
+            setLocation("/home");
+          }}
+          walletAddress={address}
+        />
+      )}
     </div>
   );
 }

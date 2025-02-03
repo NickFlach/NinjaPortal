@@ -5,34 +5,49 @@ import crypto from 'crypto';
 
 const TREASURY_ADDRESS = 'REDACTED_WALLET_ADDRESS';
 const PINATA_JWT = process.env.VITE_PINATA_JWT;
+const PINATA_API = 'https://api.pinata.cloud';
 
 interface IPFSCredentials {
   jwt: string;
   account: string;
 }
 
-// Encrypt sensitive IPFS credentials before storing
+// Use modern crypto methods
 function encryptCredentials(credentials: IPFSCredentials): string {
-  const key = process.env.REPL_ID || 'default-encryption-key';
-  const cipher = crypto.createCipher('aes-256-cbc', key);
+  const algorithm = 'aes-256-gcm';
+  const key = crypto.scryptSync(process.env.REPL_ID || 'default-key', 'salt', 32);
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(algorithm, key, iv);
+
   let encrypted = cipher.update(JSON.stringify(credentials), 'utf8', 'hex');
   encrypted += cipher.final('hex');
-  return encrypted;
+  const authTag = cipher.getAuthTag();
+
+  // Return IV + Auth Tag + Encrypted data
+  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
 }
 
-// Decrypt stored IPFS credentials
 function decryptCredentials(encrypted: string): IPFSCredentials {
-  const key = process.env.REPL_ID || 'default-encryption-key';
-  const decipher = crypto.createDecipher('aes-256-cbc', key);
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  const algorithm = 'aes-256-gcm';
+  const key = crypto.scryptSync(process.env.REPL_ID || 'default-key', 'salt', 32);
+  const [ivHex, authTagHex, encryptedText] = encrypted.split(':');
+
+  const iv = Buffer.from(ivHex, 'hex');
+  const authTag = Buffer.from(authTagHex, 'hex');
+  const decipher = crypto.createDecipheriv(algorithm, key, iv);
+  decipher.setAuthTag(authTag);
+
+  let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
   decrypted += decipher.final('utf8');
+
   return JSON.parse(decrypted);
 }
 
 export async function getIPFSCredentials(address: string): Promise<string> {
   // Treasury address always uses the main PINATA_JWT
   if (address.toLowerCase() === TREASURY_ADDRESS.toLowerCase()) {
-    return PINATA_JWT || '';
+    if (!PINATA_JWT) throw new Error('Pinata JWT not configured');
+    return PINATA_JWT;
   }
 
   const [user] = await db.select()
@@ -49,17 +64,46 @@ export async function getIPFSCredentials(address: string): Promise<string> {
 }
 
 export async function createIPFSAccount(address: string): Promise<void> {
+  if (!PINATA_JWT) {
+    throw new Error('Pinata JWT not configured');
+  }
+
   try {
-    // In a real implementation, we would:
-    // 1. Call Pinata API to create a new API key
-    // 2. Store the credentials securely
-    // For now, we'll use a placeholder implementation
-    
+    // Create a submarine key with restricted access for the user
+    const response = await fetch(`${PINATA_API}/users/generateApiKey`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${PINATA_JWT}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        keyName: `music-portal-${address.toLowerCase()}`,
+        permissions: {
+          endpoints: {
+            pinning: {
+              pinFileToIPFS: true,
+              unpin: true
+            },
+            data: {
+              pinList: true
+            }
+          }
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create Pinata API key: ${response.statusText}`);
+    }
+
+    const { JWT, pinata_api_key } = await response.json();
+
     const credentials: IPFSCredentials = {
-      jwt: PINATA_JWT || '', // For demo, using the same JWT
-      account: `ipfs-${address.toLowerCase()}`,
+      jwt: JWT,
+      account: pinata_api_key
     };
 
+    // Store the encrypted credentials
     await db.update(users)
       .set({
         ipfsAccount: credentials.account,
