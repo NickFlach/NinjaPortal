@@ -8,12 +8,12 @@ import { useEffect, useState } from 'react';
 import { OnboardingDialog } from "@/components/OnboardingDialog";
 
 export default function Landing() {
-  const { address } = useAccount();
+  const { address, isConnecting, isReconnecting } = useAccount();
   const [, setLocation] = useLocation();
   const { currentSong, isPlaying, togglePlay } = useMusicPlayer();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  // Check if user has IPFS account
+  // Only check IPFS status after wallet is connected
   const { data: ipfsStatus, isLoading: isCheckingStatus } = useQuery({
     queryKey: ["/api/user/ipfs-status", address],
     queryFn: async () => {
@@ -31,19 +31,21 @@ export default function Landing() {
 
       return response.json();
     },
-    enabled: !!address,
+    enabled: !!address && !isConnecting && !isReconnecting,
     retry: 1
   });
 
   useEffect(() => {
-    if (address && !isCheckingStatus) {
+    // Only proceed when wallet is fully connected and not in any connecting state
+    if (address && !isConnecting && !isReconnecting && !isCheckingStatus) {
+      console.log('Wallet connected, checking IPFS status:', { address, ipfsStatus });
       if (!ipfsStatus?.ipfsAccount) {
         setShowOnboarding(true);
       } else {
         setLocation("/home");
       }
     }
-  }, [address, ipfsStatus, isCheckingStatus, setLocation]);
+  }, [address, ipfsStatus, isCheckingStatus, isConnecting, isReconnecting, setLocation]);
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -112,6 +114,7 @@ export default function Landing() {
         </div>
       </div>
 
+      {/* Only show onboarding when wallet is connected and IPFS is not set up */}
       {showOnboarding && address && (
         <OnboardingDialog 
           isOpen={true}

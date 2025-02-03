@@ -26,10 +26,11 @@ export function OnboardingDialog({ isOpen, onClose, walletAddress }: OnboardingD
   };
 
   const handleCreateAccount = async () => {
-    if (isLoading) return;
+    if (isLoading || !walletAddress) return;
 
     setIsLoading(true);
     try {
+      console.log('Creating IPFS account for wallet:', walletAddress);
       const response = await fetch("/api/users/register", {
         method: 'POST',
         headers: {
@@ -44,9 +45,10 @@ export function OnboardingDialog({ isOpen, onClose, walletAddress }: OnboardingD
       }
 
       const data = await response.json();
+      console.log('Registration response:', data);
 
       if (!data.ipfsAccount) {
-        throw new Error('IPFS account creation failed');
+        throw new Error('IPFS account creation failed - no account returned');
       }
 
       toast({
@@ -102,7 +104,7 @@ export function OnboardingDialog({ isOpen, onClose, walletAddress }: OnboardingD
           <Button 
             onClick={handleCreateAccount} 
             className="w-full" 
-            disabled={isLoading}
+            disabled={isLoading || !walletAddress}
           >
             {isLoading ? (
               <>
