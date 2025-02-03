@@ -1,11 +1,5 @@
 import { Buffer } from 'buffer';
 
-const pinataJWT = import.meta.env.VITE_PINATA_JWT;
-
-if (!pinataJWT) {
-  throw new Error('Pinata JWT not found. Please check your environment variables.');
-}
-
 // Ensure Buffer is available in the browser environment
 if (typeof window !== 'undefined') {
   window.Buffer = window.Buffer || Buffer;
@@ -14,7 +8,7 @@ if (typeof window !== 'undefined') {
 const PINATA_API_URL = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
 const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs';
 
-export async function uploadToIPFS(file: File): Promise<string> {
+export async function uploadToIPFS(file: File, jwt: string): Promise<string> {
   try {
     console.log('Starting Pinata upload...');
 
@@ -30,7 +24,7 @@ export async function uploadToIPFS(file: File): Promise<string> {
     const response = await fetch(PINATA_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${pinataJWT}`,
+        'Authorization': `Bearer ${jwt}`,
       },
       body: formData,
     });
@@ -52,12 +46,12 @@ export async function uploadToIPFS(file: File): Promise<string> {
   }
 }
 
-export async function getFromIPFS(hash: string): Promise<ArrayBuffer> {
+export async function getFromIPFS(hash: string, jwt: string): Promise<ArrayBuffer> {
   try {
     console.log('Fetching from Pinata:', hash);
     const response = await fetch(`${PINATA_GATEWAY}/${hash}`, {
       headers: {
-        'Authorization': `Bearer ${pinataJWT}`
+        'Authorization': `Bearer ${jwt}`
       }
     });
 

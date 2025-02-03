@@ -9,6 +9,8 @@ export const users = pgTable("users", {
   bio: text("bio"),
   avatarUrl: text("avatar_url"),
   lastSeen: timestamp("last_seen").defaultNow(),
+  ipfsAccount: text("ipfs_account"),
+  ipfsSecret: text("ipfs_secret"),
 });
 
 export const songs = pgTable("songs", {
@@ -30,7 +32,8 @@ export const songs = pgTable("songs", {
   license: text("license"),
   bpm: integer("bpm"), // Beats per minute
   key: text("key"), // Musical key
-  tags: text("tags")
+  tags: text("tags"),
+  ipfsAccount: text("ipfs_account"),
 });
 
 export const recentlyPlayed = pgTable("recently_played", {
