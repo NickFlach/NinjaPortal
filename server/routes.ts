@@ -41,7 +41,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Modified route to handle user registration with IPFS account creation
+  // First fix the user registration endpoint
   app.post("/api/users/register", async (req, res) => {
     const address = req.headers['x-wallet-address'] as string;
 
@@ -51,9 +51,10 @@ export function registerRoutes(app: Express) {
 
     try {
       // Check if user exists
-      const existingUser = await db.query.users.findFirst({
-        where: eq(users.address, address.toLowerCase()),
-      });
+      const [existingUser] = await db.select()
+        .from(users)
+        .where(eq(users.address, address.toLowerCase()))
+        .limit(1);
 
       if (existingUser?.ipfsAccount) {
         return res.json(existingUser);
@@ -63,7 +64,7 @@ export function registerRoutes(app: Express) {
       if (!existingUser) {
         const [newUser] = await db.insert(users).values({
           address: address.toLowerCase(),
-          isAdmin: false,
+          isAdmin: address.toLowerCase() === getTreasuryAddress().toLowerCase(),
         }).returning();
 
         await createIPFSAccount(address);
@@ -72,10 +73,10 @@ export function registerRoutes(app: Express) {
 
       // If user exists but doesn't have IPFS account, create one
       await createIPFSAccount(address);
-      const [updatedUser] = await db.query.users.findMany({
-        where: eq(users.address, address.toLowerCase()),
-        limit: 1
-      });
+      const [updatedUser] = await db.select()
+        .from(users)
+        .where(eq(users.address, address.toLowerCase()))
+        .limit(1);
 
       res.json(updatedUser);
     } catch (error) {

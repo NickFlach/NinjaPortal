@@ -15,7 +15,7 @@ export default function Landing() {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Check if user has IPFS account
-  const { data: user } = useQuery({
+  const { data: user, isLoading: isCheckingUser } = useQuery({
     queryKey: ["/api/user/ipfs-status", address],
     queryFn: async () => {
       if (!address) return null;
@@ -31,15 +31,14 @@ export default function Landing() {
   });
 
   useEffect(() => {
-    if (address && !user?.ipfsAccount) {
-      setShowOnboarding(true);
-    } else if (address && user?.ipfsAccount) {
-      setLocation("/home");
+    if (address && !isCheckingUser) {
+      if (!user?.ipfsAccount) {
+        setShowOnboarding(true);
+      } else {
+        setLocation("/home");
+      }
     }
-  }, [address, user, setLocation]);
-
-  // Don't redirect away from landing if already here
-  if (address && user?.ipfsAccount && window.location.pathname === '/') return null;
+  }, [address, user, isCheckingUser, setLocation]);
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
