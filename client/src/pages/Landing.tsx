@@ -3,57 +3,22 @@ import { WalletConnect } from "@/components/WalletConnect";
 import { useLocation } from 'wouter';
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { Volume2, VolumeX, Loader2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from 'react';
-import { OnboardingDialog } from "@/components/OnboardingDialog";
-import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { useEffect } from 'react';
 
 export default function Landing() {
-  const { address, isConnecting } = useAccount();
+  const { address } = useAccount();
   const [, setLocation] = useLocation();
   const { currentSong, isPlaying, togglePlay } = useMusicPlayer();
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const { toast } = useToast();
 
-  // IPFS status check after wallet connection
-  const { data: ipfsStatus } = useQuery({
-    queryKey: ["/api/ipfs/status", address],
-    queryFn: async () => {
-      const response = await fetch("/api/ipfs/status", {
-        headers: { 'X-Wallet-Address': address! }
-      });
-      if (!response.ok) throw new Error('Failed to check IPFS status');
-      return response.json();
-    },
-    enabled: !!address && !isConnecting,
-    onSuccess: (data) => {
-      if (!data.mainJwtValid) {
-        toast({
-          title: "IPFS Configuration Error",
-          description: "There's an issue with the IPFS configuration. Please try again later.",
-          variant: "destructive",
-        });
-        return;
-      }
+  useEffect(() => {
+    if (address) {
+      setLocation("/home");
+    }
+  }, [address, setLocation]);
 
-      if (!data.hasUserJwt) {
-        setShowOnboarding(true);
-      } else if (!data.userJwtValid) {
-        // If user has invalid JWT, recreate their account
-        setShowOnboarding(true);
-      } else {
-        setLocation("/home");
-      }
-    },
-    onError: (error) => {
-      console.error('IPFS status check failed:', error);
-      toast({
-        title: "Connection Error",
-        description: "Failed to verify IPFS connection. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
+  // Don't redirect away from landing if already here
+  if (address && window.location.pathname === '/') return null;
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -85,7 +50,7 @@ export default function Landing() {
           <WalletConnect />
         </div>
 
-        {/* Centered Logo with Music Controls */}
+        {/* Centered Logo with Link and Music Controls */}
         <div className="flex flex-col items-center justify-center mt-24 space-y-6">
           <button 
             onClick={togglePlay}
@@ -121,18 +86,6 @@ export default function Landing() {
           )}
         </div>
       </div>
-
-      {/* Onboarding Dialog */}
-      {showOnboarding && address && (
-        <OnboardingDialog 
-          isOpen={true}
-          onClose={(hasAccount) => {
-            setShowOnboarding(false);
-            setLocation(hasAccount ? "/home" : "/");
-          }}
-          walletAddress={address}
-        />
-      )}
     </div>
   );
 }

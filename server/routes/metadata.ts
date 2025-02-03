@@ -16,45 +16,13 @@ router.get('/api/music/stats', async (_req, res) => {
 router.get('/api/music/metadata/:id', async (req, res) => {
   try {
     const songId = parseInt(req.params.id);
-    if (isNaN(songId)) {
-      return res.status(400).json({ error: 'Invalid song ID' });
-    }
-
     const metadata = await getSongMetadata(songId);
+    
     if (!metadata) {
       return res.status(404).json({ error: 'Song not found' });
     }
-
-    // Ensure all metadata fields exist before constructing tags
-    const metaTags = `
-      <!-- OpenGraph Meta Tags -->
-      <meta property="og:title" content="${metadata.openGraph?.title || ''}" />
-      <meta property="og:description" content="${metadata.openGraph?.description || ''}" />
-      <meta property="og:image" content="${metadata.openGraph?.image || ''}" />
-      <meta property="og:type" content="${metadata.openGraph?.type || 'music.song'}" />
-      ${metadata.openGraph?.musician ? `<meta property="music:musician" content="${metadata.openGraph.musician}" />` : ''}
-      ${metadata.openGraph?.album ? `<meta property="music:album" content="${metadata.openGraph.album}" />` : ''}
-      ${metadata.openGraph?.duration ? `<meta property="music:duration" content="${metadata.openGraph.duration}" />` : ''}
-      ${metadata.openGraph?.genre ? `<meta property="music:genre" content="${metadata.openGraph.genre}" />` : ''}
-
-      <!-- Twitter Card Meta Tags -->
-      <meta name="twitter:card" content="${metadata.twitterCard?.card || 'summary'}" />
-      <meta name="twitter:site" content="${metadata.twitterCard?.site || ''}" />
-      <meta name="twitter:title" content="${metadata.twitterCard?.title || ''}" />
-      <meta name="twitter:description" content="${metadata.twitterCard?.description || ''}" />
-      <meta name="twitter:image" content="${metadata.twitterCard?.image || ''}" />
-      ${metadata.twitterCard?.player ? `<meta name="twitter:player" content="${metadata.twitterCard.player}" />` : ''}
-
-      <!-- Schema.org JSON-LD -->
-      <script type="application/ld+json">
-        ${JSON.stringify(metadata.schemaOrg || {})}
-      </script>
-    `.trim();
-
-    res.json({ 
-      ...metadata,
-      metaTags
-    });
+    
+    res.json(metadata);
   } catch (error) {
     console.error('Error fetching song metadata:', error);
     res.status(500).json({ error: 'Failed to fetch song metadata' });

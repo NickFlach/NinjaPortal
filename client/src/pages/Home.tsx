@@ -13,11 +13,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Upload, Library } from "lucide-react";
 import { uploadToIPFS } from "@/lib/ipfs";
 import { EditSongDialog } from "@/components/EditSongDialog";
-import * as musicMetadata from 'music-metadata-browser';
 
-interface SimpleMetadata {
+interface Song {
+  id: number;
   title: string;
   artist: string;
+  ipfsHash: string;
+  uploadedBy: string | null;
+  createdAt: string | null;
+  votes: number | null;
 }
 
 export default function Home() {
@@ -27,10 +31,6 @@ export default function Home() {
   const { address } = useAccount();
   const { playSong, currentSong, recentSongs } = useMusicPlayer();
   const queryClient = useQueryClient();
-  const [initialMetadata, setInitialMetadata] = useState<SimpleMetadata>({
-    title: '',
-    artist: ''
-  });
 
   const handleBackgroundClick = () => {
     const baseUrl = 'https://pitchfork-economy-nikolaiflaukows.replit.app/';
@@ -40,81 +40,13 @@ export default function Home() {
     window.location.href = redirectUrl;
   };
 
-  const { data: librarySongs, isLoading: libraryLoading } = useQuery({
+  // Only fetch library songs when wallet is connected
+  const { data: librarySongs, isLoading: libraryLoading } = useQuery<Song[]>({
     queryKey: ["/api/songs/library"],
     enabled: !!address,
   });
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== 'audio/mpeg') {
-      toast({
-        title: "Invalid File Type",
-        description: "Please select an MP3 file",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const metadata = await musicMetadata.parseBlob(file);
-      console.log('Raw metadata:', metadata);
-
-      setInitialMetadata({
-        title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ''),
-        artist: metadata.common.artist || ''
-      });
-      setPendingUpload(file);
-      setUploadDialogOpen(true);
-    } catch (error) {
-      console.error('Error reading metadata:', error);
-      // If metadata extraction fails, just use filename
-      setInitialMetadata({
-        title: file.name.replace(/\.[^/.]+$/, ''),
-        artist: ''
-      });
-      setPendingUpload(file);
-      setUploadDialogOpen(true);
-    }
-  };
-
-  const uploadMutation = useMutation({
-    mutationFn: async ({ file, title, artist }: { file: File; title: string; artist: string }) => {
-      if (!address) throw new Error("Please connect your wallet to upload songs");
-
-      const ipfsHash = await uploadToIPFS(file);
-      console.log('IPFS upload successful, hash:', ipfsHash);
-
-      const response = await apiRequest("POST", "/api/songs", {
-        title,
-        artist,
-        ipfsHash
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/songs/library"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/songs/recent"] });
-      toast({
-        title: "Success",
-        description: "Song uploaded successfully!",
-      });
-      setPendingUpload(undefined);
-      setUploadDialogOpen(false);
-      setInitialMetadata({ title: '', artist: '' });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Upload Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-    const playMutation = useMutation({
+  const playMutation = useMutation({
     mutationFn: async (songId: number) => {
       await apiRequest("POST", `/api/songs/play/${songId}`);
     },
@@ -122,8 +54,8 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ["/api/songs/recent"] });
     },
   });
-  
-    const handlePlaySong = async (song: any, context: 'library' | 'feed' = 'feed') => {
+
+  const handlePlaySong = async (song: Song, context: 'library' | 'feed' = 'feed') => {
     if (!address) {
       toast({
         title: "Connect Wallet",
@@ -134,7 +66,9 @@ export default function Home() {
     }
 
     try {
+      // Play the song with the specified context
       playSong(song, context);
+      // Then update play count
       await playMutation.mutate(song.id);
     } catch (error) {
       console.error('Error playing song:', error);
@@ -146,16 +80,103 @@ export default function Home() {
     }
   };
 
+  const uploadMutation = useMutation({
+    mutationFn: async ({ file, title, artist }: { file: File; title: string; artist: string }) => {
+      if (!address) {
+        throw new Error("Please connect your wallet to upload songs");
+      }
+
+      try {
+        // Register user first if needed
+        await apiRequest("POST", "/api/users/register", { address });
+      } catch (error) {
+        console.error('User registration error:', error);
+        // Continue if error is due to user already being registered
+      }
+
+      toast({
+        title: "Upload Started",
+        description: "Uploading your song to IPFS...",
+      });
+
+      try {
+        console.log('Starting IPFS upload for file:', {
+          name: file.name,
+          size: file.size,
+          type: file.type
+        });
+
+        const ipfsHash = await uploadToIPFS(file);
+        console.log('IPFS upload successful, hash:', ipfsHash);
+
+        const response = await apiRequest("POST", "/api/songs", {
+          title,
+          artist,
+          ipfsHash,
+        });
+        return await response.json();
+      } catch (error) {
+        console.error('Upload error:', error);
+        throw error instanceof Error ? error : new Error('Unknown upload error');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/songs/library"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/songs/recent"] });
+      toast({
+        title: "Success",
+        description: "Song uploaded successfully!",
+      });
+      setPendingUpload(undefined);
+      setUploadDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      console.error('Upload mutation error:', error);
+      toast({
+        title: "Upload Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select a file to upload",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const file = e.target.files[0];
+
+    // Check specifically for MP3 MIME type
+    if (file.type !== 'audio/mpeg') {
+      toast({
+        title: "Invalid File Type",
+        description: "Please select an MP3 file. Other audio formats are not supported.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPendingUpload(file);
+    setUploadDialogOpen(true);
+  };
+
   return (
     <Layout>
       <div className="flex flex-col min-h-screen">
+        {/* Add clickable background div */}
         <div 
           onClick={handleBackgroundClick}
           className="absolute inset-0 z-0 cursor-pointer"
           style={{ 
-            top: '64px',
+            top: '64px', // Height of the header
             bottom: 'auto',
-            height: 'calc(30vh)',
+            height: 'calc(30vh)', // Match the height of the MusicVisualizer section
           }}
         />
 
@@ -163,6 +184,7 @@ export default function Home() {
           <MusicVisualizer />
         </section>
 
+        {/* Rest of the JSX remains unchanged */}
         <div className="flex-1 grid grid-cols-1 gap-6 mb-24 relative z-10">
           {address ? (
             <section className="px-4">
@@ -197,7 +219,7 @@ export default function Home() {
                 ) : librarySongs?.length === 0 ? (
                   <p className="text-muted-foreground">No songs in your library yet</p>
                 ) : (
-                  librarySongs?.map((song: any) => (
+                  librarySongs?.map((song) => (
                     <SongCard
                       key={song.id}
                       song={song}
@@ -221,7 +243,7 @@ export default function Home() {
               {recentSongs?.length === 0 ? (
                 <p className="text-muted-foreground">No songs played yet</p>
               ) : (
-                recentSongs?.map((song: any) => (
+                recentSongs?.map((song) => (
                   <SongCard
                     key={song.id}
                     song={song}
@@ -242,7 +264,6 @@ export default function Home() {
           if (!open) setPendingUpload(undefined);
         }}
         mode="create"
-        initialMetadata={initialMetadata}
         onSubmit={({ title, artist }) => {
           if (pendingUpload) {
             uploadMutation.mutate({

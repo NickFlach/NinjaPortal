@@ -1,129 +1,30 @@
 import type { Express } from "express";
 import { createServer } from "http";
 import { db } from "@db";
-import { songs, users, recentlyPlayed } from "@db/schema";
-import { eq, desc } from "drizzle-orm";
-import radioRouter from './routes/radio';
-import { verifyPinataJWT, getIPFSCredentials, createIPFSAccount, getTreasuryAddress } from './services/ipfs';
+import { songs, users, playlists, followers, playlistSongs, recentlyPlayed, userRewards } from "@db/schema";
+import { eq, desc, and } from "drizzle-orm";
 
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
 
-  // Register radio routes
-  app.use(radioRouter);
-
-  // Add endpoint to check user's IPFS status
-  app.get("/api/user/ipfs-status", async (req, res) => {
-    const address = req.headers['x-wallet-address'] as string;
-
-    if (!address) {
-      return res.status(400).json({ message: "Wallet address is required" });
-    }
-
-    try {
-      // Check if user exists and has IPFS account
-      const [user] = await db.select()
-        .from(users)
-        .where(eq(users.address, address.toLowerCase()))
-        .limit(1);
-
-      if (!user) {
-        return res.json({ ipfsAccount: null });
+  // Songs
+  app.get("/api/songs/recent", async (req, res) => {
+    const recentSongs = await db.query.recentlyPlayed.findMany({
+      orderBy: desc(recentlyPlayed.playedAt),
+      limit: 20,
+      with: {
+        song: true,
       }
+    });
 
-      return res.json({
-        ipfsAccount: user.ipfsAccount,
-        isAdmin: user.isAdmin
-      });
-    } catch (error) {
-      console.error('Error checking user IPFS status:', error);
-      res.status(500).json({ message: "Failed to check user status" });
-    }
+    // Map to return only unique songs in order of most recently played
+    const uniqueSongs = Array.from(
+      new Map(recentSongs.map(item => [item.songId, item.song])).values()
+    );
+
+    res.json(uniqueSongs);
   });
 
-  // First fix the user registration endpoint
-  app.post("/api/users/register", async (req, res) => {
-    const address = req.headers['x-wallet-address'] as string;
-
-    if (!address) {
-      return res.status(400).json({ message: "Wallet address is required" });
-    }
-
-    try {
-      // Check if user exists
-      const [existingUser] = await db.select()
-        .from(users)
-        .where(eq(users.address, address.toLowerCase()))
-        .limit(1);
-
-      if (existingUser?.ipfsAccount) {
-        return res.json(existingUser);
-      }
-
-      // Create new user with IPFS account if they don't exist
-      if (!existingUser) {
-        const [newUser] = await db.insert(users).values({
-          address: address.toLowerCase(),
-          isAdmin: address.toLowerCase() === getTreasuryAddress().toLowerCase(),
-        }).returning();
-
-        await createIPFSAccount(address);
-        return res.json(newUser);
-      }
-
-      // If user exists but doesn't have IPFS account, create one
-      await createIPFSAccount(address);
-      const [updatedUser] = await db.select()
-        .from(users)
-        .where(eq(users.address, address.toLowerCase()))
-        .limit(1);
-
-      res.json(updatedUser);
-    } catch (error) {
-      console.error('Error in user registration:', error);
-      res.status(500).json({ message: "Failed to register user" });
-    }
-  });
-
-  // Modified song upload route to use appropriate IPFS account
-  app.post("/api/songs", async (req, res) => {
-    const { title, artist, ipfsHash, albumArtIpfsHash, albumName, genre, releaseYear, description, license, bpm, key, tags, isExplicit } = req.body;
-    const uploadedBy = req.headers['x-wallet-address'] as string;
-
-    if (!uploadedBy) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    try {
-      // Get user's IPFS credentials
-      const ipfsJWT = await getIPFSCredentials(uploadedBy);
-
-      const newSong = await db.insert(songs).values({
-        title,
-        artist,
-        ipfsHash,
-        uploadedBy: uploadedBy.toLowerCase(),
-        ipfsAccount: uploadedBy.toLowerCase(),
-        albumArtIpfsHash,
-        albumName,
-        genre,
-        releaseYear,
-        description,
-        license,
-        bpm,
-        key,
-        tags,
-        isExplicit,
-      }).returning();
-
-      res.json(newSong[0]);
-    } catch (error) {
-      console.error('Error creating song:', error);
-      res.status(500).json({ message: "Failed to create song" });
-    }
-  });
-
-  // Modified library route to only show songs from user's IPFS account
   app.get("/api/songs/library", async (req, res) => {
     const userAddress = req.headers['x-wallet-address'] as string;
 
@@ -131,41 +32,13 @@ export function registerRoutes(app: Express) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
+    // Convert both addresses to lowercase for case-insensitive comparison
     const userSongs = await db.query.songs.findMany({
-      where: eq(songs.ipfsAccount, userAddress.toLowerCase()),
+      where: eq(songs.uploadedBy, userAddress.toLowerCase()),
       orderBy: desc(songs.createdAt),
     });
 
     res.json(userSongs);
-  });
-
-  // Modified recent songs route to only show songs from treasury account
-  app.get("/api/songs/recent", async (req, res) => {
-    const treasuryAddress = getTreasuryAddress();
-
-    try {
-      const recentSongs = await db.query.recentlyPlayed.findMany({
-        orderBy: desc(recentlyPlayed.playedAt),
-        limit: 20,
-        with: {
-          song: true,
-        }
-      });
-
-      // Filter for songs from treasury account only
-      const uniqueSongs = Array.from(
-        new Map(
-          recentSongs
-            .filter(item => item.song && item.song.ipfsAccount === treasuryAddress.toLowerCase())
-            .map(item => [item.songId, item.song])
-        ).values()
-      );
-
-      res.json(uniqueSongs);
-    } catch (error) {
-      console.error('Error fetching recent songs:', error);
-      res.status(500).json({ message: "Failed to fetch recent songs" });
-    }
   });
 
   app.post("/api/songs/play/:id", async (req, res) => {
@@ -173,25 +46,11 @@ export function registerRoutes(app: Express) {
     const userAddress = req.headers['x-wallet-address'] as string;
 
     try {
-      // If user is authenticated, ensure they're registered first
+      // If user is authenticated, record the play
       if (userAddress) {
-        // Check if user exists
-        const existingUser = await db.query.users.findFirst({
-          where: eq(users.address, userAddress.toLowerCase()),
-        });
-
-        // If user doesn't exist, register them
-        if (!existingUser) {
-          await db.insert(users).values({
-            address: userAddress.toLowerCase(),
-            isAdmin: false,
-          });
-        }
-
-        // Now record the play
         await db.insert(recentlyPlayed).values({
           songId,
-          playedBy: userAddress.toLowerCase(),
+          playedBy: userAddress,
         });
       }
       // For anonymous plays from landing page, just record the song
@@ -209,45 +68,22 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/songs/:id", async (req, res) => {
-    const songId = parseInt(req.params.id);
-    const userAddress = req.headers['x-wallet-address'] as string;
-    const { title, artist, albumArtIpfsHash, albumName, genre, releaseYear, description, license, bpm, key, tags, isExplicit } = req.body;
+  app.post("/api/songs", async (req, res) => {
+    const { title, artist, ipfsHash } = req.body;
+    const uploadedBy = req.headers['x-wallet-address'] as string;
 
-    if (!userAddress) {
+    if (!uploadedBy) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // Check if the song belongs to the user
-    const song = await db.query.songs.findFirst({
-      where: eq(songs.id, songId),
-    });
+    const newSong = await db.insert(songs).values({
+      title,
+      artist,
+      ipfsHash,
+      uploadedBy,
+    }).returning();
 
-    if (!song || song.uploadedBy !== userAddress.toLowerCase()) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
-    // Update the song
-    const [updatedSong] = await db
-      .update(songs)
-      .set({
-        title,
-        artist,
-        albumArtIpfsHash,
-        albumName,
-        genre,
-        releaseYear,
-        description,
-        license,
-        bpm,
-        key,
-        tags,
-        isExplicit,
-      })
-      .where(eq(songs.id, songId))
-      .returning();
-
-    res.json(updatedSong);
+    res.json(newSong[0]);
   });
 
   app.delete("/api/songs/:id", async (req, res) => {
@@ -268,7 +104,9 @@ export function registerRoutes(app: Express) {
     }
 
     try {
+      // Delete in order: recently_played, playlist_songs, then songs
       await db.delete(recentlyPlayed).where(eq(recentlyPlayed.songId, songId));
+      await db.delete(playlistSongs).where(eq(playlistSongs.songId, songId));
       await db.delete(songs).where(eq(songs.id, songId));
 
       res.json({ success: true });
@@ -278,61 +116,260 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Add new route to get IPFS credentials
-  app.get("/api/ipfs/credentials", async (req, res) => {
-    const address = req.headers['x-wallet-address'] as string;
+  // Add new PATCH endpoint for editing songs
+  app.patch("/api/songs/:id", async (req, res) => {
+    const songId = parseInt(req.params.id);
+    const userAddress = req.headers['x-wallet-address'] as string;
+    const { title, artist } = req.body;
 
-    if (!address) {
+    if (!userAddress) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    try {
-      const jwt = await getIPFSCredentials(address);
-      res.json({ jwt });
-    } catch (error) {
-      console.error('Error getting IPFS credentials:', error);
-      res.status(500).json({ message: "Failed to get IPFS credentials" });
+    // Check if the song belongs to the user
+    const song = await db.query.songs.findFirst({
+      where: eq(songs.id, songId),
+    });
+
+    if (!song || song.uploadedBy !== userAddress.toLowerCase()) {
+      return res.status(403).json({ message: "Forbidden" });
     }
+
+    // Update the song
+    const [updatedSong] = await db
+      .update(songs)
+      .set({
+        title,
+        artist,
+      })
+      .where(eq(songs.id, songId))
+      .returning();
+
+    res.json(updatedSong);
   });
 
-  // Modified IPFS status endpoint for better error handling
-  app.get("/api/ipfs/status", async (req, res) => {
-    const address = req.headers['x-wallet-address'] as string;
 
-    if (!address) {
+  // Playlists
+  app.get("/api/playlists", async (req, res) => {
+    const userAddress = req.headers['x-wallet-address'] as string;
+    const userPlaylists = await db.query.playlists.findMany({
+      where: userAddress ? eq(playlists.createdBy, userAddress) : undefined,
+      orderBy: desc(playlists.createdAt),
+      with: {
+        playlistSongs: {
+          with: {
+            song: true,
+          },
+        },
+      },
+    });
+    res.json(userPlaylists);
+  });
+
+  app.post("/api/playlists", async (req, res) => {
+    const { name } = req.body;
+    const userAddress = req.headers['x-wallet-address'] as string;
+
+    if (!userAddress) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    try {
-      // First verify the main JWT
-      const mainJwtValid = await verifyPinataJWT(process.env.VITE_PINATA_JWT || '');
-      console.log('Main JWT validation result:', mainJwtValid);
+    const newPlaylist = await db.insert(playlists).values({
+      name,
+      createdBy: userAddress,
+    }).returning();
 
-      // Get user's JWT if it exists
-      let userJwt = null;
-      let userJwtValid = false;
-
-      try {
-        userJwt = await getIPFSCredentials(address);
-        userJwtValid = await verifyPinataJWT(userJwt);
-        console.log('User JWT validation result:', userJwtValid, 'for address:', address);
-      } catch (error) {
-        console.error('Error getting user JWT:', error);
-      }
-
-      res.json({
-        mainJwtValid,
-        userJwtValid,
-        hasUserJwt: !!userJwt,
-        address
-      });
-    } catch (error) {
-      console.error('IPFS status check failed:', error);
-      res.status(500).json({ 
-        message: "Failed to check IPFS status",
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
+    res.json(newPlaylist[0]);
   });
+
+  app.post("/api/playlists/:playlistId/songs", async (req, res) => {
+    const { playlistId } = req.params;
+    const { songId } = req.body;
+    const userAddress = req.headers['x-wallet-address'] as string;
+
+    if (!userAddress) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Get the playlist to check ownership
+    const playlist = await db.query.playlists.findFirst({
+      where: eq(playlists.id, parseInt(playlistId)),
+    });
+
+    if (!playlist || playlist.createdBy !== userAddress) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    // Get current max position
+    const currentSongs = await db.query.playlistSongs.findMany({
+      where: eq(playlistSongs.playlistId, parseInt(playlistId)),
+      orderBy: desc(playlistSongs.position),
+    });
+
+    const nextPosition = currentSongs.length > 0 ? currentSongs[0].position + 1 : 0;
+
+    // Add song to playlist
+    await db.insert(playlistSongs).values({
+      playlistId: parseInt(playlistId),
+      songId: parseInt(songId),
+      position: nextPosition,
+    });
+
+    res.json({ success: true });
+  });
+
+  // Users
+  app.post("/api/users/register", async (req, res) => {
+    const address = req.headers['x-wallet-address'] as string;
+
+    if (!address) {
+      return res.status(400).json({ message: "Wallet address is required" });
+    }
+
+    // Check if user exists
+    const existingUser = await db.query.users.findFirst({
+      where: eq(users.address, address),
+    });
+
+    if (existingUser) {
+      return res.json(existingUser);
+    }
+
+    // Create new user
+    const newUser = await db.insert(users).values({
+      address,
+      isAdmin: false,
+    }).returning();
+
+    res.json(newUser[0]);
+  });
+
+  // Treasury Management
+  app.get("/api/admin/treasury", async (req, res) => {
+    const userAddress = req.headers['x-wallet-address'] as string;
+
+    if (!userAddress) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    console.log('Checking admin access for:', userAddress);
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.address, userAddress.toLowerCase()),
+    });
+
+    console.log('Found user:', user);
+
+    if (!user?.isAdmin) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    // Get reward statistics
+    const rewardedUsers = await db.query.userRewards.findMany();
+    const totalRewards = rewardedUsers.reduce((total, user) => {
+      return total + (user.uploadRewardClaimed ? 1 : 0) +
+                    (user.playlistRewardClaimed ? 2 : 0) +
+                    (user.nftRewardClaimed ? 3 : 0);
+    }, 0);
+
+    // Get current GAS recipient address from environment
+    const gasRecipientAddress = process.env.GAS_RECIPIENT_ADDRESS || process.env.TREASURY_ADDRESS;
+
+    res.json({
+      address: gasRecipientAddress,
+      totalRewards,
+      rewardedUsers: rewardedUsers.length,
+    });
+  });
+
+  // Add a route to set up initial admin
+  app.post("/api/admin/setup", async (req, res) => {
+    const userAddress = req.headers['x-wallet-address'] as string;
+
+    if (!userAddress) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Check if any admin exists
+    const existingAdmin = await db.query.users.findFirst({
+      where: eq(users.isAdmin, true),
+    });
+
+    if (existingAdmin) {
+      return res.status(403).json({ message: "Admin already exists" });
+    }
+
+    // Set up first admin
+    const updatedUser = await db
+      .update(users)
+      .set({ isAdmin: true })
+      .where(eq(users.address, userAddress.toLowerCase()))
+      .returning();
+
+    console.log('Created initial admin:', updatedUser);
+
+    res.json({ success: true });
+  });
+
+  app.post("/api/admin/gas-recipient", async (req, res) => {
+    const userAddress = req.headers['x-wallet-address'] as string;
+    const { address } = req.body;
+
+    if (!userAddress) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    console.log('Checking admin access for:', userAddress);
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.address, userAddress.toLowerCase()),
+    });
+
+    console.log('Found user:', user);
+
+    if (!user?.isAdmin) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    // Update GAS recipient address in environment
+    process.env.GAS_RECIPIENT_ADDRESS = address;
+
+    res.json({ success: true });
+  });
+
+  // User rewards tracking
+  app.post("/api/rewards/claim", async (req, res) => {
+    const userAddress = req.headers['x-wallet-address'] as string;
+    const { type } = req.body;
+
+    if (!userAddress) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Get or create user rewards
+    let [userReward] = await db.query.userRewards.findMany({
+      where: eq(userRewards.address, userAddress),
+    });
+
+    if (!userReward) {
+      [userReward] = await db.insert(userRewards)
+        .values({ address: userAddress })
+        .returning();
+    }
+
+    // Check if reward already claimed
+    const rewardField = `${type}RewardClaimed` as keyof typeof userReward;
+    if (userReward[rewardField]) {
+      return res.status(400).json({ message: "Reward already claimed" });
+    }
+
+    // Update reward status
+    await db.update(userRewards)
+      .set({ [rewardField]: true })
+      .where(eq(userRewards.address, userAddress));
+
+    res.json({ success: true });
+  });
+
   return httpServer;
 }

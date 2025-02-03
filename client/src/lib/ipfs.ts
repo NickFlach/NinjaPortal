@@ -1,9 +1,23 @@
-// Simplified IPFS interactions without Buffer/process dependencies
-const IPFS_GATEWAY = 'https://ipfs.io/ipfs';
+import { Buffer } from 'buffer';
+
+const pinataJWT = import.meta.env.VITE_PINATA_JWT;
+
+if (!pinataJWT) {
+  throw new Error('Pinata JWT not found. Please check your environment variables.');
+}
+
+// Ensure Buffer is available in the browser environment
+if (typeof window !== 'undefined') {
+  window.Buffer = window.Buffer || Buffer;
+}
 
 export async function uploadToIPFS(file: File): Promise<string> {
   try {
-    console.log('Starting IPFS upload process...');
+    console.log('Starting Pinata upload...', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type
+    });
 
     // Validate file size (max 100MB)
     const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB in bytes
@@ -11,55 +25,68 @@ export async function uploadToIPFS(file: File): Promise<string> {
       throw new Error('File size exceeds 100MB limit');
     }
 
-    // Create form data
     const formData = new FormData();
     formData.append('file', file);
 
-    // Upload to IPFS using Infura's IPFS API
-    console.log('Uploading to IPFS...');
-    const response = await fetch('https://ipfs.infura.io:5001/api/v0/add', {
+    const res = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${btoa(`${import.meta.env.VITE_INFURA_PROJECT_ID}:${import.meta.env.VITE_INFURA_PROJECT_SECRET}`)}`
+        'Authorization': `Bearer ${pinataJWT}`,
       },
-      body: formData
+      body: formData,
     });
 
-    if (!response.ok) {
-      throw new Error('Upload failed: ' + response.statusText);
+    if (!res.ok) {
+      const error = await res.text();
+      console.error('Pinata API error:', error);
+      if (res.status === 401) {
+        throw new Error('Invalid Pinata credentials. Please check your JWT token.');
+      } else if (res.status === 413) {
+        throw new Error('File is too large for Pinata to process.');
+      } else {
+        throw new Error(`Pinata upload failed (${res.status}): ${error}`);
+      }
     }
 
-    const data = await response.json();
-    console.log('Upload successful:', data);
-
-    if (!data.Hash) {
-      throw new Error('No IPFS hash received');
-    }
-
-    return data.Hash;
+    const data = await res.json();
+    console.log('Pinata upload successful:', {
+      ipfsHash: data.IpfsHash,
+      timestamp: new Date().toISOString()
+    });
+    return data.IpfsHash;
   } catch (error) {
-    console.error('IPFS upload error:', error);
-    throw error;
+    console.error('Error uploading to Pinata:', error);
+    if (error instanceof Error) {
+      if (error.message.includes('Failed to fetch')) {
+        throw new Error('Network error: Could not connect to Pinata. Please check your internet connection.');
+      }
+      throw new Error(`Upload failed: ${error.message}`);
+    }
+    throw new Error('Upload failed: Unknown error');
   }
 }
 
-export async function getFromIPFS(hash: string): Promise<ArrayBuffer> {
+export async function getFromIPFS(hash: string): Promise<Uint8Array> {
   try {
-    console.log('Starting IPFS fetch process for hash:', hash);
-
-    // Fetch directly from IPFS gateway
-    console.log('Fetching from IPFS gateway...');
-    const response = await fetch(`${IPFS_GATEWAY}/${hash}`);
+    console.log('Fetching from IPFS gateway:', hash);
+    const gateway = 'https://gateway.pinata.cloud/ipfs';
+    const response = await fetch(`${gateway}/${hash}`);
 
     if (!response.ok) {
-      console.error('IPFS fetch failed:', response.status, response.statusText);
-      throw new Error(`Failed to fetch from IPFS: ${response.status} ${response.statusText}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    console.log('Successfully fetched file from IPFS');
-    return await response.arrayBuffer();
+    const buffer = await response.arrayBuffer();
+    console.log('IPFS fetch successful');
+    return new Uint8Array(buffer);
   } catch (error) {
-    console.error('IPFS fetch error:', error);
-    throw error;
+    console.error('Error getting file from IPFS:', error);
+    if (error instanceof Error) {
+      if (error.message.includes('Failed to fetch')) {
+        throw new Error('Network error: Could not connect to IPFS gateway. Please try again later.');
+      }
+      throw new Error(`IPFS Fetch failed: ${error.message}`);
+    }
+    throw new Error('IPFS Fetch failed: Unknown error');
   }
 }

@@ -10,68 +10,106 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
-interface SimpleMetadata {
+interface Song {
+  id: number;
   title: string;
   artist: string;
+  ipfsHash: string;
 }
 
 interface EditSongDialogProps {
+  song?: Song;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: 'edit' | 'create';
-  onSubmit?: (data: SimpleMetadata) => void;
-  initialMetadata?: SimpleMetadata;
+  onSubmit?: (data: { title: string; artist: string }) => void;
 }
 
 export function EditSongDialog({ 
+  song, 
   open, 
   onOpenChange,
   mode,
-  onSubmit,
-  initialMetadata 
+  onSubmit 
 }: EditSongDialogProps) {
-  const [title, setTitle] = React.useState(initialMetadata?.title || '');
-  const [artist, setArtist] = React.useState(initialMetadata?.artist || '');
+  const [title, setTitle] = React.useState(song?.title || '');
+  const [artist, setArtist] = React.useState(song?.artist || '');
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   React.useEffect(() => {
-    if (initialMetadata) {
-      setTitle(initialMetadata.title);
-      setArtist(initialMetadata.artist);
+    if (song) {
+      setTitle(song.title);
+      setArtist(song.artist);
     }
-  }, [initialMetadata]);
+  }, [song]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const editSongMutation = useMutation({
+    mutationFn: async (data: { title: string; artist: string }) => {
+      const response = await apiRequest(
+        "PATCH",
+        `/api/songs/${song?.id}`,
+        data
+      );
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/songs/library"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/songs/recent"] });
+      toast({
+        title: "Success",
+        description: "Song updated successfully",
+      });
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!title || !artist) {
       toast({
         title: "Error",
-        description: "Title and artist are required",
+        description: "Please fill in all fields",
         variant: "destructive",
       });
       return;
     }
 
-    if (onSubmit) {
+    if (mode === 'edit') {
+      editSongMutation.mutate({ title, artist });
+    } else if (onSubmit) {
       onSubmit({ title, artist });
+      onOpenChange(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>New Song Details</DialogTitle>
+            <DialogTitle>
+              {mode === 'edit' ? 'Edit Song Details' : 'New Song Details'}
+            </DialogTitle>
             <DialogDescription>
-              Enter the song title and artist name below.
+              {mode === 'edit' ? 'Update the title and artist for this song.' : 'Enter the title and artist for your new song.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <label htmlFor="title" className="text-sm font-medium">Title *</label>
+              <label htmlFor="title" className="text-sm font-medium">
+                Title
+              </label>
               <Input
                 id="title"
                 value={title}
@@ -80,7 +118,9 @@ export function EditSongDialog({
               />
             </div>
             <div className="grid gap-2">
-              <label htmlFor="artist" className="text-sm font-medium">Artist *</label>
+              <label htmlFor="artist" className="text-sm font-medium">
+                Artist
+              </label>
               <Input
                 id="artist"
                 value={artist}
@@ -90,8 +130,11 @@ export function EditSongDialog({
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={!title || !artist}>
-              Upload Song
+            <Button 
+              type="submit" 
+              disabled={!title || !artist || editSongMutation.isPending}
+            >
+              {mode === 'edit' ? 'Save Changes' : 'Create Song'}
             </Button>
           </DialogFooter>
         </form>
