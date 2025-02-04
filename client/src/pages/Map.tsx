@@ -16,7 +16,6 @@ import { Layout } from "@/components/Layout";
 interface MapData {
   countries: {
     [key: string]: {
-      votes: number;
       locations: Array<[number, number]>;  // [latitude, longitude] pairs
     };
   };
@@ -91,7 +90,7 @@ const MapPage: FC = () => {
       const newMarkers: MarkerData[] = [];
 
       Object.entries(mapData.countries).forEach(([countryCode, data]) => {
-        if (data.votes > 0 && data.locations.length > 0) {
+        if (data.locations.length > 0) {
           data.locations.forEach(([lat, lng]) => {
             const id = `${countryCode}-${lat}-${lng}`;
             const existingMarker = prevMarkersRef.current.find(m => m.id === id);
@@ -119,24 +118,17 @@ const MapPage: FC = () => {
     if (!mapData?.countries) return "#1e293b"; // Base color for countries without data
 
     const countryData = mapData.countries[countryCode];
-    if (!countryData?.votes) return "#1e293b"; // Base color for inactive countries
+    if (!countryData?.locations.length) return "#1e293b"; // Base color for inactive countries
 
-    // Calculate opacity based on activity level
-    const maxVotes = Math.max(1, 
-      Object.values(mapData.countries)
-        .reduce((max, country) => Math.max(max, country.votes), 1)
-    );
-
-    // Only show green for countries with actual plays
-    const opacity = Math.min(0.3 + (countryData.votes / maxVotes) * 0.7, 1);
-    return `rgba(74, 222, 128, ${opacity})`; // Green-500 with variable opacity
+    // Show active color for any country with listeners
+    return `rgba(74, 222, 128, 0.5)`; // Green-500 with fixed opacity for active regions
   };
 
   // Helper function to format tooltip content
-  const formatTooltip = (name: string, votes: number) => {
-    if (votes === 0) return `${name}: No Activity`;
-    if (votes === 1) return `${name}: Active Region (1 play)`;
-    return `${name}: Active Region (${votes} plays)`;
+  const formatTooltip = (name: string, locations: number = 0) => {
+    if (locations === 0) return `${name}: No Activity`;
+    if (locations === 1) return `${name}: 1 Active Listener`;
+    return `${name}: ${locations} Active Listeners`;
   };
 
   const hasNoData = !isLoading && (!mapData || mapData.totalListeners === 0);
@@ -184,7 +176,7 @@ const MapPage: FC = () => {
                       {({ geographies }) =>
                         geographies.map((geo) => {
                           const countryCode = geo.properties.iso_a3;
-                          const votes = mapData?.countries?.[countryCode]?.votes || 0;
+                          const locations = mapData?.countries?.[countryCode]?.locations.length || 0;
                           return (
                             <Geography
                               key={geo.rsmKey}
@@ -195,7 +187,7 @@ const MapPage: FC = () => {
                               onMouseEnter={() => {
                                 const { name } = geo.properties;
                                 setSelectedCountry(countryCode);
-                                setTooltipContent(formatTooltip(name, votes));
+                                setTooltipContent(formatTooltip(name, locations));
                               }}
                               onMouseLeave={() => {
                                 setSelectedCountry(null);
@@ -204,7 +196,7 @@ const MapPage: FC = () => {
                               style={{
                                 default: { outline: "none" },
                                 hover: {
-                                  fill: votes > 0 ? "#60A5FA" : "#475569",
+                                  fill: locations > 0 ? "#60A5FA" : "#475569",
                                   outline: "none",
                                   cursor: "pointer"
                                 },

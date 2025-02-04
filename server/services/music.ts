@@ -5,7 +5,6 @@ import { desc, eq, sql } from 'drizzle-orm';
 export interface MapDataResponse {
   countries: {
     [key: string]: {
-      votes: number;
       locations: Array<[number, number]>;  // [latitude, longitude] pairs
     };
   };
@@ -23,7 +22,7 @@ export async function getMapData(): Promise<MapDataResponse> {
   .where(sql`${listeners.latitude} is not null and ${listeners.longitude} is not null`);
 
   // Process listener data by country and aggregate locations into regions
-  const countries: { [key: string]: { votes: number; locations: Array<[number, number]> } } = {};
+  const countries: { [key: string]: { locations: Array<[number, number]> } } = {};
   const processedLocations = new Set<string>(); // Track processed locations to avoid duplicates
   let totalListeners = 0;
 
@@ -39,10 +38,9 @@ export async function getMapData(): Promise<MapDataResponse> {
     if (!countryCode || !latitude || !longitude) return;
 
     if (!countries[countryCode]) {
-      countries[countryCode] = { votes: 0, locations: [] };
+      countries[countryCode] = { locations: [] };
     }
 
-    countries[countryCode].votes++;
     totalListeners++;
 
     // Create a location key using rounded coordinates for aggregation
@@ -73,7 +71,6 @@ export interface MusicStats {
   recentUploads: Array<typeof songs.$inferSelect>;
   countries: {
     [key: string]: {
-      votes: number;
       locations: Array<[number, number]>; // [latitude, longitude] pairs
     };
   };
@@ -120,17 +117,15 @@ export async function getMusicStats(): Promise<MusicStats> {
     .where(sql`${listeners.latitude} is not null and ${listeners.longitude} is not null`);
 
     // Process listener data by country and aggregate locations into regions
-    const countries: { [key: string]: { votes: number; locations: Array<[number, number]> } } = {};
+    const countries: { [key: string]: { locations: Array<[number, number]> } } = {};
     const processedLocations = new Set<string>(); // Track processed locations to avoid duplicates
 
     listenerData.forEach(({ countryCode, latitude, longitude }) => {
       if (!countryCode || !latitude || !longitude) return;
 
       if (!countries[countryCode]) {
-        countries[countryCode] = { votes: 0, locations: [] };
+        countries[countryCode] = { locations: [] };
       }
-
-      countries[countryCode].votes++;
 
       // Create a location key using rounded coordinates for aggregation
       const roundedLat = Math.round(parseFloat(latitude) * 10) / 10;
