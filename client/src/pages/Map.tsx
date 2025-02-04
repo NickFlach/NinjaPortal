@@ -18,8 +18,8 @@ const MapPage: FC = () => {
   const { data: songStats, isLoading } = useQuery({
     queryKey: ['/api/music/stats'],
     select: (data: any) => {
-      console.log('Music stats response:', data);
-      console.log('Country data:', data?.countries);
+      console.log('Raw music stats response:', data);
+      console.log('Country data from response:', data?.countries);
       return data;
     }
   });
@@ -66,19 +66,22 @@ const MapPage: FC = () => {
                     {({ geographies }) =>
                       geographies.map((geo) => {
                         const countryCode = geo.properties.iso_a3;
-                        console.log('Checking country:', countryCode, 'Data:', songStats?.countries?.[countryCode]?.votes);
-                        const countryVotes = songStats?.countries?.[countryCode]?.votes || 0;
+                        const votes = songStats?.countries?.[countryCode]?.votes || 0;
+                        console.log(`Rendering country: ${countryCode}, votes: ${votes}`, {
+                          hasData: countryCode in (songStats?.countries || {}),
+                          rawVotes: songStats?.countries?.[countryCode]?.votes
+                        });
 
                         return (
                           <Geography
                             key={geo.rsmKey}
                             geography={geo}
-                            fill={getColor(countryVotes)}
+                            fill={getColor(votes)}
                             stroke="#4A5568"
                             strokeWidth={0.5}
                             onMouseEnter={() => {
                               const { name } = geo.properties;
-                              setTooltipContent(`${name}: ${countryVotes.toLocaleString()} plays`);
+                              setTooltipContent(`${name}: ${votes.toLocaleString()} plays`);
                             }}
                             onMouseLeave={() => {
                               setTooltipContent("");

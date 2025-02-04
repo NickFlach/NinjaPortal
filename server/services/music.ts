@@ -61,13 +61,12 @@ export async function getMusicStats(): Promise<MusicStats> {
 
   // Transform into the expected format
   const countries: { [key: string]: { votes: number } } = {};
-  listenersByCountry.forEach(({ countryCode, votes }) => {
+  for (const { countryCode, votes } of listenersByCountry) {
     if (countryCode) {
-      // Convert to uppercase to match the ISO codes from the map
       countries[countryCode] = { votes: Number(votes) };
       console.log(`Adding country ${countryCode} with ${votes} votes`);
     }
-  });
+  }
 
   console.log('Final country statistics:', countries);
 
