@@ -1,11 +1,20 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { Map } from "lucide-react";
 
 export function Navigation() {
   const [location] = useLocation();
 
   const links = [
-    // Treasury and Admin routes removed as requested
+    {
+      href: "/map",
+      label: (
+        <span className="flex items-center gap-2">
+          <Map className="h-4 w-4" />
+          Map
+        </span>
+      )
+    }
   ];
 
   return (
