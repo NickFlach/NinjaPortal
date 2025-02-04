@@ -71,10 +71,19 @@ export function registerRoutes(app: Express) {
 
       // Record play in recently played
       if (userAddress) {
-        await db.insert(recentlyPlayed).values({
-          songId,
-          playedBy: userAddress,
-        });
+        try {
+          // Register user first if needed
+          await db.insert(users).values({
+            address: userAddress.toLowerCase(),
+          }).onConflictDoNothing();
+
+          await db.insert(recentlyPlayed).values({
+            songId,
+            playedBy: userAddress.toLowerCase(),
+          });
+        } catch (error) {
+          console.error('Error recording authenticated play:', error);
+        }
       }
       // For anonymous plays from landing page, just record the song
       else {
