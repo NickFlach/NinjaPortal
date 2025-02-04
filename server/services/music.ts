@@ -47,7 +47,7 @@ export async function getMusicStats(): Promise<MusicStats> {
       .orderBy(desc(songs.createdAt))
       .limit(5);
 
-    // Get all listener data with coordinates
+    // Get all listener data with coordinates, aggregated by region
     const listenerData = await db.select({
       countryCode: listeners.countryCode,
       latitude: listeners.latitude,
@@ -56,22 +56,30 @@ export async function getMusicStats(): Promise<MusicStats> {
     .from(listeners)
     .where(sql`${listeners.latitude} is not null and ${listeners.longitude} is not null`);
 
-    console.log('Found listener data:', listenerData);
-
-    // Process listener data by country
+    // Process listener data by country and aggregate locations into regions
     const countries: { [key: string]: { votes: number; locations: Array<[number, number]> } } = {};
+    const processedLocations = new Set<string>(); // Track processed locations to avoid duplicates
 
     listenerData.forEach(({ countryCode, latitude, longitude }) => {
+      if (!countryCode || !latitude || !longitude) return;
+
       if (!countries[countryCode]) {
         countries[countryCode] = { votes: 0, locations: [] };
       }
+
       countries[countryCode].votes++;
-      if (latitude && longitude) {
-        countries[countryCode].locations.push([Number(latitude), Number(longitude)]);
+
+      // Create a location key using rounded coordinates for aggregation
+      const roundedLat = Math.round(parseFloat(latitude) * 10) / 10;
+      const roundedLng = Math.round(parseFloat(longitude) * 10) / 10;
+      const locationKey = `${roundedLat},${roundedLng}`;
+
+      // Only add location if we haven't seen this rounded coordinate pair before
+      if (!processedLocations.has(locationKey)) {
+        processedLocations.add(locationKey);
+        countries[countryCode].locations.push([roundedLat, roundedLng]);
       }
     });
-
-    console.log('Processed country data:', countries);
 
     return {
       totalSongs,
@@ -84,47 +92,53 @@ export async function getMusicStats(): Promise<MusicStats> {
       recentUploads,
       countries
     };
-  }
+}
 
-  export async function getSongMetadata(id: number) {
-    const [song] = await db.select()
-      .from(songs)
+export async function getSongMetadata(id: number) {
+  const [song] = await db.select()
+    .from(songs)
+    .where(eq(songs.id, id));
+  return song;
+}
+
+export async function incrementListenCount(id: number, countryCode: string, coords?: { lat: number; lng: number }) {
+  await db.transaction(async (tx) => {
+    // Increment song votes
+    await tx.update(songs)
+      .set({ votes: sql`coalesce(${songs.votes}, 0) + 1` })
       .where(eq(songs.id, id));
-    return song;
-  }
 
-  export async function incrementListenCount(id: number, countryCode: string, coords?: { lat: number; lng: number }) {
-    await db.transaction(async (tx) => {
-      // Increment song votes
-      await tx.update(songs)
-        .set({ votes: sql`coalesce(${songs.votes}, 0) + 1` })
-        .where(eq(songs.id, id));
-
-      // Only record location if provided and valid
-      if (coords?.lat && coords?.lng) {
-        // Round coordinates to 1 decimal place for privacy
-        const latitude = Math.round(coords.lat * 10) / 10;
-        const longitude = Math.round(coords.lng * 10) / 10;
-
-        // Record listener location with reduced precision
-        await tx.insert(listeners)
-          .values({
-            songId: id,
-            countryCode,
-            latitude: latitude.toString(),
-            longitude: longitude.toString(),
-            timestamp: new Date()
-          });
-      } else {
-        // Record just the country without coordinates
-        await tx.insert(listeners)
-          .values({
-            songId: id,
-            countryCode,
-            latitude: null,
-            longitude: null,
-            timestamp: new Date()
-          });
+    // Only record location if provided and valid
+    if (coords?.lat && coords?.lng) {
+      // Validate coordinates
+      if (Math.abs(coords.lat) > 90 || Math.abs(coords.lng) > 180) {
+        console.warn('Invalid coordinates received, skipping location recording');
+        return;
       }
-    });
-  }
+
+      // Round coordinates to 1 decimal place for privacy
+      const latitude = Math.round(coords.lat * 10) / 10;
+      const longitude = Math.round(coords.lng * 10) / 10;
+
+      // Record listener location with reduced precision
+      await tx.insert(listeners)
+        .values({
+          songId: id,
+          countryCode,
+          latitude: latitude.toString(),
+          longitude: longitude.toString(),
+          timestamp: new Date()
+        });
+    } else {
+      // Record just the country without coordinates
+      await tx.insert(listeners)
+        .values({
+          songId: id,
+          countryCode,
+          latitude: null,
+          longitude: null,
+          timestamp: new Date()
+        });
+    }
+  });
+}
