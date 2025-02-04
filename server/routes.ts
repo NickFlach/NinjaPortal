@@ -42,7 +42,15 @@ export function registerRoutes(app: Express) {
   // Initialize WebSocket server with specific path to avoid conflicts with Vite HMR
   const wss = new WebSocketServer({ 
     server: httpServer,
-    path: '/ws/music-sync'
+    path: '/ws/music-sync',
+    verifyClient: (info, cb) => {
+      // Skip Vite HMR websocket connections
+      if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
+        cb(false);
+        return;
+      }
+      cb(true);
+    }
   });
 
   wss.on('connection', (ws) => {

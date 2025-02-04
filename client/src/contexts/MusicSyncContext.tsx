@@ -31,8 +31,13 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
     function connect() {
       try {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/music-sync`;
+        // Construct WebSocket URL carefully
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.host;
+        const wsPath = '/ws/music-sync';
+        const wsUrl = `${wsProtocol}//${wsHost}${wsPath}`;
+
+        console.log('Connecting to WebSocket:', wsUrl);
         const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
@@ -54,7 +59,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
               const currentTime = audioRef.current.currentTime;
               const timeDiff = Math.abs(currentTime - message.timestamp);
 
-              // Prevent sync feedback loops by checking last sync state
+              // Prevent sync feedback loops
               const now = Date.now();
               if (lastSyncRef.current && 
                   now - lastSyncRef.current.timestamp < 1000 && 
@@ -62,7 +67,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
                 return;
               }
 
-              // Only sync if time difference is significant (>1 second)
+              // Only sync if time difference is significant
               if (timeDiff > 1) {
                 audioRef.current.currentTime = message.timestamp;
               }
@@ -85,6 +90,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
         ws.onerror = (error) => {
           console.error('WebSocket error:', error);
+          setSyncEnabled(false);
         };
 
         ws.onclose = (event) => {
@@ -124,49 +130,47 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
         reconnectTimeoutRef.current = undefined;
       }
     };
-  }, [syncEnabled, address, togglePlay]);
+  }, [syncEnabled, address, togglePlay, currentSong?.id, isPlaying]);
 
   // Send sync messages when playback state changes
   useEffect(() => {
-    if (!syncEnabled || !wsRef.current || !currentSong) {
+    if (!syncEnabled || !wsRef.current || !currentSong || wsRef.current.readyState !== WebSocket.OPEN) {
       return;
     }
 
-    if (wsRef.current.readyState === WebSocket.OPEN) {
-      try {
-        // Only send sync message if it's different from last sync
-        const now = Date.now();
-        if (lastSyncRef.current && 
-            now - lastSyncRef.current.timestamp < 1000 && 
-            lastSyncRef.current.playing === isPlaying) {
-          return;
-        }
-
-        // Subscribe to current song
-        wsRef.current.send(JSON.stringify({
-          type: 'subscribe',
-          songId: currentSong.id
-        }));
-
-        // Send current playback state
-        wsRef.current.send(JSON.stringify({
-          type: 'sync',
-          songId: currentSong.id,
-          timestamp: audioRef.current?.currentTime || 0,
-          playing: isPlaying
-        }));
-
-        // Update last sync state
-        lastSyncRef.current = {
-          timestamp: now,
-          playing: isPlaying
-        };
-      } catch (error) {
-        console.error('Error sending sync message:', error);
-        setSyncEnabled(false);
+    try {
+      // Only send sync message if it's different from last sync
+      const now = Date.now();
+      if (lastSyncRef.current && 
+          now - lastSyncRef.current.timestamp < 1000 && 
+          lastSyncRef.current.playing === isPlaying) {
+        return;
       }
+
+      // Subscribe to current song
+      wsRef.current.send(JSON.stringify({
+        type: 'subscribe',
+        songId: currentSong.id
+      }));
+
+      // Send current playback state
+      wsRef.current.send(JSON.stringify({
+        type: 'sync',
+        songId: currentSong.id,
+        timestamp: audioRef.current?.currentTime || 0,
+        playing: isPlaying
+      }));
+
+      // Update last sync state
+      lastSyncRef.current = {
+        timestamp: now,
+        playing: isPlaying
+      };
+    } catch (error) {
+      console.error('Error sending sync message:', error);
+      setSyncEnabled(false);
     }
-  }, [syncEnabled, currentSong?.id, isPlaying]);
+  }, [syncEnabled, currentSong?.id, isPlaying, audioRef.current?.currentTime]);
 
   const toggleSync = () => {
     setSyncEnabled(!syncEnabled);
