@@ -12,7 +12,7 @@ type ListenerData = {
   [key: string]: number;
 };
 
-// Sample data with correct ISO 3166-1 alpha-3 country codes
+// Sample data - using correct ISO Alpha-3 codes that match the world-atlas TopoJSON
 const sampleListenerData: ListenerData = {
   USA: 1000,
   GBR: 500,
@@ -43,16 +43,6 @@ const MapPage: FC = () => {
     return `rgba(52, 211, 153, ${opacity})`;
   };
 
-  if (error) {
-    return (
-      <div className="container mx-auto py-6">
-        <Card className="p-4 text-red-500">
-          Error loading map: {error}
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto py-6">
       <h1 className="text-4xl font-bold mb-6">Global Listener Map</h1>
@@ -79,12 +69,12 @@ const MapPage: FC = () => {
                 <Geographies geography={geoUrl}>
                   {({ geographies }) =>
                     geographies.map((geo) => {
-                      const countryCode = geo.properties.ISO_A3;
+                      // Debugging the structure
+                      console.log("Geography properties:", geo.properties);
+
+                      const countryCode = geo.properties.iso_a3;
                       const listeners = sampleListenerData[countryCode] || 0;
                       const fillColor = getColor(listeners);
-
-                      // Debug log to check country codes and colors
-                      console.log(`Country: ${geo.properties.NAME}, Code: ${countryCode}, Listeners: ${listeners}, Color: ${fillColor}`);
 
                       return (
                         <Geography
@@ -94,8 +84,8 @@ const MapPage: FC = () => {
                           stroke="#D6D6DA"
                           strokeWidth={0.5}
                           onMouseEnter={() => {
-                            const { NAME } = geo.properties;
-                            setTooltipContent(`${NAME}: ${listeners.toLocaleString()} listeners`);
+                            const { name } = geo.properties;
+                            setTooltipContent(`${name}: ${listeners.toLocaleString()} listeners`);
                           }}
                           onMouseLeave={() => {
                             setTooltipContent("");
