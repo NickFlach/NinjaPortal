@@ -59,7 +59,13 @@ export const userRewards = pgTable("user_rewards", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Relations
+export const listeners = pgTable("listeners", {
+  id: serial("id").primaryKey(),
+  songId: integer("song_id").references(() => songs.id),
+  countryCode: text("country_code").notNull(),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
 export const songsRelations = relations(songs, ({ many, one }) => ({
   recentPlays: many(recentlyPlayed),
   playlistSongs: many(playlistSongs),
@@ -99,6 +105,13 @@ export const usersRelations = relations(users, ({ many }) => ({
 export const recentlyPlayedRelations = relations(recentlyPlayed, ({ one }) => ({
   song: one(songs, {
     fields: [recentlyPlayed.songId],
+    references: [songs.id],
+  }),
+}));
+
+export const listenersRelations = relations(listeners, ({ one }) => ({
+  song: one(songs, {
+    fields: [listeners.songId],
     references: [songs.id],
   }),
 }));

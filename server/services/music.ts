@@ -1,5 +1,5 @@
 import { db } from '@db';
-import { songs } from '@db/schema';
+import { songs, listeners } from '@db/schema';
 import { desc, eq, sql } from 'drizzle-orm';
 
 export interface MusicStats {
@@ -8,6 +8,7 @@ export interface MusicStats {
   totalListens: number;
   topArtists: Array<{ artist: string; songCount: number }>;
   recentUploads: Array<typeof songs.$inferSelect>;
+  listenersByCountry: Array<{ countryCode: string; listenerCount: number }>;
 }
 
 export async function getMusicStats(): Promise<MusicStats> {
@@ -45,6 +46,15 @@ export async function getMusicStats(): Promise<MusicStats> {
     .orderBy(desc(songs.createdAt))
     .limit(5);
 
+  // Get listener counts by country
+  const listenersByCountry = await db.select({
+    countryCode: listeners.countryCode,
+    listenerCount: sql<number>`count(*)`
+  })
+  .from(listeners)
+  .groupBy(listeners.countryCode)
+  .orderBy(sql`count(*) desc`);
+
   return {
     totalSongs,
     totalArtists,
@@ -53,7 +63,8 @@ export async function getMusicStats(): Promise<MusicStats> {
       artist: artist || 'Unknown',
       songCount
     })),
-    recentUploads
+    recentUploads,
+    listenersByCountry
   };
 }
 
@@ -65,8 +76,20 @@ export async function getSongMetadata(id: number) {
   return song;
 }
 
-export async function incrementListenCount(id: number) {
-  await db.update(songs)
-    .set({ votes: sql`coalesce(${songs.votes}, 0) + 1` })
-    .where(eq(songs.id, id));
+export async function incrementListenCount(id: number, countryCode: string) {
+  // Begin a transaction to ensure both operations complete
+  await db.transaction(async (tx) => {
+    // Increment song votes
+    await tx.update(songs)
+      .set({ votes: sql`coalesce(${songs.votes}, 0) + 1` })
+      .where(eq(songs.id, id));
+
+    // Record listener location
+    await tx.insert(listeners)
+      .values({
+        songId: id,
+        countryCode: countryCode.toLowerCase(),
+        timestamp: new Date()
+      });
+  });
 }
