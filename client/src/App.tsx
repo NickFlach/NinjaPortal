@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Treasury from "@/pages/Treasury";
 import Admin from "@/pages/Admin";
+import Map from "@/pages/Map";
 import Landing from "@/pages/Landing";
 import { useAccount } from 'wagmi';
 import { MusicPlayerProvider } from "@/contexts/MusicPlayerContext";
@@ -35,13 +36,11 @@ function PublicRoute({ component: Component }: { component: React.ComponentType 
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    // If we have an address and we're on the landing page, redirect to home
     if (address && window.location.pathname === '/') {
       setLocation('/home');
     }
   }, [address, setLocation]);
 
-  // Don't redirect away from landing if already here
   if (address && window.location.pathname === '/') return null;
 
   return <Component />;
@@ -61,6 +60,9 @@ function Router() {
       </Route>
       <Route path="/admin">
         <ProtectedRoute component={Admin} />
+      </Route>
+      <Route path="/map">
+        <ProtectedRoute component={Map} />
       </Route>
       <Route>
         <NotFound />
