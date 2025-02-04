@@ -12,34 +12,34 @@ type ListenerData = {
   [key: string]: number;
 };
 
-// Sample data - using correct ISO Alpha-3 codes that match the world-atlas TopoJSON
+// Sample data using lowercase ISO Alpha-3 codes
 const sampleListenerData: ListenerData = {
-  USA: 1000,
-  GBR: 500,
-  FRA: 300,
-  DEU: 400,
-  JPN: 600,
-  CAN: 450,
-  AUS: 350,
-  BRA: 250,
-  IND: 800,
-  CHN: 900,
-  RUS: 200,
-  ZAF: 150,
-  MEX: 300,
-  ESP: 250,
-  ITA: 200
+  usa: 1000,
+  gbr: 500,
+  fra: 300,
+  deu: 400,
+  jpn: 600,
+  can: 450,
+  aus: 350,
+  bra: 250,
+  ind: 800,
+  chn: 900,
+  rus: 200,
+  zaf: 150,
+  mex: 300,
+  esp: 250,
+  ita: 200
 };
 
 const geoUrl = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
 const MapPage: FC = () => {
   const [tooltipContent, setTooltipContent] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   const getColor = (listeners: number) => {
     if (listeners === 0) return "#F5F5F5";
-    const opacity = Math.min(0.2 + (listeners / 1000) * 0.8, 0.9);
+    // Adjust opacity range for better visibility
+    const opacity = Math.min(0.2 + (listeners / 1000) * 0.8, 1);
     return `rgba(52, 211, 153, ${opacity})`;
   };
 
@@ -69,10 +69,7 @@ const MapPage: FC = () => {
                 <Geographies geography={geoUrl}>
                   {({ geographies }) =>
                     geographies.map((geo) => {
-                      // Debugging the structure
-                      console.log("Geography properties:", geo.properties);
-
-                      const countryCode = geo.properties.iso_a3;
+                      const countryCode = geo.properties.iso_a3?.toLowerCase();
                       const listeners = sampleListenerData[countryCode] || 0;
                       const fillColor = getColor(listeners);
 
