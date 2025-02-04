@@ -165,6 +165,13 @@ export async function getSongMetadata(id: number) {
 }
 
 export async function incrementListenCount(id: number, countryCode: string, coords?: { lat: number; lng: number }) {
+  console.log('Received play request:', {
+    songId: id,
+    countryCode,
+    hasLocation: !!coords,
+    coordinates: coords ? `${coords.lat},${coords.lng}` : 'No coordinates provided'
+  });
+
   await db.transaction(async (tx) => {
     // Increment song votes
     await tx.update(songs)
@@ -175,13 +182,20 @@ export async function incrementListenCount(id: number, countryCode: string, coor
     if (coords?.lat && coords?.lng) {
       // Validate coordinates
       if (Math.abs(coords.lat) > 90 || Math.abs(coords.lng) > 180) {
-        console.warn('Invalid coordinates received, skipping location recording');
+        console.warn('Invalid coordinates received:', coords);
         return;
       }
 
       // Round coordinates to 1 decimal place for privacy
       const latitude = Math.round(coords.lat * 10) / 10;
       const longitude = Math.round(coords.lng * 10) / 10;
+
+      console.log('Recording location:', {
+        songId: id,
+        countryCode,
+        latitude,
+        longitude
+      });
 
       // Record listener location with reduced precision
       await tx.insert(listeners)
@@ -193,6 +207,7 @@ export async function incrementListenCount(id: number, countryCode: string, coor
           timestamp: new Date()
         });
     } else {
+      console.log('No coordinates provided, recording country only');
       // Record just the country without coordinates
       await tx.insert(listeners)
         .values({

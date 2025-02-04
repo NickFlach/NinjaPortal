@@ -71,8 +71,19 @@ const MapPage: FC = () => {
 
   const { data: mapData, isLoading } = useQuery<MapData>({
     queryKey: ['/api/music/map'],
-    refetchInterval: 15000, // Refresh every 15 seconds for smoother updates
+    refetchInterval: 15000,
   });
+
+  // Debug logging
+  useEffect(() => {
+    if (mapData) {
+      console.log('Map data received:', {
+        countries: Object.keys(mapData.countries).length,
+        totalListeners: mapData.totalListeners,
+        hasLocations: Object.values(mapData.countries).some(c => c.locations.length > 0)
+      });
+    }
+  }, [mapData]);
 
   // Update markers when map data changes
   useEffect(() => {
@@ -80,7 +91,7 @@ const MapPage: FC = () => {
       const newMarkers: MarkerData[] = [];
 
       Object.entries(mapData.countries).forEach(([countryCode, data]) => {
-        if (data.votes > 0) {
+        if (data.votes > 0 && data.locations.length > 0) {
           data.locations.forEach(([lat, lng]) => {
             const id = `${countryCode}-${lat}-${lng}`;
             const existingMarker = prevMarkersRef.current.find(m => m.id === id);
@@ -92,6 +103,11 @@ const MapPage: FC = () => {
             });
           });
         }
+      });
+
+      console.log('Updating markers:', {
+        total: newMarkers.length,
+        new: newMarkers.filter(m => m.isNew).length
       });
 
       setMarkers(newMarkers);
@@ -169,7 +185,6 @@ const MapPage: FC = () => {
                         geographies.map((geo) => {
                           const countryCode = geo.properties.iso_a3;
                           const votes = mapData?.countries?.[countryCode]?.votes || 0;
-
                           return (
                             <Geography
                               key={geo.rsmKey}
@@ -201,15 +216,14 @@ const MapPage: FC = () => {
                       }
                     </Geographies>
 
-                    {/* Render markers with individual AnimatePresence */}
+                    {/* Render markers */}
                     {markers.map((marker) => (
-                      <AnimatePresence key={marker.id} mode="wait">
-                        <AnimatedMarker
-                          coordinates={marker.coordinates}
-                          isSelected={selectedCountry === marker.countryCode}
-                          isNew={marker.isNew}
-                        />
-                      </AnimatePresence>
+                      <AnimatedMarker
+                        key={marker.id}
+                        coordinates={marker.coordinates}
+                        isSelected={selectedCountry === marker.countryCode}
+                        isNew={marker.isNew}
+                      />
                     ))}
                   </ZoomableGroup>
                 </ComposableMap>

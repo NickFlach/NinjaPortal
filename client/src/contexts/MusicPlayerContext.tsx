@@ -32,13 +32,27 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [currentSong, setCurrentSong] = useState<Song>();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentContext, setCurrentContext] = useState<PlaylistContext>('landing');
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { address: userAddress } = useAccount();
   const defaultWallet = "REDACTED_WALLET_ADDRESS";
   const landingAddress = userAddress || defaultWallet;
   const isLandingPage = !userAddress;
   const audioContextRef = useRef<AudioContext>();
+
+  // Initialize audio element
+  useEffect(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.preload = 'auto';
+    }
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   // Fetch landing page feed (recent songs)
   const { data: recentSongs } = useQuery<Song[]>({
@@ -101,38 +115,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
-  const cleanupAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.removeAttribute('src');
-      audioRef.current.load();
-      if (audioRef.current.src) {
-        URL.revokeObjectURL(audioRef.current.src);
-      }
-      audioRef.current = null;
-    }
-  };
-
-  // Initialize music once on load - only if we're on landing page
-  useEffect(() => {
-    async function initializeMusic() {
-      if (!recentSongs?.length || audioRef.current?.src) return;
-
-      try {
-        const firstSong = recentSongs[0];
-        console.log('Initializing music with:', firstSong.title);
-        await playSong(firstSong, 'landing');
-      } catch (error) {
-        console.error('Error initializing music:', error);
-        setIsPlaying(false);
-      }
-    }
-
-    if (isLandingPage) {
-      initializeMusic();
-    }
-  }, [recentSongs, isLandingPage]);
-
 
   const playSong = async (song: Song, context?: PlaylistContext) => {
     try {
@@ -140,9 +122,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-
-      // Clean up existing audio before creating new one
-      cleanupAudio();
 
       // Create new abort controller for this request
       abortControllerRef.current = new AbortController();
@@ -159,38 +138,19 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       const blob = new Blob([audioData], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
 
-      // Create new audio element
-      const newAudio = new Audio();
-
-      // Set up event handlers before setting src
-      newAudio.addEventListener('error', (event) => {
-        const error = event.currentTarget as HTMLAudioElement;
-        console.error('Audio playback error:', error.error?.message || 'Unknown error');
-        setIsPlaying(false);
-      });
-
-      newAudio.addEventListener('ended', async () => {
-        console.log('Song ended, playing next song');
-        const nextSong = getNextSong(song.id);
-        if (nextSong) {
-          await playSong(nextSong, currentContext);
-        }
-      });
-
       // Set source and load
-      newAudio.src = url;
+      audioRef.current.src = url;
       await new Promise((resolve, reject) => {
-        newAudio.addEventListener('loadeddata', resolve);
-        newAudio.addEventListener('error', reject);
-        newAudio.load();
+        audioRef.current.addEventListener('loadeddata', resolve);
+        audioRef.current.addEventListener('error', reject);
+        audioRef.current.load();
       });
 
       // Update refs and state
-      audioRef.current = newAudio;
       setCurrentSong(song);
 
       // Try to play
-      const playPromise = newAudio.play();
+      const playPromise = audioRef.current.play();
       if (playPromise !== undefined) {
         try {
           await playPromise;
@@ -249,13 +209,36 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   };
 
+  // Initialize music once on load - only if we're on landing page
+  useEffect(() => {
+    async function initializeMusic() {
+      if (!recentSongs?.length || audioRef.current?.src) return;
+
+      try {
+        const firstSong = recentSongs[0];
+        console.log('Initializing music with:', firstSong.title);
+        await playSong(firstSong, 'landing');
+      } catch (error) {
+        console.error('Error initializing music:', error);
+        setIsPlaying(false);
+      }
+    }
+
+    if (isLandingPage) {
+      initializeMusic();
+    }
+  }, [recentSongs, isLandingPage]);
+
   // Clean up on unmount
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-      cleanupAudio();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
     };
   }, []);
 
