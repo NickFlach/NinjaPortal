@@ -49,7 +49,7 @@ export async function getMusicStats(): Promise<MusicStats> {
     .orderBy(desc(songs.createdAt))
     .limit(5);
 
-  // Get listener counts by country
+  // Get listener counts by country with proper counting
   const listenersByCountry = await db.select({
     countryCode: listeners.countryCode,
     votes: sql<number>`count(*)`
@@ -61,8 +61,12 @@ export async function getMusicStats(): Promise<MusicStats> {
   // Transform into the expected format
   const countries: { [key: string]: { votes: number } } = {};
   listenersByCountry.forEach(({ countryCode, votes }) => {
-    countries[countryCode] = { votes };
+    if (countryCode) {  // Only add if countryCode exists
+      countries[countryCode.toLowerCase()] = { votes };
+    }
   });
+
+  console.log('Country statistics:', countries); // Add logging
 
   return {
     totalSongs,
