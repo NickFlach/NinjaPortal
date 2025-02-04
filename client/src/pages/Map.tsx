@@ -18,17 +18,26 @@ const MapPage: FC = () => {
   const { data: songStats, isLoading } = useQuery({
     queryKey: ['/api/music/stats'],
     select: (data: any) => {
-      console.log('Raw music stats response:', data);
-      console.log('Country data from response:', data?.countries);
+      console.log('Raw stats data:', data);
+      if (data?.countries) {
+        console.log('Countries with plays:', Object.keys(data.countries).map(code => ({
+          code,
+          plays: data.countries[code].votes
+        })));
+      }
       return data;
     }
   });
 
   const getColor = (votes: number) => {
     // Use a darker base color for countries with no plays
-    if (!votes || votes === 0) return "#2A303C";
+    if (votes === undefined || votes === null) return "#2A303C";
 
-    const maxVotes = Math.max(1, songStats?.totalListens || 1);
+    const maxVotes = Math.max(1, 
+      Object.values(songStats?.countries || {})
+        .reduce((max, country: any) => Math.max(max, country.votes || 0), 1)
+    );
+
     // Adjust opacity range to be more visible
     const opacity = Math.min(0.3 + (votes / maxVotes) * 0.7, 1);
     // Use a brighter green for better visibility
@@ -66,10 +75,12 @@ const MapPage: FC = () => {
                     {({ geographies }) =>
                       geographies.map((geo) => {
                         const countryCode = geo.properties.iso_a3;
-                        const votes = songStats?.countries?.[countryCode]?.votes || 0;
-                        console.log(`Rendering country: ${countryCode}, votes: ${votes}`, {
+                        const votes = songStats?.countries?.[countryCode]?.votes ?? 0;
+
+                        console.log(`Rendering ${geo.properties.name} (${countryCode}):`, {
+                          votes,
                           hasData: countryCode in (songStats?.countries || {}),
-                          rawVotes: songStats?.countries?.[countryCode]?.votes
+                          color: getColor(votes)
                         });
 
                         return (
