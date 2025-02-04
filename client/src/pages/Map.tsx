@@ -6,6 +6,7 @@ import {
   ZoomableGroup,
   Marker
 } from "react-simple-maps";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -23,6 +24,35 @@ interface MapData {
 }
 
 const geoUrl = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
+
+// Custom animated marker component
+const AnimatedMarker: FC<{
+  coordinates: [number, number];
+  isSelected: boolean;
+}> = ({ coordinates, isSelected }) => {
+  return (
+    <Marker coordinates={coordinates}>
+      <motion.circle
+        initial={{ r: 0, opacity: 0, y: -20 }}
+        animate={{ 
+          r: 6,
+          opacity: 0.4,
+          y: 0
+        }}
+        exit={{ r: 0, opacity: 0 }}
+        transition={{
+          type: "spring",
+          stiffness: 200,
+          damping: 20
+        }}
+        fill={isSelected ? "#60A5FA" : "#10B981"}
+        stroke="#fff"
+        strokeWidth={1}
+        className="animate-pulse"
+      />
+    </Marker>
+  );
+};
 
 const MapPage: FC = () => {
   const [tooltipContent, setTooltipContent] = useState("");
@@ -135,25 +165,19 @@ const MapPage: FC = () => {
                       }
                     </Geographies>
 
-                    {/* Only render markers if we have data */}
-                    {mapData?.countries && !hasNoData && 
-                      Object.entries(mapData.countries).map(([countryCode, data]) =>
-                        data.votes > 0 && data.locations.map(([lat, lng], index) => (
-                          <Marker 
-                            key={`${countryCode}-${index}`} 
-                            coordinates={[lng, lat]}
-                          >
-                            <circle
-                              r={6} // Larger radius to indicate general area
-                              fill={selectedCountry === countryCode ? "#60A5FA" : "#10B981"}
-                              fillOpacity={0.4} // More transparent
-                              stroke="#fff"
-                              strokeWidth={1}
-                              className="animate-pulse"
+                    {/* Animated markers with AnimatePresence for smooth transitions */}
+                    <AnimatePresence>
+                      {mapData?.countries && !hasNoData && 
+                        Object.entries(mapData.countries).map(([countryCode, data]) =>
+                          data.votes > 0 && data.locations.map(([lat, lng], index) => (
+                            <AnimatedMarker
+                              key={`${countryCode}-${index}`}
+                              coordinates={[lng, lat]}
+                              isSelected={selectedCountry === countryCode}
                             />
-                          </Marker>
-                        ))
-                      )}
+                          ))
+                        )}
+                    </AnimatePresence>
                   </ZoomableGroup>
                 </ComposableMap>
               )}
