@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, Volume2, VolumeX, Wifi, WifiOff } from "lucide-react";
+import { Volume2, VolumeX, Wifi, WifiOff } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useMusicSync } from "@/contexts/MusicSyncContext";

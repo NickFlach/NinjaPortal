@@ -12,6 +12,30 @@ const clients = new Map<WebSocket, {
   currentSong?: number;
 }>();
 
+// Function to broadcast sync message to all clients listening to a song
+function broadcastSyncMessage(sender: WebSocket, songId: number, timestamp: number, playing: boolean) {
+  const message = JSON.stringify({
+    type: 'sync',
+    timestamp,
+    playing,
+    songId
+  });
+
+  Array.from(clients.entries()).forEach(([client, info]) => {
+    if (client !== sender && 
+        info.currentSong === songId && 
+        client.readyState === WebSocket.OPEN) {
+      try {
+        client.send(message);
+      } catch (error) {
+        console.error('Error sending sync message:', error);
+        // Remove client if send fails
+        clients.delete(client);
+      }
+    }
+  });
+}
+
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
 
@@ -30,38 +54,30 @@ export function registerRoutes(app: Express) {
         const message = JSON.parse(data.toString());
         const clientInfo = clients.get(ws);
 
+        if (!clientInfo) {
+          console.error('Client info not found');
+          return;
+        }
+
         switch (message.type) {
           case 'auth': {
-            if (clientInfo) {
-              clientInfo.address = message.address?.toLowerCase();
+            if (message.address) {
+              clientInfo.address = message.address.toLowerCase();
             }
             break;
           }
 
           case 'subscribe': {
-            if (clientInfo && message.songId) {
+            if (message.songId) {
               clientInfo.currentSong = parseInt(message.songId);
             }
             break;
           }
 
           case 'sync': {
-            // Broadcast sync state to all clients listening to the same song
             const { timestamp, playing, songId } = message;
             if (typeof songId === 'number') {
-              // Convert Map entries to array before iteration
-              Array.from(clients.entries()).forEach(([client, info]) => {
-                if (client !== ws && 
-                    info.currentSong === songId && 
-                    client.readyState === WebSocket.OPEN) {
-                  client.send(JSON.stringify({
-                    type: 'sync',
-                    timestamp,
-                    playing,
-                    songId
-                  }));
-                }
-              });
+              broadcastSyncMessage(ws, songId, timestamp, playing);
             }
             break;
           }
@@ -71,10 +87,25 @@ export function registerRoutes(app: Express) {
       }
     });
 
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+      clients.delete(ws);
+    });
+
     ws.on('close', () => {
+      console.log('Client disconnected');
       clients.delete(ws);
     });
   });
+
+  // Regular cleanup of stale connections
+  setInterval(() => {
+    Array.from(clients.keys()).forEach((client) => {
+      if (client.readyState !== WebSocket.OPEN) {
+        clients.delete(client);
+      }
+    });
+  }, 30000);
 
   // Songs
   app.get("/api/songs/recent", async (req, res) => {
