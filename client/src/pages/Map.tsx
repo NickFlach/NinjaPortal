@@ -14,10 +14,14 @@ const geoUrl = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 const MapPage: FC = () => {
   const [tooltipContent, setTooltipContent] = useState("");
 
-  // Fetch song data
+  // Fetch song data with logging
   const { data: songStats, isLoading } = useQuery({
     queryKey: ['/api/music/stats'],
-    select: (data: any) => data
+    select: (data: any) => {
+      console.log('Music stats response:', data);
+      console.log('Country data:', data?.countries);
+      return data;
+    }
   });
 
   const getColor = (votes: number) => {
@@ -61,8 +65,9 @@ const MapPage: FC = () => {
                   <Geographies geography={geoUrl}>
                     {({ geographies }) =>
                       geographies.map((geo) => {
-                        const countryCode = geo.properties.iso_a3?.toLowerCase();
-                        const countryVotes = songStats?.countries?.[countryCode]?.votes || 0;
+                        const countryCode = geo.properties.iso_a3;
+                        console.log('Checking country:', countryCode, 'Data:', songStats?.countries?.[countryCode?.toLowerCase()]?.votes);
+                        const countryVotes = songStats?.countries?.[countryCode?.toLowerCase()]?.votes || 0;
 
                         return (
                           <Geography

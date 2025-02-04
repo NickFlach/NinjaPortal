@@ -39,7 +39,7 @@ export async function getMusicStats(): Promise<MusicStats> {
     songCount: sql<number>`count(*)`
   })
   .from(songs)
-  .where(sql`${songs.artist} is not null`)  // Only count non-null artists
+  .where(sql`${songs.artist} is not null`)
   .groupBy(songs.artist)
   .orderBy(sql`count(*) desc`)
   .limit(10);
@@ -55,18 +55,22 @@ export async function getMusicStats(): Promise<MusicStats> {
     votes: sql<number>`count(*)`
   })
   .from(listeners)
-  .groupBy(listeners.countryCode)
-  .orderBy(sql`count(*) desc`);
+  .groupBy(listeners.countryCode);
+
+  console.log('Raw listener data:', listenersByCountry);
 
   // Transform into the expected format
   const countries: { [key: string]: { votes: number } } = {};
   listenersByCountry.forEach(({ countryCode, votes }) => {
-    if (countryCode) {  // Only add if countryCode exists
-      countries[countryCode.toLowerCase()] = { votes };
+    if (countryCode) {
+      // Convert to uppercase to match the ISO codes from the map
+      const code = countryCode.toUpperCase();
+      countries[code] = { votes: Number(votes) };
+      console.log(`Adding country ${code} with ${votes} votes`);
     }
   });
 
-  console.log('Country statistics:', countries); // Add logging
+  console.log('Final country statistics:', countries);
 
   return {
     totalSongs,
@@ -74,7 +78,7 @@ export async function getMusicStats(): Promise<MusicStats> {
     totalListens,
     topArtists: topArtists.map(({ artist, songCount }) => ({
       artist: artist || 'Unknown',
-      songCount
+      songCount: Number(songCount)
     })),
     recentUploads,
     countries
@@ -101,7 +105,7 @@ export async function incrementListenCount(id: number, countryCode: string) {
     await tx.insert(listeners)
       .values({
         songId: id,
-        countryCode: countryCode.toLowerCase(),
+        countryCode: countryCode.toUpperCase(), // Store in uppercase
         timestamp: new Date()
       });
   });
