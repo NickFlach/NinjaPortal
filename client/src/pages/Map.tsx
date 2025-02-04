@@ -1,4 +1,4 @@
-import { FC, Suspense } from "react";
+import { FC, Suspense, useEffect, useRef } from "react";
 import {
   ComposableMap,
   Geographies,
@@ -23,17 +23,25 @@ interface MapData {
   totalListeners: number;
 }
 
+interface MarkerData {
+  id: string;
+  coordinates: [number, number];
+  countryCode: string;
+  isNew: boolean;
+}
+
 const geoUrl = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
 // Custom animated marker component
 const AnimatedMarker: FC<{
   coordinates: [number, number];
   isSelected: boolean;
-}> = ({ coordinates, isSelected }) => {
+  isNew: boolean;
+}> = ({ coordinates, isSelected, isNew }) => {
   return (
     <Marker coordinates={coordinates}>
       <motion.circle
-        initial={{ r: 0, opacity: 0, y: -20 }}
+        initial={isNew ? { r: 0, opacity: 0, y: -20 } : { r: 6, opacity: 0.4, y: 0 }}
         animate={{ 
           r: 6,
           opacity: 0.4,
@@ -58,11 +66,38 @@ const AnimatedMarker: FC<{
 const MapPage: FC = () => {
   const [tooltipContent, setTooltipContent] = useState("");
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [markers, setMarkers] = useState<MarkerData[]>([]);
+  const prevMarkersRef = useRef<MarkerData[]>([]);
 
   const { data: mapData, isLoading } = useQuery<MapData>({
     queryKey: ['/api/music/map'],
-    refetchInterval: 5000, // Refresh every 5 seconds for more responsive updates
+    refetchInterval: 15000, // Refresh every 15 seconds for smoother updates
   });
+
+  // Update markers when map data changes
+  useEffect(() => {
+    if (mapData?.countries) {
+      const newMarkers: MarkerData[] = [];
+
+      Object.entries(mapData.countries).forEach(([countryCode, data]) => {
+        if (data.votes > 0) {
+          data.locations.forEach(([lat, lng]) => {
+            const id = `${countryCode}-${lat}-${lng}`;
+            const existingMarker = prevMarkersRef.current.find(m => m.id === id);
+            newMarkers.push({
+              id,
+              coordinates: [lng, lat],
+              countryCode,
+              isNew: !existingMarker
+            });
+          });
+        }
+      });
+
+      setMarkers(newMarkers);
+      prevMarkersRef.current = newMarkers;
+    }
+  }, [mapData]);
 
   const getColor = (countryCode: string) => {
     if (!mapData?.countries) return "#1e293b"; // Base color for countries without data
@@ -166,19 +201,16 @@ const MapPage: FC = () => {
                       }
                     </Geographies>
 
-                    {/* Animated markers with AnimatePresence for smooth transitions */}
-                    <AnimatePresence>
-                      {mapData?.countries && !hasNoData && 
-                        Object.entries(mapData.countries).map(([countryCode, data]) =>
-                          data.votes > 0 && data.locations.map(([lat, lng], index) => (
-                            <AnimatedMarker
-                              key={`${countryCode}-${index}-${data.votes}`}
-                              coordinates={[lng, lat]}
-                              isSelected={selectedCountry === countryCode}
-                            />
-                          ))
-                        )}
-                    </AnimatePresence>
+                    {/* Render markers with individual AnimatePresence */}
+                    {markers.map((marker) => (
+                      <AnimatePresence key={marker.id} mode="wait">
+                        <AnimatedMarker
+                          coordinates={marker.coordinates}
+                          isSelected={selectedCountry === marker.countryCode}
+                          isNew={marker.isNew}
+                        />
+                      </AnimatePresence>
+                    ))}
                   </ZoomableGroup>
                 </ComposableMap>
               )}
