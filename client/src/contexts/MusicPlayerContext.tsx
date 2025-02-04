@@ -229,6 +229,32 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [recentSongs, isLandingPage]);
 
+  // Add event listener for song end
+  useEffect(() => {
+    if (!audioRef.current) return;
+
+    const handleSongEnd = async () => {
+      if (!currentSong) return;
+
+      try {
+        // Get the next song in the current context
+        const nextSong = getNextSong(currentSong.id);
+        if (nextSong) {
+          console.log('Current song ended, playing next:', nextSong.title);
+          await playSong(nextSong, currentContext);
+        }
+      } catch (error) {
+        console.error('Error auto-playing next song:', error);
+        setIsPlaying(false);
+      }
+    };
+
+    audioRef.current.addEventListener('ended', handleSongEnd);
+    return () => {
+      audioRef.current?.removeEventListener('ended', handleSongEnd);
+    };
+  }, [currentSong, currentContext]);
+
   // Clean up on unmount
   useEffect(() => {
     return () => {
