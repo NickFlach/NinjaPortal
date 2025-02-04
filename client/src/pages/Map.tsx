@@ -16,7 +16,7 @@ import { Layout } from "@/components/Layout";
 interface MapData {
   countries: {
     [key: string]: {
-      locations: Array<[number, number]>;  // [latitude, longitude] pairs
+      locations: Array<[number, number]>;  // [longitude, latitude] pairs
     };
   };
   totalListeners: number;
@@ -37,13 +37,14 @@ const AnimatedMarker: FC<{
   isSelected: boolean;
   isNew: boolean;
 }> = ({ coordinates, isSelected, isNew }) => {
+  console.log('Rendering marker at:', coordinates);
   return (
     <Marker coordinates={coordinates}>
       <motion.circle
         initial={{ r: 0, opacity: 0, y: -20 }}
         animate={{ 
           r: 6,
-          opacity: 0.4,
+          opacity: 0.8,
           y: 0
         }}
         exit={{ r: 0, opacity: 0, y: 20 }}
@@ -55,8 +56,8 @@ const AnimatedMarker: FC<{
         }}
         fill={isSelected ? "#60A5FA" : "#10B981"}
         stroke="#fff"
-        strokeWidth={1}
-        className="animate-pulse cursor-pointer"
+        strokeWidth={2}
+        className="cursor-pointer hover:opacity-100"
       />
     </Marker>
   );
@@ -79,7 +80,8 @@ const MapPage: FC = () => {
       console.log('Map data received:', {
         countries: Object.keys(mapData.countries).length,
         totalListeners: mapData.totalListeners,
-        hasLocations: Object.values(mapData.countries).some(c => c.locations.length > 0)
+        hasLocations: Object.values(mapData.countries).some(c => c.locations.length > 0),
+        firstCountryLocations: Object.values(mapData.countries)[0]?.locations
       });
     }
   }, [mapData]);
@@ -91,12 +93,13 @@ const MapPage: FC = () => {
 
       Object.entries(mapData.countries).forEach(([countryCode, data]) => {
         if (data.locations.length > 0) {
-          data.locations.forEach(([lat, lng]) => {
-            const id = `${countryCode}-${lat}-${lng}`;
+          console.log(`Processing locations for ${countryCode}:`, data.locations);
+          data.locations.forEach((coordinates) => {
+            const id = `${countryCode}-${coordinates[0]}-${coordinates[1]}`;
             const existingMarker = prevMarkersRef.current.find(m => m.id === id);
             newMarkers.push({
               id,
-              coordinates: [lng, lat],
+              coordinates,
               countryCode,
               isNew: !existingMarker
             });
@@ -106,7 +109,8 @@ const MapPage: FC = () => {
 
       console.log('Updating markers:', {
         total: newMarkers.length,
-        new: newMarkers.filter(m => m.isNew).length
+        new: newMarkers.filter(m => m.isNew).length,
+        coordinates: newMarkers.map(m => m.coordinates)
       });
 
       setMarkers(newMarkers);
@@ -116,11 +120,8 @@ const MapPage: FC = () => {
 
   const getColor = (countryCode: string) => {
     if (!mapData?.countries) return "#1e293b"; // Base color for countries without data
-
     const countryData = mapData.countries[countryCode];
     if (!countryData?.locations.length) return "#1e293b"; // Base color for inactive countries
-
-    // Show active color for any country with listeners
     return `rgba(74, 222, 128, 0.5)`; // Green-500 with fixed opacity for active regions
   };
 
@@ -208,7 +209,7 @@ const MapPage: FC = () => {
                       }
                     </Geographies>
 
-                    {/* Render markers */}
+                    {/* Render markers with more visibility */}
                     {markers.map((marker) => (
                       <AnimatedMarker
                         key={marker.id}
