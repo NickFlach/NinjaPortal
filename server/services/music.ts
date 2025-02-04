@@ -57,6 +57,8 @@ export async function getMapData(): Promise<MapDataResponse> {
     }
   });
 
+  console.log('Map data response:', { countries, totalListeners });
+
   return {
     countries,
     totalListeners

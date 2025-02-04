@@ -41,7 +41,7 @@ const AnimatedMarker: FC<{
   return (
     <Marker coordinates={coordinates}>
       <motion.circle
-        initial={isNew ? { r: 0, opacity: 0, y: -20 } : { r: 6, opacity: 0.4, y: 0 }}
+        initial={{ r: 0, opacity: 0, y: -20 }}
         animate={{ 
           r: 6,
           opacity: 0.4,
