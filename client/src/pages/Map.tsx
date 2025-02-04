@@ -66,8 +66,8 @@ const MapPage: FC = () => {
                     {({ geographies }) =>
                       geographies.map((geo) => {
                         const countryCode = geo.properties.iso_a3;
-                        console.log('Checking country:', countryCode, 'Data:', songStats?.countries?.[countryCode?.toLowerCase()]?.votes);
-                        const countryVotes = songStats?.countries?.[countryCode?.toLowerCase()]?.votes || 0;
+                        console.log('Checking country:', countryCode, 'Data:', songStats?.countries?.[countryCode]?.votes);
+                        const countryVotes = songStats?.countries?.[countryCode]?.votes || 0;
 
                         return (
                           <Geography

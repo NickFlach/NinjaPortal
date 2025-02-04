@@ -64,9 +64,8 @@ export async function getMusicStats(): Promise<MusicStats> {
   listenersByCountry.forEach(({ countryCode, votes }) => {
     if (countryCode) {
       // Convert to uppercase to match the ISO codes from the map
-      const code = countryCode.toUpperCase();
-      countries[code] = { votes: Number(votes) };
-      console.log(`Adding country ${code} with ${votes} votes`);
+      countries[countryCode] = { votes: Number(votes) };
+      console.log(`Adding country ${countryCode} with ${votes} votes`);
     }
   });
 
@@ -105,7 +104,7 @@ export async function incrementListenCount(id: number, countryCode: string) {
     await tx.insert(listeners)
       .values({
         songId: id,
-        countryCode: countryCode.toUpperCase(), // Store in uppercase
+        countryCode, // Keep original case from input
         timestamp: new Date()
       });
   });
