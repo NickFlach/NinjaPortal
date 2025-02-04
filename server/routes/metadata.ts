@@ -29,10 +29,12 @@ router.get('/api/music/metadata/:id', async (req, res) => {
   }
 });
 
-// New endpoint for map data
+// Map data endpoint with debug logging
 router.get('/api/music/map', async (_req, res) => {
   try {
+    console.log('Map data request received');
     const mapData = await getMapData();
+    console.log('Map data response:', mapData);
     res.json(mapData);
   } catch (error) {
     console.error('Error fetching map data:', error);
