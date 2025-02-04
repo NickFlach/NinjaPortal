@@ -1,12 +1,80 @@
 import type { Express } from "express";
 import { createServer } from "http";
+import { WebSocketServer, WebSocket } from 'ws';
 import { db } from "@db";
 import { songs, users, playlists, followers, playlistSongs, recentlyPlayed, userRewards } from "@db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { incrementListenCount } from './services/music';
 
+// Track connected clients and their song subscriptions
+const clients = new Map<WebSocket, {
+  address?: string;
+  currentSong?: number;
+}>();
+
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
+
+  // Initialize WebSocket server with specific path to avoid conflicts with Vite HMR
+  const wss = new WebSocketServer({ 
+    server: httpServer,
+    path: '/ws/music-sync'
+  });
+
+  wss.on('connection', (ws) => {
+    console.log('New client connected');
+    clients.set(ws, {});
+
+    ws.on('message', async (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        const clientInfo = clients.get(ws);
+
+        switch (message.type) {
+          case 'auth': {
+            if (clientInfo) {
+              clientInfo.address = message.address?.toLowerCase();
+            }
+            break;
+          }
+
+          case 'subscribe': {
+            if (clientInfo && message.songId) {
+              clientInfo.currentSong = parseInt(message.songId);
+            }
+            break;
+          }
+
+          case 'sync': {
+            // Broadcast sync state to all clients listening to the same song
+            const { timestamp, playing, songId } = message;
+            if (typeof songId === 'number') {
+              // Convert Map entries to array before iteration
+              Array.from(clients.entries()).forEach(([client, info]) => {
+                if (client !== ws && 
+                    info.currentSong === songId && 
+                    client.readyState === WebSocket.OPEN) {
+                  client.send(JSON.stringify({
+                    type: 'sync',
+                    timestamp,
+                    playing,
+                    songId
+                  }));
+                }
+              });
+            }
+            break;
+          }
+        }
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+      }
+    });
+
+    ws.on('close', () => {
+      clients.delete(ws);
+    });
+  });
 
   // Songs
   app.get("/api/songs/recent", async (req, res) => {

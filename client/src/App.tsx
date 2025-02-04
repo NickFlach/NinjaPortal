@@ -12,6 +12,7 @@ import Map from "@/pages/Map";
 import Landing from "@/pages/Landing";
 import { useAccount } from 'wagmi';
 import { MusicPlayerProvider } from "@/contexts/MusicPlayerContext";
+import { MusicSyncProvider } from "@/contexts/MusicSyncContext";
 import { useEffect } from "react";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -76,8 +77,10 @@ function App() {
     <WagmiConfig config={config}>
       <QueryClientProvider client={queryClient}>
         <MusicPlayerProvider>
-          <Router />
-          <Toaster />
+          <MusicSyncProvider>
+            <Router />
+            <Toaster />
+          </MusicSyncProvider>
         </MusicPlayerProvider>
       </QueryClientProvider>
     </WagmiConfig>

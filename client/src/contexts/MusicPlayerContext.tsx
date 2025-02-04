@@ -23,6 +23,7 @@ interface MusicPlayerContextType {
   recentSongs?: Song[];
   isLandingPage: boolean;
   currentContext: PlaylistContext;
+  audioRef: React.RefObject<HTMLAudioElement>;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -34,7 +35,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { address: userAddress } = useAccount();
-  const defaultWallet = "REDACTED_WALLET_ADDRESS"; // Default wallet for landing page
+  const defaultWallet = "REDACTED_WALLET_ADDRESS";
   const landingAddress = userAddress || defaultWallet;
   const isLandingPage = !userAddress;
 
@@ -303,7 +304,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         playSong,
         recentSongs,
         isLandingPage,
-        currentContext
+        currentContext,
+        audioRef
       }}
     >
       {children}

@@ -1,8 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, Volume2, VolumeX } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Wifi, WifiOff } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
+import { useMusicSync } from "@/contexts/MusicSyncContext";
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 export function MusicPlayer() {
   const {
@@ -11,6 +13,8 @@ export function MusicPlayer() {
     togglePlay,
     isLandingPage
   } = useMusicPlayer();
+
+  const { syncEnabled, toggleSync } = useMusicSync();
 
   // Only show mini player when not on landing page and we have a song
   if (!isLandingPage && !currentSong) return null;
@@ -27,6 +31,27 @@ export function MusicPlayer() {
         </div>
 
         <div className="flex items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={toggleSync}
+                  className={syncEnabled ? "text-primary" : "text-muted-foreground"}
+                >
+                  {syncEnabled ? (
+                    <Wifi className="h-4 w-4" />
+                  ) : (
+                    <WifiOff className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {syncEnabled ? "Disable sync" : "Enable sync"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button variant="ghost" size="icon" onClick={togglePlay}>
             {isPlaying ? (
               <VolumeX className="h-4 w-4" />
