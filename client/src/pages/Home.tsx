@@ -33,7 +33,7 @@ export default function Home() {
   const queryClient = useQueryClient();
 
   const handleBackgroundClick = () => {
-    const baseUrl = 'https://pitchfork-economy-nikolaiflaukows.replit.app/';
+    const baseUrl = window.location.origin;
     const redirectUrl = address 
       ? `${baseUrl}?wallet=${address}`
       : baseUrl;
@@ -48,7 +48,31 @@ export default function Home() {
 
   const playMutation = useMutation({
     mutationFn: async (songId: number) => {
-      await apiRequest("POST", `/api/songs/play/${songId}`);
+      if (!address) {
+        throw new Error("Please connect your wallet to play songs");
+      }
+
+      try {
+        // Register user first if needed
+        const registerResponse = await apiRequest("POST", "/api/users/register", { 
+          address,
+          // Include geolocation if available
+          geolocation: null // We'll add this later
+        });
+
+        if (!registerResponse.ok) {
+          throw new Error("Failed to register user");
+        }
+
+        const registerData = await registerResponse.json();
+        console.log('Registration successful before play:', registerData);
+
+        // Now play the song
+        await apiRequest("POST", `/api/songs/play/${songId}`);
+      } catch (error) {
+        console.error('Play mutation error:', error);
+        throw error instanceof Error ? error : new Error('Unknown error during play');
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/songs/recent"] });
@@ -88,36 +112,47 @@ export default function Home() {
 
       try {
         // Register user first if needed
-        await apiRequest("POST", "/api/users/register", { address });
-      } catch (error) {
-        console.error('User registration error:', error);
-        // Continue if error is due to user already being registered
-      }
-
-      toast({
-        title: "Upload Started",
-        description: "Uploading your song to IPFS...",
-      });
-
-      try {
-        console.log('Starting IPFS upload for file:', {
-          name: file.name,
-          size: file.size,
-          type: file.type
+        const registerResponse = await apiRequest("POST", "/api/users/register", { 
+          address,
+          // Include geolocation if available
+          geolocation: null 
         });
 
-        const ipfsHash = await uploadToIPFS(file);
-        console.log('IPFS upload successful, hash:', ipfsHash);
+        if (!registerResponse.ok) {
+          throw new Error("Failed to register user");
+        }
 
-        const response = await apiRequest("POST", "/api/songs", {
-          title,
-          artist,
-          ipfsHash,
+        const registerData = await registerResponse.json();
+        console.log('Registration successful:', registerData);
+
+        toast({
+          title: "Upload Started",
+          description: "Uploading your song to IPFS...",
         });
-        return await response.json();
+
+        try {
+          console.log('Starting IPFS upload for file:', {
+            name: file.name,
+            size: file.size,
+            type: file.type
+          });
+
+          const ipfsHash = await uploadToIPFS(file);
+          console.log('IPFS upload successful, hash:', ipfsHash);
+
+          const response = await apiRequest("POST", "/api/songs", {
+            title,
+            artist,
+            ipfsHash,
+          });
+          return await response.json();
+        } catch (error) {
+          console.error('Upload error:', error);
+          throw error instanceof Error ? error : new Error('Unknown upload error');
+        }
       } catch (error) {
-        console.error('Upload error:', error);
-        throw error instanceof Error ? error : new Error('Unknown upload error');
+        console.error('Registration/Upload error:', error);
+        throw error instanceof Error ? error : new Error('Unknown error during registration or upload');
       }
     },
     onSuccess: () => {
@@ -174,9 +209,9 @@ export default function Home() {
           onClick={handleBackgroundClick}
           className="absolute inset-0 z-0 cursor-pointer"
           style={{ 
-            top: '64px', // Height of the header
+            top: '64px', 
             bottom: 'auto',
-            height: 'calc(30vh)', // Match the height of the MusicVisualizer section
+            height: 'calc(30vh)', 
           }}
         />
 
@@ -184,7 +219,6 @@ export default function Home() {
           <MusicVisualizer />
         </section>
 
-        {/* Rest of the JSX remains unchanged */}
         <div className="flex-1 grid grid-cols-1 gap-6 mb-24 relative z-10">
           {address ? (
             <section className="px-4">
