@@ -7,8 +7,12 @@ import {
 } from "react-simple-maps";
 import { Card } from "@/components/ui/card";
 
+type ListenerData = {
+  [key: string]: number;
+};
+
 // Sample data - in production this would come from your backend
-const sampleListenerData = {
+const sampleListenerData: ListenerData = {
   USA: 1000,
   GBR: 500,
   FRA: 300,
@@ -30,11 +34,12 @@ const MapPage: FC = () => {
               <Geographies geography={geoUrl}>
                 {({ geographies }) =>
                   geographies.map((geo) => {
-                    const listeners = sampleListenerData[geo.properties.ISO_A3] || 0;
+                    const countryCode = geo.properties.ISO_A3 as string;
+                    const listeners = sampleListenerData[countryCode] || 0;
                     const fillColor = listeners > 0 
                       ? `rgba(52, 211, 153, ${Math.min(listeners / 1000, 0.8)})`
                       : "#F5F5F5";
-                    
+
                     return (
                       <Geography
                         key={geo.rsmKey}
