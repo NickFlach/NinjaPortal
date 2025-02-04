@@ -46,7 +46,7 @@ export function registerRoutes(app: Express) {
     const songId = parseInt(req.params.id);
     const userAddress = req.headers['x-wallet-address'] as string;
     const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    const { latitude, longitude } = req.body; // Accept coordinates from client
+    const { latitude, longitude } = req.body;
 
     try {
       // Get country from IP using CloudFlare headers if available
@@ -56,6 +56,13 @@ export function registerRoutes(app: Express) {
       if (!countryCode) {
         countryCode = 'USA';
       }
+
+      console.log('Recording play with data:', {
+        songId,
+        countryCode,
+        hasLocation: !!latitude && !!longitude,
+        coordinates: latitude && longitude ? { lat: latitude, lng: longitude } : 'No coordinates'
+      });
 
       // If user is authenticated, record the play with country and coordinates
       await incrementListenCount(songId, countryCode, 

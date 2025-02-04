@@ -33,10 +33,10 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [currentContext, setCurrentContext] = useState<PlaylistContext>('landing');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const { address } = useAccount();
+  const { address: userAddress } = useAccount();
   const defaultWallet = "REDACTED_WALLET_ADDRESS"; // Default wallet for landing page
-  const landingAddress = address || defaultWallet;
-  const isLandingPage = !address;
+  const landingAddress = userAddress || defaultWallet;
+  const isLandingPage = !userAddress;
 
   // Fetch landing page feed (recent songs)
   const { data: recentSongs } = useQuery<Song[]>({
@@ -84,10 +84,10 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
   // Reset to landing context when wallet disconnects
   useEffect(() => {
-    if (!address) {
+    if (!userAddress) {
       setCurrentContext('landing');
     }
-  }, [address]);
+  }, [userAddress]);
 
   // Initialize music once on load - only if we're on landing page
   useEffect(() => {
@@ -145,6 +145,45 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         setCurrentContext(context);
       }
 
+      // Get geolocation before playing
+      let geoData: { latitude?: number; longitude?: number } = {};
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          if (!navigator.geolocation) {
+            reject(new Error('Geolocation not supported'));
+            return;
+          }
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
+          });
+        });
+
+        geoData = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        };
+        console.log('Got geolocation:', geoData);
+      } catch (error) {
+        console.log('Geolocation error:', error);
+        // Continue without location data
+      }
+
+      // Record play with geolocation data
+      try {
+        await fetch(`/api/songs/play/${song.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(userAddress && { 'X-Wallet-Address': userAddress })
+          },
+          body: JSON.stringify(geoData)
+        });
+      } catch (error) {
+        console.error('Error recording play:', error);
+      }
+
       // Clean up old audio element completely
       if (audioRef.current) {
         audioRef.current.pause();
@@ -155,12 +194,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
       console.log('Fetching from IPFS gateway:', song.ipfsHash);
       const audioData = await getFromIPFS(song.ipfsHash);
-
-      // Check if request was aborted
-      if (abortControllerRef.current.signal.aborted) {
-        console.log('IPFS fetch was aborted');
-        return;
-      }
 
       const blob = new Blob([audioData], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
