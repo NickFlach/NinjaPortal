@@ -1,4 +1,3 @@
-
 # API Documentation
 
 ## Authentication
@@ -96,6 +95,24 @@ Returns metadata for a specific song.
   "ipfsHash": "string",
   "uploadedBy": "string",
   "createdAt": "timestamp"
+}
+```
+
+#### GET /api/music/map
+Returns geographical data about music listeners.
+
+**Response:**
+```json
+{
+  "countries": {
+    "[country_code]": {
+      "votes": "number",
+      "locations": [
+        [latitude, longitude]
+      ]
+    }
+  },
+  "totalListeners": "number"
 }
 ```
 

@@ -2,6 +2,60 @@ import { db } from '@db';
 import { songs, listeners } from '@db/schema';
 import { desc, eq, sql } from 'drizzle-orm';
 
+export interface MapDataResponse {
+  countries: {
+    [key: string]: {
+      votes: number;
+      locations: Array<[number, number]>;  // [latitude, longitude] pairs
+    };
+  };
+  totalListeners: number;
+}
+
+// New function to get map-specific data
+export async function getMapData(): Promise<MapDataResponse> {
+  // Get all listener data with coordinates
+  const listenerData = await db.select({
+    countryCode: listeners.countryCode,
+    latitude: listeners.latitude,
+    longitude: listeners.longitude,
+  })
+  .from(listeners)
+  .where(sql`${listeners.latitude} is not null and ${listeners.longitude} is not null`);
+
+  // Process listener data by country and aggregate locations into regions
+  const countries: { [key: string]: { votes: number; locations: Array<[number, number]> } } = {};
+  const processedLocations = new Set<string>(); // Track processed locations to avoid duplicates
+  let totalListeners = 0;
+
+  listenerData.forEach(({ countryCode, latitude, longitude }) => {
+    if (!countryCode || !latitude || !longitude) return;
+
+    if (!countries[countryCode]) {
+      countries[countryCode] = { votes: 0, locations: [] };
+    }
+
+    countries[countryCode].votes++;
+    totalListeners++;
+
+    // Create a location key using rounded coordinates for aggregation
+    const roundedLat = Math.round(parseFloat(latitude) * 10) / 10;
+    const roundedLng = Math.round(parseFloat(longitude) * 10) / 10;
+    const locationKey = `${roundedLat},${roundedLng}`;
+
+    // Only add location if we haven't seen this rounded coordinate pair before
+    if (!processedLocations.has(locationKey)) {
+      processedLocations.add(locationKey);
+      countries[countryCode].locations.push([roundedLat, roundedLng]);
+    }
+  });
+
+  return {
+    countries,
+    totalListeners
+  };
+}
+
 export interface MusicStats {
   totalSongs: number;
   totalArtists: number;

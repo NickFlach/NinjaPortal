@@ -11,18 +11,15 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 
-// Define types for our statistics data
-interface MusicStats {
-  totalSongs: number;
-  totalArtists: number;
-  totalListens: number;
-  topArtists: Array<{ artist: string; songCount: number }>;
+// Define types for our map data
+interface MapData {
   countries: {
     [key: string]: {
       votes: number;
-      locations: Array<[number, number]>;
+      locations: Array<[number, number]>;  // [latitude, longitude] pairs
     };
   };
+  totalListeners: number;
 }
 
 const geoUrl = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
@@ -31,19 +28,20 @@ const MapPage: FC = () => {
   const [tooltipContent, setTooltipContent] = useState("");
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
 
-  const { data: songStats, isLoading } = useQuery<MusicStats>({
-    queryKey: ['/api/music/stats']
+  const { data: mapData, isLoading } = useQuery<MapData>({
+    queryKey: ['/api/music/map'],
+    refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   const getColor = (countryCode: string) => {
-    if (!songStats?.countries) return "#1e293b"; // Base color for countries without data
+    if (!mapData?.countries) return "#1e293b"; // Base color for countries without data
 
-    const countryData = songStats.countries[countryCode];
+    const countryData = mapData.countries[countryCode];
     if (!countryData?.votes) return "#1e293b"; // Base color for inactive countries
 
     // Calculate opacity based on activity level
     const maxVotes = Math.max(1, 
-      Object.values(songStats.countries)
+      Object.values(mapData.countries)
         .reduce((max, country) => Math.max(max, country.votes), 1)
     );
 
@@ -63,6 +61,11 @@ const MapPage: FC = () => {
     <Layout>
       <div className="container mx-auto py-6">
         <h1 className="text-4xl font-bold mb-6">Global Listener Map</h1>
+        {mapData && (
+          <div className="text-sm text-muted-foreground mb-4">
+            Total Active Listeners: {mapData.totalListeners}
+          </div>
+        )}
         <Card className="p-4 bg-background">
           <div className="relative w-full h-[600px] rounded-lg overflow-hidden">
             {tooltipContent && (
@@ -91,7 +94,7 @@ const MapPage: FC = () => {
                       {({ geographies }) =>
                         geographies.map((geo) => {
                           const countryCode = geo.properties.iso_a3;
-                          const votes = songStats?.countries?.[countryCode]?.votes || 0;
+                          const votes = mapData?.countries?.[countryCode]?.votes || 0;
 
                           return (
                             <Geography
@@ -124,8 +127,8 @@ const MapPage: FC = () => {
                       }
                     </Geographies>
 
-                    {songStats?.countries && 
-                      Object.entries(songStats.countries).map(([countryCode, data]) =>
+                    {mapData?.countries && 
+                      Object.entries(mapData.countries).map(([countryCode, data]) =>
                         data.votes > 0 && data.locations.map(([lat, lng], index) => (
                           <Marker 
                             key={`${countryCode}-${index}`} 
@@ -141,7 +144,7 @@ const MapPage: FC = () => {
                             />
                           </Marker>
                         ))
-                    )}
+                      )}
                   </ZoomableGroup>
                 </ComposableMap>
               )}

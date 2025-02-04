@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getMusicStats, getSongMetadata } from '../services/music';
+import { getMusicStats, getSongMetadata, getMapData } from '../services/music';
 
 const router = Router();
 
@@ -17,15 +17,26 @@ router.get('/api/music/metadata/:id', async (req, res) => {
   try {
     const songId = parseInt(req.params.id);
     const metadata = await getSongMetadata(songId);
-    
+
     if (!metadata) {
       return res.status(404).json({ error: 'Song not found' });
     }
-    
+
     res.json(metadata);
   } catch (error) {
     console.error('Error fetching song metadata:', error);
     res.status(500).json({ error: 'Failed to fetch song metadata' });
+  }
+});
+
+// New endpoint for map data
+router.get('/api/music/map', async (_req, res) => {
+  try {
+    const mapData = await getMapData();
+    res.json(mapData);
+  } catch (error) {
+    console.error('Error fetching map data:', error);
+    res.status(500).json({ error: 'Failed to fetch map data' });
   }
 });
 
