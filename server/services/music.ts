@@ -43,24 +43,18 @@ export async function getMapData(): Promise<MapDataResponse> {
     totalListeners++;
 
     // Convert string coordinates to numbers and round to 1 decimal place
-    const lat = parseFloat(latitude);
-    const lng = parseFloat(longitude);
+    const lat = Number(latitude);
+    const lng = Number(longitude);
 
     if (isNaN(lat) || isNaN(lng)) {
       console.log('Invalid coordinates:', { latitude, longitude });
       return;
     }
 
-    const roundedLat = Math.round(lat * 10) / 10;
-    const roundedLng = Math.round(lng * 10) / 10;
-    const locationKey = `${roundedLat},${roundedLng}`;
-
-    // Only add location if we haven't seen this rounded coordinate pair before
-    if (!processedLocations.has(locationKey)) {
-      processedLocations.add(locationKey);
-      countries[countryCode].locations.push([roundedLat, roundedLng]);
-      console.log('Added location:', { countryCode, roundedLat, roundedLng });
-    }
+    // Important: For the map, we need to swap lat/lng to lng/lat order
+    // React Simple Maps expects [longitude, latitude] format
+    countries[countryCode].locations.push([lng, lat]);
+    console.log('Added location:', { countryCode, lat, lng });
   });
 
   const response = {
