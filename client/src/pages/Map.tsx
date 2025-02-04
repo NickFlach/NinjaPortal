@@ -12,21 +12,36 @@ type ListenerData = {
   [key: string]: number;
 };
 
-// Sample data - in production this would come from your backend
+// Sample data with correct ISO 3166-1 alpha-3 country codes
 const sampleListenerData: ListenerData = {
   USA: 1000,
   GBR: 500,
   FRA: 300,
   DEU: 400,
   JPN: 600,
+  CAN: 450,
+  AUS: 350,
+  BRA: 250,
+  IND: 800,
+  CHN: 900,
+  RUS: 200,
+  ZAF: 150,
+  MEX: 300,
+  ESP: 250,
+  ITA: 200
 };
 
-// Using a more reliable TopoJSON source
 const geoUrl = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
 const MapPage: FC = () => {
   const [tooltipContent, setTooltipContent] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const getColor = (listeners: number) => {
+    if (listeners === 0) return "#F5F5F5";
+    const opacity = Math.min(0.2 + (listeners / 1000) * 0.8, 0.9);
+    return `rgba(52, 211, 153, ${opacity})`;
+  };
 
   if (error) {
     return (
@@ -66,9 +81,7 @@ const MapPage: FC = () => {
                     geographies.map((geo) => {
                       const countryCode = geo.properties.ISO_A3;
                       const listeners = sampleListenerData[countryCode] || 0;
-                      const fillColor = listeners > 0 
-                        ? `rgba(52, 211, 153, ${Math.min(listeners / 1000, 0.8)})`
-                        : "#F5F5F5";
+                      const fillColor = getColor(listeners);
 
                       return (
                         <Geography
@@ -79,7 +92,7 @@ const MapPage: FC = () => {
                           strokeWidth={0.5}
                           onMouseEnter={() => {
                             const { NAME } = geo.properties;
-                            setTooltipContent(`${NAME}: ${listeners} listeners`);
+                            setTooltipContent(`${NAME}: ${listeners.toLocaleString()} listeners`);
                           }}
                           onMouseLeave={() => {
                             setTooltipContent("");
