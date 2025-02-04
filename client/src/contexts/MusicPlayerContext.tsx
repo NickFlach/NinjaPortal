@@ -146,32 +146,32 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         setCurrentContext(context);
       }
 
-      // Get geolocation before playing
+      // Get approximate location if available (optional)
       let geoData: { latitude?: number; longitude?: number } = {};
       try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
           if (!navigator.geolocation) {
-            reject(new Error('Geolocation not supported'));
+            reject(new Error('not_supported'));
             return;
           }
           navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0
+            enableHighAccuracy: false, // Less precise location
+            timeout: 3000,
+            maximumAge: 300000 // Cache location for 5 minutes
           });
         });
 
+        // Round coordinates to 1 decimal place for less precision
         geoData = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
+          latitude: Math.round(position.coords.latitude * 10) / 10,
+          longitude: Math.round(position.coords.longitude * 10) / 10
         };
-        console.log('Got geolocation:', geoData);
       } catch (error) {
-        console.log('Geolocation error:', error);
-        // Continue without location data
+        // Silently continue without location
+        console.debug('Location not available');
       }
 
-      // Record play with geolocation data
+      // Record play with optional location data
       try {
         await fetch(`/api/songs/play/${song.id}`, {
           method: 'POST',

@@ -95,25 +95,36 @@ export async function getMusicStats(): Promise<MusicStats> {
 
   export async function incrementListenCount(id: number, countryCode: string, coords?: { lat: number; lng: number }) {
     await db.transaction(async (tx) => {
-      console.log('Recording listen with coordinates:', {
-        songId: id,
-        countryCode,
-        coordinates: coords
-      });
-
       // Increment song votes
       await tx.update(songs)
         .set({ votes: sql`coalesce(${songs.votes}, 0) + 1` })
         .where(eq(songs.id, id));
 
-      // Record listener location with coordinates if available
-      await tx.insert(listeners)
-        .values({
-          songId: id,
-          countryCode,
-          latitude: coords?.lat || null,
-          longitude: coords?.lng || null,
-          timestamp: new Date()
-        });
+      // Only record location if provided and valid
+      if (coords?.lat && coords?.lng) {
+        // Round coordinates to 1 decimal place for privacy
+        const latitude = Math.round(coords.lat * 10) / 10;
+        const longitude = Math.round(coords.lng * 10) / 10;
+
+        // Record listener location with reduced precision
+        await tx.insert(listeners)
+          .values({
+            songId: id,
+            countryCode,
+            latitude: latitude.toString(),
+            longitude: longitude.toString(),
+            timestamp: new Date()
+          });
+      } else {
+        // Record just the country without coordinates
+        await tx.insert(listeners)
+          .values({
+            songId: id,
+            countryCode,
+            latitude: null,
+            longitude: null,
+            timestamp: new Date()
+          });
+      }
     });
   }

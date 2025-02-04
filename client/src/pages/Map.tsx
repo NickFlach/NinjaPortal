@@ -83,7 +83,7 @@ const MapPage: FC = () => {
                                 const { name } = geo.properties;
                                 setSelectedCountry(countryCode);
                                 setTooltipContent(
-                                  `${name}: ${votes > 0 ? votes.toLocaleString() + ' plays' : 'No plays'}`
+                                  `${name}: ${votes > 0 ? 'Active Region' : 'No Activity'}`
                                 );
                               }}
                               onMouseLeave={() => {
@@ -105,15 +105,15 @@ const MapPage: FC = () => {
                       }
                     </Geographies>
 
-                    {/* Render location pins for countries with actual plays */}
                     {Object.entries(songStats?.countries || {}).map(([countryCode, data]) =>
                       data.votes > 0 && (data.locations || []).map(([lat, lng], index) => (
                         <Marker key={`${countryCode}-${index}`} coordinates={[lng, lat]}>
                           <circle
-                            r={4}
+                            r={6} // Larger radius to indicate general area
                             fill={selectedCountry === countryCode ? "#60A5FA" : "#10B981"}
+                            fillOpacity={0.4} // More transparent
                             stroke="#fff"
-                            strokeWidth={2}
+                            strokeWidth={1}
                             className="animate-pulse"
                           />
                         </Marker>
