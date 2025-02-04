@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, boolean, decimal } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 export const users = pgTable("users", {
@@ -63,6 +63,8 @@ export const listeners = pgTable("listeners", {
   id: serial("id").primaryKey(),
   songId: integer("song_id").references(() => songs.id),
   countryCode: text("country_code").notNull(),
+  latitude: decimal("latitude", { precision: 10, scale: 6 }),
+  longitude: decimal("longitude", { precision: 10, scale: 6 }),
   timestamp: timestamp("timestamp").defaultNow(),
 });
 

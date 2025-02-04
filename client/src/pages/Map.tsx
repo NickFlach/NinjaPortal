@@ -3,7 +3,8 @@ import {
   ComposableMap,
   Geographies,
   Geography,
-  ZoomableGroup
+  ZoomableGroup,
+  Marker
 } from "react-simple-maps";
 import { Card } from "@/components/ui/card";
 import { useState } from "react";
@@ -13,34 +14,21 @@ const geoUrl = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
 const MapPage: FC = () => {
   const [tooltipContent, setTooltipContent] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
 
-  // Fetch song data with logging
   const { data: songStats, isLoading } = useQuery({
-    queryKey: ['/api/music/stats'],
-    select: (data: any) => {
-      console.log('Raw stats data:', data);
-      if (data?.countries) {
-        console.log('Countries with plays:', Object.keys(data.countries).map(code => ({
-          code,
-          plays: data.countries[code].votes
-        })));
-      }
-      return data;
-    }
+    queryKey: ['/api/music/stats']
   });
 
   const getColor = (votes: number) => {
-    // Use a darker base color for countries with no plays
     if (votes === undefined || votes === null) return "#2A303C";
 
     const maxVotes = Math.max(1, 
       Object.values(songStats?.countries || {})
-        .reduce((max, country: any) => Math.max(max, country.votes || 0), 1)
+        .reduce((max, country) => Math.max(max, country.votes || 0), 1)
     );
 
-    // Adjust opacity range to be more visible
     const opacity = Math.min(0.3 + (votes / maxVotes) * 0.7, 1);
-    // Use a brighter green for better visibility
     return `rgba(74, 222, 128, ${opacity})`;
   };
 
@@ -75,13 +63,8 @@ const MapPage: FC = () => {
                     {({ geographies }) =>
                       geographies.map((geo) => {
                         const countryCode = geo.properties.iso_a3;
-                        const votes = songStats?.countries?.[countryCode]?.votes ?? 0;
-
-                        console.log(`Rendering ${geo.properties.name} (${countryCode}):`, {
-                          votes,
-                          hasData: countryCode in (songStats?.countries || {}),
-                          color: getColor(votes)
-                        });
+                        const countryData = songStats?.countries?.[countryCode];
+                        const votes = countryData?.votes ?? 0;
 
                         return (
                           <Geography
@@ -92,29 +75,44 @@ const MapPage: FC = () => {
                             strokeWidth={0.5}
                             onMouseEnter={() => {
                               const { name } = geo.properties;
-                              setTooltipContent(`${name}: ${votes.toLocaleString()} plays`);
+                              setSelectedCountry(countryCode);
+                              setTooltipContent(
+                                `${name}: ${votes.toLocaleString()} plays`
+                              );
                             }}
                             onMouseLeave={() => {
+                              setSelectedCountry(null);
                               setTooltipContent("");
                             }}
                             style={{
-                              default: {
-                                outline: "none",
-                              },
+                              default: { outline: "none" },
                               hover: {
                                 fill: "#60A5FA",
                                 outline: "none",
                                 cursor: "pointer"
                               },
-                              pressed: {
-                                outline: "none",
-                              },
+                              pressed: { outline: "none" },
                             }}
                           />
                         );
                       })
                     }
                   </Geographies>
+
+                  {/* Render location pins */}
+                  {Object.entries(songStats?.countries || {}).map(([countryCode, data]) =>
+                    (data.locations || []).map(([lat, lng], index) => (
+                      <Marker key={`${countryCode}-${index}`} coordinates={[lng, lat]}>
+                        <circle
+                          r={4}
+                          fill={selectedCountry === countryCode ? "#60A5FA" : "#10B981"}
+                          stroke="#fff"
+                          strokeWidth={2}
+                          className="animate-pulse"
+                        />
+                      </Marker>
+                    ))
+                  )}
                 </ZoomableGroup>
               </ComposableMap>
             )}

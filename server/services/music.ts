@@ -11,29 +11,26 @@ export interface MusicStats {
   countries: {
     [key: string]: {
       votes: number;
+      locations: Array<[number, number]>; // [latitude, longitude] pairs
     };
   };
 }
 
 export async function getMusicStats(): Promise<MusicStats> {
-  const [
-    { count: totalSongs }
-  ] = await db.select({
+  // Get basic stats
+  const [{ count: totalSongs }] = await db.select({
     count: sql<number>`count(*)`
   }).from(songs);
 
-  const [
-    { count: totalArtists }
-  ] = await db.select({
+  const [{ count: totalArtists }] = await db.select({
     count: sql<number>`count(distinct ${songs.artist})`
   }).from(songs);
 
-  const [
-    { sum: totalListens }
-  ] = await db.select({
+  const [{ sum: totalListens }] = await db.select({
     sum: sql<number>`coalesce(sum(${songs.votes}), 0)`
   }).from(songs);
 
+  // Get top artists
   const topArtists = await db.select({
     artist: songs.artist,
     songCount: sql<number>`count(*)`
@@ -44,32 +41,33 @@ export async function getMusicStats(): Promise<MusicStats> {
   .orderBy(sql`count(*) desc`)
   .limit(10);
 
+  // Get recent uploads
   const recentUploads = await db.select()
     .from(songs)
     .orderBy(desc(songs.createdAt))
     .limit(5);
 
-  // Get listener counts by country with proper counting
-  const listenersByCountry = await db.select({
-    countryCode: listeners.country_code,
-    votes: sql<number>`count(*)`
+  // Get all listener data with coordinates
+  const listenerData = await db.select({
+    countryCode: listeners.countryCode,
+    latitude: listeners.latitude,
+    longitude: listeners.longitude,
   })
   .from(listeners)
-  .groupBy(listeners.country_code);
+  .where(sql`${listeners.latitude} is not null and ${listeners.longitude} is not null`);
 
-  console.log('Raw listener data:', listenersByCountry);
+  // Process listener data by country
+  const countries: { [key: string]: { votes: number; locations: Array<[number, number]> } } = {};
 
-  // Transform into the expected format with ISO codes
-  const countries: { [key: string]: { votes: number } } = {};
-  for (const { countryCode, votes } of listenersByCountry) {
-    if (countryCode) {
-      // Keep the ISO code format (3-letter codes)
-      countries[countryCode] = { votes: Number(votes) };
-      console.log(`Adding country ${countryCode} with ${votes} votes`);
+  listenerData.forEach(({ countryCode, latitude, longitude }) => {
+    if (!countries[countryCode]) {
+      countries[countryCode] = { votes: 0, locations: [] };
     }
-  }
-
-  console.log('Final country statistics:', countries);
+    countries[countryCode].votes++;
+    if (latitude && longitude) {
+      countries[countryCode].locations.push([Number(latitude), Number(longitude)]);
+    }
+  });
 
   return {
     totalSongs,
@@ -88,26 +86,24 @@ export async function getSongMetadata(id: number) {
   const [song] = await db.select()
     .from(songs)
     .where(eq(songs.id, id));
-
   return song;
 }
 
-export async function incrementListenCount(id: number, countryCode: string) {
-  // Begin a transaction to ensure both operations complete
+export async function incrementListenCount(id: number, countryCode: string, coords?: { lat: number; lng: number }) {
   await db.transaction(async (tx) => {
     // Increment song votes
     await tx.update(songs)
       .set({ votes: sql`coalesce(${songs.votes}, 0) + 1` })
       .where(eq(songs.id, id));
 
-    // Record listener location
+    // Record listener location with coordinates if available
     await tx.insert(listeners)
       .values({
-        song_id: id,
-        country_code: countryCode, // Keep original ISO format
+        songId: id,
+        countryCode,
+        latitude: coords?.lat || null,
+        longitude: coords?.lng || null,
         timestamp: new Date()
       });
-
-    console.log(`Recorded listen for song ${id} from country ${countryCode}`);
   });
 }
