@@ -51,11 +51,11 @@ export async function getMusicStats(): Promise<MusicStats> {
 
   // Get listener counts by country with proper counting
   const listenersByCountry = await db.select({
-    countryCode: listeners.countryCode,
+    countryCode: listeners.country_code,
     votes: sql<number>`count(*)`
   })
   .from(listeners)
-  .groupBy(listeners.countryCode);
+  .groupBy(listeners.country_code);
 
   console.log('Raw listener data:', listenersByCountry);
 
@@ -103,9 +103,11 @@ export async function incrementListenCount(id: number, countryCode: string) {
     // Record listener location
     await tx.insert(listeners)
       .values({
-        songId: id,
-        countryCode, // Keep original ISO format
+        song_id: id,
+        country_code: countryCode, // Keep original ISO format
         timestamp: new Date()
       });
+
+    console.log(`Recorded listen for song ${id} from country ${countryCode}`);
   });
 }
