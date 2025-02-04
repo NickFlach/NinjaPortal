@@ -6,6 +6,8 @@ import {
   ZoomableGroup
 } from "react-simple-maps";
 import { Card } from "@/components/ui/card";
+import { Tooltip } from "@/components/ui/tooltip";
+import { useState } from "react";
 
 type ListenerData = {
   [key: string]: number;
@@ -24,13 +26,36 @@ const sampleListenerData: ListenerData = {
 const geoUrl = "https://raw.githubusercontent.com/deldersveld/topojson/master/world-countries.json";
 
 const MapPage: FC = () => {
+  const [tooltipContent, setTooltipContent] = useState("");
+
   return (
     <div className="container mx-auto py-6">
       <h1 className="text-4xl font-bold mb-6">Global Listener Map</h1>
-      <Card className="p-4">
-        <div style={{ width: "100%", height: "500px" }}>
-          <ComposableMap>
-            <ZoomableGroup>
+      <Card className="p-4 relative">
+        <div style={{ width: "100%", minHeight: "500px", position: "relative" }}>
+          {tooltipContent && (
+            <div
+              style={{
+                position: "absolute",
+                top: "10px",
+                left: "10px",
+                padding: "8px",
+                background: "white",
+                borderRadius: "4px",
+                boxShadow: "0 0 10px rgba(0,0,0,0.1)",
+                zIndex: 1000
+              }}
+            >
+              {tooltipContent}
+            </div>
+          )}
+          <ComposableMap 
+            projection="geoMercator"
+            projectionConfig={{
+              scale: 100
+            }}
+          >
+            <ZoomableGroup center={[0, 20]} zoom={1}>
               <Geographies geography={geoUrl}>
                 {({ geographies }) =>
                   geographies.map((geo) => {
@@ -46,6 +71,13 @@ const MapPage: FC = () => {
                         geography={geo}
                         fill={fillColor}
                         stroke="#D6D6DA"
+                        onMouseEnter={() => {
+                          const { NAME } = geo.properties;
+                          setTooltipContent(`${NAME}: ${listeners} listeners`);
+                        }}
+                        onMouseLeave={() => {
+                          setTooltipContent("");
+                        }}
                         style={{
                           default: {
                             outline: "none",
@@ -53,6 +85,7 @@ const MapPage: FC = () => {
                           hover: {
                             fill: "#93C5FD",
                             outline: "none",
+                            cursor: "pointer"
                           },
                           pressed: {
                             outline: "none",
