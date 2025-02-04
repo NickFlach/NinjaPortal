@@ -39,16 +39,17 @@ const AnimatedMarker: FC<{
           opacity: 0.4,
           y: 0
         }}
-        exit={{ r: 0, opacity: 0 }}
+        exit={{ r: 0, opacity: 0, y: 20 }}
         transition={{
           type: "spring",
           stiffness: 200,
-          damping: 20
+          damping: 20,
+          duration: 0.5
         }}
         fill={isSelected ? "#60A5FA" : "#10B981"}
         stroke="#fff"
         strokeWidth={1}
-        className="animate-pulse"
+        className="animate-pulse cursor-pointer"
       />
     </Marker>
   );
@@ -60,7 +61,7 @@ const MapPage: FC = () => {
 
   const { data: mapData, isLoading } = useQuery<MapData>({
     queryKey: ['/api/music/map'],
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 5000, // Refresh every 5 seconds for more responsive updates
   });
 
   const getColor = (countryCode: string) => {
@@ -171,7 +172,7 @@ const MapPage: FC = () => {
                         Object.entries(mapData.countries).map(([countryCode, data]) =>
                           data.votes > 0 && data.locations.map(([lat, lng], index) => (
                             <AnimatedMarker
-                              key={`${countryCode}-${index}`}
+                              key={`${countryCode}-${index}-${data.votes}`}
                               coordinates={[lng, lat]}
                               isSelected={selectedCountry === countryCode}
                             />
