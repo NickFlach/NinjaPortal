@@ -3,6 +3,7 @@ import { createServer } from "http";
 import { db } from "@db";
 import { songs, users, playlists, followers, playlistSongs, recentlyPlayed, userRewards } from "@db/schema";
 import { eq, desc, and } from "drizzle-orm";
+import { incrementListenCount } from './services/music';
 
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
@@ -44,9 +45,21 @@ export function registerRoutes(app: Express) {
   app.post("/api/songs/play/:id", async (req, res) => {
     const songId = parseInt(req.params.id);
     const userAddress = req.headers['x-wallet-address'] as string;
+    const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     try {
-      // If user is authenticated, record the play
+      // Get country from IP using CloudFlare headers if available
+      let countryCode = req.headers['cf-ipcountry'] as string;
+
+      // Fallback to US if we can't determine country (for development)
+      if (!countryCode) {
+        countryCode = 'USA';
+      }
+
+      // If user is authenticated, record the play with country
+      await incrementListenCount(songId, countryCode);
+
+      // Record play in recently played
       if (userAddress) {
         await db.insert(recentlyPlayed).values({
           songId,
