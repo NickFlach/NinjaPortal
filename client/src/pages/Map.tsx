@@ -21,19 +21,23 @@ const MapPage: FC = () => {
   });
 
   const getColor = (votes: number) => {
-    if (!votes || votes === 0) return "#F5F5F5";
-    const maxVotes = songStats?.totalListens || 1;
-    const opacity = Math.min(0.2 + (votes / maxVotes) * 0.8, 1);
-    return `rgba(52, 211, 153, ${opacity})`;
+    // Use a darker base color for countries with no plays
+    if (!votes || votes === 0) return "#2A303C";
+
+    const maxVotes = Math.max(1, songStats?.totalListens || 1);
+    // Adjust opacity range to be more visible
+    const opacity = Math.min(0.3 + (votes / maxVotes) * 0.7, 1);
+    // Use a brighter green for better visibility
+    return `rgba(74, 222, 128, ${opacity})`;
   };
 
   return (
     <div className="container mx-auto py-6">
       <h1 className="text-4xl font-bold mb-6">Global Listener Map</h1>
-      <Card className="p-4">
-        <div className="relative w-full h-[600px] border rounded-lg overflow-hidden">
+      <Card className="p-4 bg-background">
+        <div className="relative w-full h-[600px] rounded-lg overflow-hidden">
           {tooltipContent && (
-            <div className="absolute top-4 left-4 bg-white p-2 rounded-md shadow-lg z-50">
+            <div className="absolute top-4 left-4 bg-background/90 p-2 rounded-md shadow-lg z-50">
               {tooltipContent}
             </div>
           )}
@@ -49,7 +53,8 @@ const MapPage: FC = () => {
                 }}
                 style={{
                   width: "100%",
-                  height: "100%"
+                  height: "100%",
+                  backgroundColor: "transparent"
                 }}
               >
                 <ZoomableGroup>
@@ -57,16 +62,14 @@ const MapPage: FC = () => {
                     {({ geographies }) =>
                       geographies.map((geo) => {
                         const countryCode = geo.properties.iso_a3?.toLowerCase();
-                        const countryVotes = songStats?.countries?.[countryCode]?.votes || 0; // Accessing votes from API response
-
-                        const fillColor = getColor(countryVotes);
+                        const countryVotes = songStats?.countries?.[countryCode]?.votes || 0;
 
                         return (
                           <Geography
                             key={geo.rsmKey}
                             geography={geo}
-                            fill={fillColor}
-                            stroke="#D6D6DA"
+                            fill={getColor(countryVotes)}
+                            stroke="#4A5568"
                             strokeWidth={0.5}
                             onMouseEnter={() => {
                               const { name } = geo.properties;
@@ -80,7 +83,7 @@ const MapPage: FC = () => {
                                 outline: "none",
                               },
                               hover: {
-                                fill: "#93C5FD",
+                                fill: "#60A5FA",
                                 outline: "none",
                                 cursor: "pointer"
                               },
