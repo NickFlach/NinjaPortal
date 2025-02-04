@@ -13,10 +13,11 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
   const [syncEnabled, setSyncEnabled] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const { address } = useAccount();
-  const { currentSong, isPlaying, audioRef } = useMusicPlayer();
+  const { currentSong, isPlaying, audioRef, togglePlay } = useMusicPlayer();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const maxReconnectAttempts = 5;
   const reconnectAttemptRef = useRef(0);
+  const lastSyncRef = useRef<{ timestamp: number; playing: boolean } | null>(null);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -30,41 +31,52 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
     function connect() {
       try {
-        console.log('Attempting to connect to WebSocket server...');
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/music-sync`;
         const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
           console.log('Connected to music sync server');
-          reconnectAttemptRef.current = 0; // Reset reconnect attempts on successful connection
+          reconnectAttemptRef.current = 0;
           if (address) {
             ws.send(JSON.stringify({ type: 'auth', address }));
           }
-          // Clear reconnect timeout if connection successful
           if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current);
             reconnectTimeoutRef.current = undefined;
           }
         };
 
-        ws.onmessage = (event) => {
+        ws.onmessage = async (event) => {
           try {
             const message = JSON.parse(event.data);
             if (message.type === 'sync' && audioRef.current && message.songId === currentSong?.id) {
               const currentTime = audioRef.current.currentTime;
               const timeDiff = Math.abs(currentTime - message.timestamp);
 
+              // Prevent sync feedback loops by checking last sync state
+              const now = Date.now();
+              if (lastSyncRef.current && 
+                  now - lastSyncRef.current.timestamp < 1000 && 
+                  lastSyncRef.current.playing === message.playing) {
+                return;
+              }
+
               // Only sync if time difference is significant (>1 second)
               if (timeDiff > 1) {
                 audioRef.current.currentTime = message.timestamp;
               }
 
-              if (message.playing && !isPlaying) {
-                audioRef.current.play().catch(console.error);
-              } else if (!message.playing && isPlaying) {
-                audioRef.current.pause();
+              // Handle play/pause state
+              if (message.playing !== isPlaying) {
+                await togglePlay();
               }
+
+              // Update last sync state
+              lastSyncRef.current = {
+                timestamp: now,
+                playing: message.playing
+              };
             }
           } catch (error) {
             console.error('Error processing sync message:', error);
@@ -78,11 +90,8 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
         ws.onclose = (event) => {
           console.log('WebSocket connection closed:', event.code, event.reason);
 
-          // Attempt to reconnect if not manually disabled and within max attempts
           if (syncEnabled && !reconnectTimeoutRef.current && reconnectAttemptRef.current < maxReconnectAttempts) {
             const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
-            console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttemptRef.current + 1}/${maxReconnectAttempts})`);
-
             reconnectTimeoutRef.current = setTimeout(() => {
               reconnectTimeoutRef.current = undefined;
               reconnectAttemptRef.current++;
@@ -115,7 +124,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
         reconnectTimeoutRef.current = undefined;
       }
     };
-  }, [syncEnabled, address]);
+  }, [syncEnabled, address, togglePlay]);
 
   // Send sync messages when playback state changes
   useEffect(() => {
@@ -125,6 +134,14 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
     if (wsRef.current.readyState === WebSocket.OPEN) {
       try {
+        // Only send sync message if it's different from last sync
+        const now = Date.now();
+        if (lastSyncRef.current && 
+            now - lastSyncRef.current.timestamp < 1000 && 
+            lastSyncRef.current.playing === isPlaying) {
+          return;
+        }
+
         // Subscribe to current song
         wsRef.current.send(JSON.stringify({
           type: 'subscribe',
@@ -138,6 +155,12 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
           timestamp: audioRef.current?.currentTime || 0,
           playing: isPlaying
         }));
+
+        // Update last sync state
+        lastSyncRef.current = {
+          timestamp: now,
+          playing: isPlaying
+        };
       } catch (error) {
         console.error('Error sending sync message:', error);
         setSyncEnabled(false);

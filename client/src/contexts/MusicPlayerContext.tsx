@@ -38,6 +38,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const defaultWallet = "REDACTED_WALLET_ADDRESS";
   const landingAddress = userAddress || defaultWallet;
   const isLandingPage = !userAddress;
+  const audioContextRef = useRef<AudioContext>();
 
   // Fetch landing page feed (recent songs)
   const { data: recentSongs } = useQuery<Song[]>({
@@ -90,6 +91,28 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [userAddress]);
 
+  // Initialize audio context
+  useEffect(() => {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    audioContextRef.current = new AudioContext();
+
+    return () => {
+      audioContextRef.current?.close();
+    };
+  }, []);
+
+  const cleanupAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute('src');
+      audioRef.current.load();
+      if (audioRef.current.src) {
+        URL.revokeObjectURL(audioRef.current.src);
+      }
+      audioRef.current = null;
+    }
+  };
+
   // Initialize music once on load - only if we're on landing page
   useEffect(() => {
     async function initializeMusic() {
@@ -98,28 +121,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       try {
         const firstSong = recentSongs[0];
         console.log('Initializing music with:', firstSong.title);
-
-        // Create audio context to handle autoplay
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        const audioContext = new AudioContext();
-
-        // Try to resume audio context (required for autoplay)
-        if (audioContext.state === 'suspended') {
-          await audioContext.resume();
-        }
-
         await playSong(firstSong, 'landing');
-
-        // Handle autoplay failure
-        if (audioRef.current) {
-          const playPromise = audioRef.current.play();
-          if (playPromise !== undefined) {
-            playPromise.catch(error => {
-              console.log('Autoplay prevented:', error);
-              setIsPlaying(false);
-            });
-          }
-        }
       } catch (error) {
         console.error('Error initializing music:', error);
         setIsPlaying(false);
@@ -131,12 +133,16 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [recentSongs, isLandingPage]);
 
+
   const playSong = async (song: Song, context?: PlaylistContext) => {
     try {
       // Cancel any existing fetch request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+
+      // Clean up existing audio before creating new one
+      cleanupAudio();
 
       // Create new abort controller for this request
       abortControllerRef.current = new AbortController();
@@ -146,53 +152,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         setCurrentContext(context);
       }
 
-      // Get approximate location if available (optional)
-      let geoData: { latitude?: number; longitude?: number } = {};
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          if (!navigator.geolocation) {
-            reject(new Error('not_supported'));
-            return;
-          }
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: false, // Less precise location
-            timeout: 3000,
-            maximumAge: 300000 // Cache location for 5 minutes
-          });
-        });
-
-        // Round coordinates to 1 decimal place for less precision
-        geoData = {
-          latitude: Math.round(position.coords.latitude * 10) / 10,
-          longitude: Math.round(position.coords.longitude * 10) / 10
-        };
-      } catch (error) {
-        // Silently continue without location
-        console.debug('Location not available');
-      }
-
-      // Record play with optional location data
-      try {
-        await fetch(`/api/songs/play/${song.id}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(userAddress && { 'X-Wallet-Address': userAddress })
-          },
-          body: JSON.stringify(geoData)
-        });
-      } catch (error) {
-        console.error('Error recording play:', error);
-      }
-
-      // Clean up old audio element completely
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.removeAttribute('src');
-        audioRef.current.load();
-        audioRef.current = null;
-      }
-
+      // Get IPFS data
       console.log('Fetching from IPFS gateway:', song.ipfsHash);
       const audioData = await getFromIPFS(song.ipfsHash);
 
@@ -209,11 +169,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         setIsPlaying(false);
       });
 
-      newAudio.addEventListener('loadeddata', () => {
-        console.log('Audio data loaded successfully');
-      });
-
-      // Add ended event listener to play next song
       newAudio.addEventListener('ended', async () => {
         console.log('Song ended, playing next song');
         const nextSong = getNextSong(song.id);
@@ -230,19 +185,36 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         newAudio.load();
       });
 
+      // Update refs and state
       audioRef.current = newAudio;
-      const playPromise = audioRef.current.play();
+      setCurrentSong(song);
 
+      // Try to play
+      const playPromise = newAudio.play();
       if (playPromise !== undefined) {
-        playPromise.then(() => {
+        try {
+          await playPromise;
           setIsPlaying(true);
-          setCurrentSong(song);
           console.log('IPFS fetch and playback successful');
-        }).catch(error => {
+        } catch (error) {
           console.error('Playback prevented:', error);
           setIsPlaying(false);
-        });
+        }
       }
+
+      // Record play
+      try {
+        await fetch(`/api/songs/play/${song.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(userAddress && { 'X-Wallet-Address': userAddress })
+          }
+        });
+      } catch (error) {
+        console.error('Error recording play:', error);
+      }
+
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('IPFS fetch aborted');
@@ -268,7 +240,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           await playPromise;
-          audioRef.current.volume = 1;
           setIsPlaying(true);
         }
       }
@@ -284,14 +255,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.removeAttribute('src');
-        audioRef.current.load();
-        if (audioRef.current.src) {
-          URL.revokeObjectURL(audioRef.current.src);
-        }
-      }
+      cleanupAudio();
     };
   }, []);
 
