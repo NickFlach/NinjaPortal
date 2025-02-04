@@ -83,6 +83,9 @@ const MapPage: FC = () => {
                       const listeners = sampleListenerData[countryCode] || 0;
                       const fillColor = getColor(listeners);
 
+                      // Debug log to check country codes and colors
+                      console.log(`Country: ${geo.properties.NAME}, Code: ${countryCode}, Listeners: ${listeners}, Color: ${fillColor}`);
+
                       return (
                         <Geography
                           key={geo.rsmKey}
