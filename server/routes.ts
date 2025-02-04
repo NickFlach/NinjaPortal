@@ -111,7 +111,7 @@ export function registerRoutes(app: Express) {
   app.get("/api/songs/recent", async (req, res) => {
     const recentSongs = await db.query.recentlyPlayed.findMany({
       orderBy: desc(recentlyPlayed.playedAt),
-      limit: 20,
+      limit: 100,
       with: {
         song: true,
       }
