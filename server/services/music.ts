@@ -12,6 +12,8 @@ export interface MapDataResponse {
 }
 
 export async function getMapData(): Promise<MapDataResponse> {
+  console.log('Starting getMapData');
+
   // Get all listener data with coordinates
   const listenerData = await db.select({
     countryCode: listeners.countryCode,
@@ -21,21 +23,18 @@ export async function getMapData(): Promise<MapDataResponse> {
   .from(listeners)
   .where(sql`${listeners.latitude} is not null and ${listeners.longitude} is not null`);
 
+  console.log('Raw listener data:', listenerData);
+
   // Process listener data by country and aggregate locations into regions
   const countries: { [key: string]: { locations: Array<[number, number]> } } = {};
   const processedLocations = new Set<string>(); // Track processed locations to avoid duplicates
   let totalListeners = 0;
 
-  // If no listener data, return empty response
-  if (!listenerData || listenerData.length === 0) {
-    return {
-      countries: {},
-      totalListeners: 0
-    };
-  }
-
   listenerData.forEach(({ countryCode, latitude, longitude }) => {
-    if (!countryCode || !latitude || !longitude) return;
+    if (!countryCode || !latitude || !longitude) {
+      console.log('Skipping record due to missing data:', { countryCode, latitude, longitude });
+      return;
+    }
 
     if (!countries[countryCode]) {
       countries[countryCode] = { locations: [] };
@@ -43,24 +42,35 @@ export async function getMapData(): Promise<MapDataResponse> {
 
     totalListeners++;
 
-    // Create a location key using rounded coordinates for aggregation
-    const roundedLat = Math.round(parseFloat(latitude) * 10) / 10;
-    const roundedLng = Math.round(parseFloat(longitude) * 10) / 10;
+    // Convert string coordinates to numbers and round to 1 decimal place
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      console.log('Invalid coordinates:', { latitude, longitude });
+      return;
+    }
+
+    const roundedLat = Math.round(lat * 10) / 10;
+    const roundedLng = Math.round(lng * 10) / 10;
     const locationKey = `${roundedLat},${roundedLng}`;
 
     // Only add location if we haven't seen this rounded coordinate pair before
     if (!processedLocations.has(locationKey)) {
       processedLocations.add(locationKey);
       countries[countryCode].locations.push([roundedLat, roundedLng]);
+      console.log('Added location:', { countryCode, roundedLat, roundedLng });
     }
   });
 
-  console.log('Map data response:', { countries, totalListeners });
-
-  return {
+  const response = {
     countries,
     totalListeners
   };
+
+  console.log('Final map data:', JSON.stringify(response, null, 2));
+
+  return response;
 }
 
 export interface MusicStats {
