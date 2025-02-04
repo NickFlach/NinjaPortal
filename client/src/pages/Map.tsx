@@ -57,14 +57,22 @@ const MapPage: FC = () => {
     return `${name}: Active Region (${votes} plays)`;
   };
 
+  const hasNoData = !isLoading && (!mapData || mapData.totalListeners === 0);
+
   return (
     <Layout>
       <div className="container mx-auto py-6">
         <h1 className="text-4xl font-bold mb-6">Global Listener Map</h1>
-        {mapData && (
+        {hasNoData ? (
           <div className="text-sm text-muted-foreground mb-4">
-            Total Active Listeners: {mapData.totalListeners}
+            No listener data available yet. Play some music to see activity on the map!
           </div>
+        ) : (
+          mapData && (
+            <div className="text-sm text-muted-foreground mb-4">
+              Total Active Listeners: {mapData.totalListeners}
+            </div>
+          )
         )}
         <Card className="p-4 bg-background">
           <div className="relative w-full h-[600px] rounded-lg overflow-hidden">
@@ -127,7 +135,8 @@ const MapPage: FC = () => {
                       }
                     </Geographies>
 
-                    {mapData?.countries && 
+                    {/* Only render markers if we have data */}
+                    {mapData?.countries && !hasNoData && 
                       Object.entries(mapData.countries).map(([countryCode, data]) =>
                         data.votes > 0 && data.locations.map(([lat, lng], index) => (
                           <Marker 

@@ -12,7 +12,6 @@ export interface MapDataResponse {
   totalListeners: number;
 }
 
-// New function to get map-specific data
 export async function getMapData(): Promise<MapDataResponse> {
   // Get all listener data with coordinates
   const listenerData = await db.select({
@@ -27,6 +26,14 @@ export async function getMapData(): Promise<MapDataResponse> {
   const countries: { [key: string]: { votes: number; locations: Array<[number, number]> } } = {};
   const processedLocations = new Set<string>(); // Track processed locations to avoid duplicates
   let totalListeners = 0;
+
+  // If no listener data, return empty response
+  if (!listenerData || listenerData.length === 0) {
+    return {
+      countries: {},
+      totalListeners: 0
+    };
+  }
 
   listenerData.forEach(({ countryCode, latitude, longitude }) => {
     if (!countryCode || !latitude || !longitude) return;
