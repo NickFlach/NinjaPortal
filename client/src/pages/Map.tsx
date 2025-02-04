@@ -20,16 +20,20 @@ const MapPage: FC = () => {
     queryKey: ['/api/music/stats']
   });
 
-  const getColor = (votes: number) => {
-    if (votes === undefined || votes === null) return "#2A303C";
+  const getColor = (countryCode: string) => {
+    const countryData = songStats?.countries?.[countryCode];
+
+    // If no data exists for this country, return the base color
+    if (!countryData || !countryData.votes) return "#1e293b"; // Slate-800 for base color
 
     const maxVotes = Math.max(1, 
       Object.values(songStats?.countries || {})
         .reduce((max, country) => Math.max(max, country.votes || 0), 1)
     );
 
-    const opacity = Math.min(0.3 + (votes / maxVotes) * 0.7, 1);
-    return `rgba(74, 222, 128, ${opacity})`;
+    // Only show green for countries with actual plays
+    const opacity = Math.min(0.3 + (countryData.votes / maxVotes) * 0.7, 1);
+    return `rgba(74, 222, 128, ${opacity})`; // Green-500 with variable opacity
   };
 
   return (
@@ -70,14 +74,14 @@ const MapPage: FC = () => {
                           <Geography
                             key={geo.rsmKey}
                             geography={geo}
-                            fill={getColor(votes)}
+                            fill={getColor(countryCode)}
                             stroke="#4A5568"
                             strokeWidth={0.5}
                             onMouseEnter={() => {
                               const { name } = geo.properties;
                               setSelectedCountry(countryCode);
                               setTooltipContent(
-                                `${name}: ${votes.toLocaleString()} plays`
+                                `${name}: ${votes > 0 ? votes.toLocaleString() + ' plays' : 'No plays'}`
                               );
                             }}
                             onMouseLeave={() => {
@@ -87,7 +91,7 @@ const MapPage: FC = () => {
                             style={{
                               default: { outline: "none" },
                               hover: {
-                                fill: "#60A5FA",
+                                fill: votes > 0 ? "#60A5FA" : "#475569", // Blue for active, darker for inactive
                                 outline: "none",
                                 cursor: "pointer"
                               },
@@ -99,9 +103,9 @@ const MapPage: FC = () => {
                     }
                   </Geographies>
 
-                  {/* Render location pins */}
+                  {/* Render location pins for countries with actual plays */}
                   {Object.entries(songStats?.countries || {}).map(([countryCode, data]) =>
-                    (data.locations || []).map(([lat, lng], index) => (
+                    data.votes > 0 && (data.locations || []).map(([lat, lng], index) => (
                       <Marker key={`${countryCode}-${index}`} coordinates={[lng, lat]}>
                         <circle
                           r={4}
