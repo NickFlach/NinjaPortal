@@ -59,10 +59,11 @@ export async function getMusicStats(): Promise<MusicStats> {
 
   console.log('Raw listener data:', listenersByCountry);
 
-  // Transform into the expected format
+  // Transform into the expected format with ISO codes
   const countries: { [key: string]: { votes: number } } = {};
   for (const { countryCode, votes } of listenersByCountry) {
     if (countryCode) {
+      // Keep the ISO code format (3-letter codes)
       countries[countryCode] = { votes: Number(votes) };
       console.log(`Adding country ${countryCode} with ${votes} votes`);
     }
@@ -103,7 +104,7 @@ export async function incrementListenCount(id: number, countryCode: string) {
     await tx.insert(listeners)
       .values({
         songId: id,
-        countryCode, // Keep original case from input
+        countryCode, // Keep original ISO format
         timestamp: new Date()
       });
   });
