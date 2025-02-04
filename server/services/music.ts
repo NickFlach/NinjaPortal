@@ -8,7 +8,11 @@ export interface MusicStats {
   totalListens: number;
   topArtists: Array<{ artist: string; songCount: number }>;
   recentUploads: Array<typeof songs.$inferSelect>;
-  listenersByCountry: Array<{ countryCode: string; listenerCount: number }>;
+  countries: {
+    [key: string]: {
+      votes: number;
+    };
+  };
 }
 
 export async function getMusicStats(): Promise<MusicStats> {
@@ -24,7 +28,6 @@ export async function getMusicStats(): Promise<MusicStats> {
     count: sql<number>`count(distinct ${songs.artist})`
   }).from(songs);
 
-  // Use votes as a proxy for listens since we don't have a plays field
   const [
     { sum: totalListens }
   ] = await db.select({
@@ -49,11 +52,17 @@ export async function getMusicStats(): Promise<MusicStats> {
   // Get listener counts by country
   const listenersByCountry = await db.select({
     countryCode: listeners.countryCode,
-    listenerCount: sql<number>`count(*)`
+    votes: sql<number>`count(*)`
   })
   .from(listeners)
   .groupBy(listeners.countryCode)
   .orderBy(sql`count(*) desc`);
+
+  // Transform into the expected format
+  const countries: { [key: string]: { votes: number } } = {};
+  listenersByCountry.forEach(({ countryCode, votes }) => {
+    countries[countryCode] = { votes };
+  });
 
   return {
     totalSongs,
@@ -64,7 +73,7 @@ export async function getMusicStats(): Promise<MusicStats> {
       songCount
     })),
     recentUploads,
-    listenersByCountry
+    countries
   };
 }
 
