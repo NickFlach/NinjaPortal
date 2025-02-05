@@ -17,6 +17,7 @@ interface MapData {
   countries: {
     [key: string]: {
       locations: Array<[number, number]>;  // [longitude, latitude] pairs
+      listenerCount: number;  // Add listener count
     };
   };
   totalListeners: number;
@@ -42,7 +43,7 @@ const AnimatedMarker: FC<{
     <Marker coordinates={coordinates}>
       <motion.circle
         initial={{ r: 0, opacity: 0, y: -20 }}
-        animate={{ 
+        animate={{
           r: 6,
           opacity: 0.8,
           y: 0
@@ -121,15 +122,15 @@ const MapPage: FC = () => {
   const getColor = (countryCode: string) => {
     if (!mapData?.countries) return "#1e293b"; // Base color for countries without data
     const countryData = mapData.countries[countryCode];
-    if (!countryData?.locations.length) return "#1e293b"; // Base color for inactive countries
+    if (!countryData?.listenerCount) return "#1e293b"; // Base color for inactive countries
     return `rgba(74, 222, 128, 0.5)`; // Green-500 with fixed opacity for active regions
   };
 
   // Helper function to format tooltip content
-  const formatTooltip = (name: string, locations: number = 0) => {
-    if (locations === 0) return `${name}: No Activity`;
-    if (locations === 1) return `${name}: 1 Active Listener`;
-    return `${name}: ${locations} Active Listeners`;
+  const formatTooltip = (name: string, countryCode: string) => {
+    if (!mapData?.countries[countryCode]) return `${name}: No Activity`;
+    const listenerCount = mapData.countries[countryCode].listenerCount;
+    return `${name}: ${listenerCount} ${listenerCount === 1 ? 'Listener' : 'Listeners'}`;
   };
 
   const hasNoData = !isLoading && (!mapData || mapData.totalListeners === 0);
@@ -177,7 +178,7 @@ const MapPage: FC = () => {
                       {({ geographies }) =>
                         geographies.map((geo) => {
                           const countryCode = geo.properties.iso_a3;
-                          const locations = mapData?.countries?.[countryCode]?.locations.length || 0;
+                          const countryData = mapData?.countries?.[countryCode];
                           return (
                             <Geography
                               key={geo.rsmKey}
@@ -188,7 +189,7 @@ const MapPage: FC = () => {
                               onMouseEnter={() => {
                                 const { name } = geo.properties;
                                 setSelectedCountry(countryCode);
-                                setTooltipContent(formatTooltip(name, locations));
+                                setTooltipContent(formatTooltip(name, countryCode));
                               }}
                               onMouseLeave={() => {
                                 setSelectedCountry(null);
@@ -197,7 +198,7 @@ const MapPage: FC = () => {
                               style={{
                                 default: { outline: "none" },
                                 hover: {
-                                  fill: locations > 0 ? "#60A5FA" : "#475569",
+                                  fill: countryData?.listenerCount ? "#60A5FA" : "#475569",
                                   outline: "none",
                                   cursor: "pointer"
                                 },
@@ -209,7 +210,7 @@ const MapPage: FC = () => {
                       }
                     </Geographies>
 
-                    {/* Render markers with more visibility */}
+                    {/* Render markers for precise locations if available */}
                     {markers.map((marker) => (
                       <AnimatedMarker
                         key={marker.id}

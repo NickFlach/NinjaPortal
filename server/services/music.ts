@@ -6,6 +6,7 @@ export interface MapDataResponse {
   countries: {
     [key: string]: {
       locations: Array<[number, number]>;  // [latitude, longitude] pairs
+      listenerCount: number; // Add listener count per country
     };
   };
   totalListeners: number;
@@ -14,47 +15,46 @@ export interface MapDataResponse {
 export async function getMapData(): Promise<MapDataResponse> {
   console.log('Starting getMapData');
 
-  // Get all listener data with coordinates
+  // Get all listener data including those without coordinates
   const listenerData = await db.select({
     countryCode: listeners.countryCode,
     latitude: listeners.latitude,
     longitude: listeners.longitude,
   })
   .from(listeners)
-  .where(sql`${listeners.latitude} is not null and ${listeners.longitude} is not null`);
+  .where(sql`${listeners.countryCode} is not null`);
 
   console.log('Raw listener data:', listenerData);
 
-  // Process listener data by country and aggregate locations into regions
-  const countries: { [key: string]: { locations: Array<[number, number]> } } = {};
-  const processedLocations = new Set<string>(); // Track processed locations to avoid duplicates
+  // Process listener data by country
+  const countries: { [key: string]: { locations: Array<[number, number]>; listenerCount: number } } = {};
   let totalListeners = 0;
 
   listenerData.forEach(({ countryCode, latitude, longitude }) => {
-    if (!countryCode || !latitude || !longitude) {
-      console.log('Skipping record due to missing data:', { countryCode, latitude, longitude });
+    if (!countryCode) {
+      console.log('Skipping record due to missing country code');
       return;
     }
 
     if (!countries[countryCode]) {
-      countries[countryCode] = { locations: [] };
+      countries[countryCode] = { locations: [], listenerCount: 0 };
     }
 
+    countries[countryCode].listenerCount++;
     totalListeners++;
 
-    // Convert string coordinates to numbers and round to 1 decimal place
-    const lat = Number(latitude);
-    const lng = Number(longitude);
+    // Add coordinates if available
+    if (latitude && longitude) {
+      const lat = Number(latitude);
+      const lng = Number(longitude);
 
-    if (isNaN(lat) || isNaN(lng)) {
-      console.log('Invalid coordinates:', { latitude, longitude });
-      return;
+      if (!isNaN(lat) && !isNaN(lng)) {
+        // Important: For the map, we need to swap lat/lng to lng/lat order
+        // React Simple Maps expects [longitude, latitude] format
+        countries[countryCode].locations.push([lng, lat]);
+        console.log('Added location:', { countryCode, lat, lng });
+      }
     }
-
-    // Important: For the map, we need to swap lat/lng to lng/lat order
-    // React Simple Maps expects [longitude, latitude] format
-    countries[countryCode].locations.push([lng, lat]);
-    console.log('Added location:', { countryCode, lat, lng });
   });
 
   const response = {
@@ -63,7 +63,6 @@ export async function getMapData(): Promise<MapDataResponse> {
   };
 
   console.log('Final map data:', JSON.stringify(response, null, 2));
-
   return response;
 }
 
@@ -167,8 +166,8 @@ export async function incrementListenCount(id: number, countryCode: string, coor
   console.log('Received play request:', {
     songId: id,
     countryCode,
-    hasLocation: !!coords,
-    coordinates: coords ? `${coords.lat},${coords.lng}` : 'No coordinates provided'
+    hasLocation: true, // Changed to true since we have country code
+    coordinates: coords ? `${coords.lat},${coords.lng}` : 'Country-level only'
   });
 
   await db.transaction(async (tx) => {
@@ -177,7 +176,7 @@ export async function incrementListenCount(id: number, countryCode: string, coor
       .set({ votes: sql`coalesce(${songs.votes}, 0) + 1` })
       .where(eq(songs.id, id));
 
-    // Only record location if provided and valid
+    // Record listener with coordinates if provided
     if (coords?.lat && coords?.lng) {
       // Validate coordinates
       if (Math.abs(coords.lat) > 90 || Math.abs(coords.lng) > 180) {
@@ -206,8 +205,8 @@ export async function incrementListenCount(id: number, countryCode: string, coor
           timestamp: new Date()
         });
     } else {
-      console.log('No coordinates provided, recording country only');
-      // Record just the country without coordinates
+      console.log('Recording country-level location');
+      // Record just the country
       await tx.insert(listeners)
         .values({
           songId: id,
