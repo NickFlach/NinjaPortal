@@ -19,7 +19,7 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center">
             <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-                Music-Portal
+                Ninja-Portal
               </h1>
             </Link>
             <Navigation />
