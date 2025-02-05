@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '@db';
-import { users, recentlyPlayed } from '@db/schema';
+import { users, recentlyPlayed, songs } from '@db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -57,22 +57,18 @@ router.post('/api/users/register', async (req, res) => {
       throw new Error('Failed to create or update user');
     }
 
-    // Get user's recent songs
-    const recentSongs = await db.query.recentlyPlayed.findMany({
-      where: eq(recentlyPlayed.playedBy, address.toLowerCase()),
-      orderBy: desc(recentlyPlayed.playedAt),
-      limit: 5,
-      with: {
-        song: true,
-      }
+    // Get global recent songs instead of user-specific
+    const recentSongs = await db.query.songs.findMany({
+      orderBy: desc(songs.createdAt),
+      limit: 100,
     });
 
-    console.log('Retrieved recent songs:', recentSongs);
+    console.log('Retrieved recent songs:', recentSongs.length);
 
     const response = {
       success: true,
       user,
-      recentSongs: recentSongs.map(item => item.song)
+      recentSongs
     };
 
     console.log('Sending response:', response);
@@ -87,25 +83,28 @@ router.post('/api/users/register', async (req, res) => {
   }
 });
 
-// Add endpoint to get user's recent activity
-router.get('/api/users/recent', async (req, res) => {
+// Update recent endpoint to return global feed
+router.get('/api/songs/recent', async (_req, res) => {
   try {
-    const address = req.headers['x-wallet-address'] as string;
-
-    if (!address) {
-      return res.status(400).json({ message: "Wallet address is required" });
-    }
-
-    const recentSongs = await db.query.recentlyPlayed.findMany({
-      where: eq(recentlyPlayed.playedBy, address.toLowerCase()),
+    // Get most recently played songs across all users
+    const recentlyPlayedSongs = await db.query.recentlyPlayed.findMany({
       orderBy: desc(recentlyPlayed.playedAt),
-      limit: 10,
+      limit: 100,
       with: {
         song: true,
       }
     });
 
-    res.json(recentSongs.map(item => item.song));
+    // Extract unique songs, keeping only the most recent play for each
+    const uniqueSongs = Array.from(
+      new Map(
+        recentlyPlayedSongs
+          .filter(item => item.song) // Ensure song exists
+          .map(item => [item.song.id, item.song])
+      ).values()
+    );
+
+    res.json(uniqueSongs);
   } catch (error) {
     console.error('Error fetching recent activity:', error);
     res.status(500).json({ message: "Failed to fetch recent activity" });
