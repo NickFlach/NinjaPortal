@@ -21,54 +21,26 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Background Image with Overlay */}
-      <div
-        className="absolute inset-0 z-0"
-        style={{
-          backgroundImage: 'url("/assets/branding/logo.png")',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          filter: 'blur(8px)',
-          transform: 'scale(1.1)',
-          opacity: '0.15'
-        }}
-      />
-
+      {/* Centered Logo with Link and Music Controls */}
       <div className="container mx-auto px-4 py-8 relative z-10">
-        {/* Centered Logo with Link and Music Controls */}
         <div className="flex flex-col items-center justify-center min-h-screen space-y-6">
           <button 
             onClick={togglePlay}
             className="group relative transition-transform hover:scale-105 focus:outline-none rounded-lg"
           >
-            <img 
-              src="/assets/branding/logo.png" 
-              alt="Music Portal Logo"
-              className={`w-64 h-64 object-contain ${isPlaying ? 'animate-pulse' : ''}`}
-            />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="bg-background/80 backdrop-blur-sm p-4 rounded-full">
-                {isPlaying ? (
-                  <VolumeX className="h-12 w-12 text-primary" />
-                ) : (
-                  <Volume2 className="h-12 w-12 text-primary" />
-                )}
+            {/* Now Playing Display */}
+            {currentSong ? (
+              <div className="text-center space-y-2">
+                <h2 className="text-lg font-semibold">{currentSong.title}</h2>
+                <p className="text-sm text-muted-foreground">{currentSong.artist}</p>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Loading music...</span>
+              </div>
+            )}
           </button>
-
-          {/* Now Playing Display */}
-          {currentSong ? (
-            <div className="text-center space-y-2">
-              <h2 className="text-lg font-semibold">{currentSong.title}</h2>
-              <p className="text-sm text-muted-foreground">{currentSong.artist}</p>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Loading music...</span>
-            </div>
-          )}
 
           {/* Connect Wallet Button */}
           <div className="mt-8">
