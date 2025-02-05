@@ -86,24 +86,42 @@ router.post('/api/users/register', async (req, res) => {
 // Update recent endpoint to return global feed
 router.get('/api/songs/recent', async (_req, res) => {
   try {
+    console.log('Fetching recent songs feed');
+
     // Get most recently played songs across all users
     const recentlyPlayedSongs = await db.query.recentlyPlayed.findMany({
       orderBy: desc(recentlyPlayed.playedAt),
       limit: 100,
       with: {
-        song: true,
+        song: {
+          columns: {
+            id: true,
+            title: true,
+            artist: true,
+            ipfsHash: true,
+            uploadedBy: true,
+            createdAt: true,
+            votes: true
+          }
+        },
       }
     });
+
+    console.log('Found recently played songs:', recentlyPlayedSongs.length);
 
     // Extract unique songs, keeping only the most recent play for each
     const uniqueSongs = Array.from(
       new Map(
         recentlyPlayedSongs
-          .filter(item => item.song) // Ensure song exists
-          .map(item => [item.song.id, item.song])
+          .filter(item => item.song) // Filter out any null songs
+          .map(item => [item.song.id, {
+            ...item.song,
+            lastPlayed: item.playedAt // Include the play timestamp
+          }])
       ).values()
     );
 
+    console.log('Returning unique songs:', uniqueSongs.length);
     res.json(uniqueSongs);
   } catch (error) {
     console.error('Error fetching recent activity:', error);
