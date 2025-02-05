@@ -1,6 +1,6 @@
 import { db } from '@db';
-import { songs, listeners } from '@db/schema';
-import { desc, eq, sql } from 'drizzle-orm';
+import { listeners } from '@db/schema';
+import { sql } from 'drizzle-orm';
 
 export interface MapDataResponse {
   countries: {
@@ -15,55 +15,62 @@ export interface MapDataResponse {
 export async function getMapData(): Promise<MapDataResponse> {
   console.log('Starting getMapData');
 
-  // Get all listener data including those without coordinates
-  const listenerData = await db.select({
-    countryCode: listeners.countryCode,
-    latitude: listeners.latitude,
-    longitude: listeners.longitude,
-  })
-  .from(listeners)
-  .where(sql`${listeners.countryCode} is not null`);
+  try {
+    // Get all listener data including those without coordinates
+    const listenerData = await db.select({
+      countryCode: listeners.countryCode,
+      latitude: listeners.latitude,
+      longitude: listeners.longitude,
+    })
+    .from(listeners)
+    .where(sql`${listeners.countryCode} is not null`);
 
-  console.log('Raw listener data:', listenerData);
+    console.log('Raw listener data count:', listenerData.length);
 
-  // Process listener data by country
-  const countries: { [key: string]: { locations: Array<[number, number]>; listenerCount: number } } = {};
-  let totalListeners = 0;
+    // Process listener data by country
+    const countries: { [key: string]: { locations: Array<[number, number]>; listenerCount: number } } = {};
+    let totalListeners = 0;
 
-  listenerData.forEach(({ countryCode, latitude, longitude }) => {
-    if (!countryCode) {
-      console.log('Skipping record due to missing country code');
-      return;
-    }
-
-    if (!countries[countryCode]) {
-      countries[countryCode] = { locations: [], listenerCount: 0 };
-    }
-
-    countries[countryCode].listenerCount++;
-    totalListeners++;
-
-    // Add coordinates if available
-    if (latitude && longitude) {
-      const lat = Number(latitude);
-      const lng = Number(longitude);
-
-      if (!isNaN(lat) && !isNaN(lng)) {
-        // Important: For the map, we need to swap lat/lng to lng/lat order
-        // React Simple Maps expects [longitude, latitude] format
-        countries[countryCode].locations.push([lng, lat]);
-        console.log('Added location:', { countryCode, lat, lng });
+    listenerData.forEach(({ countryCode, latitude, longitude }) => {
+      if (!countryCode) {
+        console.log('Skipping record due to missing country code');
+        return;
       }
-    }
-  });
 
-  const response = {
-    countries,
-    totalListeners
-  };
+      if (!countries[countryCode]) {
+        countries[countryCode] = { locations: [], listenerCount: 0 };
+      }
 
-  console.log('Final map data:', JSON.stringify(response, null, 2));
-  return response;
+      countries[countryCode].listenerCount++;
+      totalListeners++;
+
+      // Add coordinates if available
+      if (latitude && longitude) {
+        const lat = Number(latitude);
+        const lng = Number(longitude);
+
+        if (!isNaN(lat) && !isNaN(lng)) {
+          countries[countryCode].locations.push([lat, lng]);
+          console.log('Added location:', { countryCode, lat, lng });
+        }
+      }
+    });
+
+    const response = {
+      countries,
+      totalListeners
+    };
+
+    console.log('Processed map data:', {
+      totalCountries: Object.keys(response.countries).length,
+      totalListeners: response.totalListeners
+    });
+
+    return response;
+  } catch (error) {
+    console.error('Error in getMapData:', error);
+    throw error;
+  }
 }
 
 export interface MusicStats {
