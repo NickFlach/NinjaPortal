@@ -1,6 +1,6 @@
 import { db } from '@db';
-import { listeners } from '@db/schema';
-import { sql } from 'drizzle-orm';
+import { listeners, songs } from '@db/schema';
+import { sql, eq } from 'drizzle-orm';
 
 export interface MapDataResponse {
   countries: {
