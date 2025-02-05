@@ -18,13 +18,8 @@ export function Layout({ children }: LayoutProps) {
         <div className="container mx-auto py-4 flex items-center justify-between">
           <div className="flex items-center">
             <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <img 
-                src="/neo_token_logo_flaukowski.png" 
-                alt="NEO Token"
-                className="w-8 h-8"
-              />
               <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-                Music Portal
+                Ninja-Portal
               </h1>
             </Link>
             <Navigation />
