@@ -43,7 +43,7 @@ export default function Landing() {
           >
             <img 
               src="/neo_token_logo_flaukowski.png" 
-              alt="Token Logo"
+              alt="Music Portal Logo"
               className={`w-64 h-64 object-contain ${isPlaying ? 'animate-pulse' : ''}`}
             />
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
