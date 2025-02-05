@@ -25,7 +25,7 @@ export default function Landing() {
       <div
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: 'url("/neo_token_logo_flaukowski.png")',
+          backgroundImage: 'url("/assets/branding/logo.png")',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           filter: 'blur(8px)',
@@ -42,7 +42,7 @@ export default function Landing() {
             className="group relative transition-transform hover:scale-105 focus:outline-none rounded-lg"
           >
             <img 
-              src="/neo_token_logo_flaukowski.png" 
+              src="/assets/branding/logo.png" 
               alt="Music Portal Logo"
               className={`w-64 h-64 object-contain ${isPlaying ? 'animate-pulse' : ''}`}
             />
