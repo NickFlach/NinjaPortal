@@ -36,22 +36,8 @@ export default function Landing() {
       />
 
       <div className="container mx-auto px-4 py-8 relative z-10">
-        <div className="flex items-center justify-between mb-12">
-          <div className="flex items-center gap-2">
-            <img 
-              src="/neo_token_logo_flaukowski.png" 
-              alt="NEO Token"
-              className="w-12 h-12"
-            />
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-              Music Portal
-            </h1>
-          </div>
-          <WalletConnect />
-        </div>
-
         {/* Centered Logo with Link and Music Controls */}
-        <div className="flex flex-col items-center justify-center mt-24 space-y-6">
+        <div className="flex flex-col items-center justify-center min-h-screen space-y-6">
           <button 
             onClick={togglePlay}
             className="group relative transition-transform hover:scale-105 focus:outline-none rounded-lg"
@@ -84,6 +70,11 @@ export default function Landing() {
               <span>Loading music...</span>
             </div>
           )}
+
+          {/* Connect Wallet Button */}
+          <div className="mt-8">
+            <WalletConnect />
+          </div>
         </div>
       </div>
     </div>
