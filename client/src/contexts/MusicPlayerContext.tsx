@@ -35,8 +35,24 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const audioRef = useRef<HTMLAudioElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { address: userAddress } = useAccount();
+  const defaultWallet = "REDACTED_WALLET_ADDRESS";
+  const landingAddress = userAddress || defaultWallet;
   const isLandingPage = !userAddress;
   const audioContextRef = useRef<AudioContext>();
+
+  // Initialize audio element
+  useEffect(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.preload = 'auto';
+    }
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   // Fetch landing page feed (recent songs)
   const { data: recentSongs } = useQuery<Song[]>({
@@ -47,9 +63,9 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           'X-Internal-Token': 'landing-page'
         };
 
-        // Only add wallet address if user is connected
-        if (userAddress) {
-          headers['X-Wallet-Address'] = userAddress;
+        // Add wallet address header if available
+        if (landingAddress) {
+          headers['X-Wallet-Address'] = landingAddress;
         }
 
         const response = await fetch("/api/songs/recent", {
@@ -99,6 +115,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
+
   const playSong = async (song: Song, context?: PlaylistContext) => {
     try {
       // Cancel any existing fetch request
@@ -121,48 +138,43 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       const blob = new Blob([audioData], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
 
-      if (audioRef.current) {
-        // Set source and load
-        audioRef.current.src = url;
-        await new Promise((resolve, reject) => {
-          if (audioRef.current) {
-            audioRef.current.addEventListener('loadeddata', resolve);
-            audioRef.current.addEventListener('error', reject);
-            audioRef.current.load();
-          }
-        });
+      // Set source and load
+      audioRef.current.src = url;
+      await new Promise((resolve, reject) => {
+        audioRef.current.addEventListener('loadeddata', resolve);
+        audioRef.current.addEventListener('error', reject);
+        audioRef.current.load();
+      });
 
-        // Update refs and state
-        setCurrentSong(song);
+      // Update refs and state
+      setCurrentSong(song);
 
-        // Try to play
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          try {
-            await playPromise;
-            setIsPlaying(true);
-            console.log('IPFS fetch and playback successful');
-          } catch (error) {
-            console.error('Playback prevented:', error);
-            setIsPlaying(false);
-          }
-        }
-
-        // Record play if user is connected
-        if (userAddress) {
-          try {
-            await fetch(`/api/songs/play/${song.id}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Wallet-Address': userAddress
-              }
-            });
-          } catch (error) {
-            console.error('Error recording play:', error);
-          }
+      // Try to play
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        try {
+          await playPromise;
+          setIsPlaying(true);
+          console.log('IPFS fetch and playback successful');
+        } catch (error) {
+          console.error('Playback prevented:', error);
+          setIsPlaying(false);
         }
       }
+
+      // Record play
+      try {
+        await fetch(`/api/songs/play/${song.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(userAddress && { 'X-Wallet-Address': userAddress })
+          }
+        });
+      } catch (error) {
+        console.error('Error recording play:', error);
+      }
+
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('IPFS fetch aborted');
