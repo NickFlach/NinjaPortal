@@ -34,11 +34,13 @@ export function registerRoutes(app: Express) {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // Apply auth middleware to API routes
+  // Register metadata routes first (before auth middleware)
+  app.use(metadataRoutes);
+
+  // Apply auth middleware to remaining API routes
   app.use('/api', authMiddleware);
 
-  // Register routes - ensure metadata routes are registered first
-  app.use(metadataRoutes); // Register metadata routes first (includes map endpoint)
+  // Register other routes
   app.use(feedRoutes);
   app.use(userRoutes);
 
