@@ -81,12 +81,9 @@ const MapPage: FC = () => {
         useInternalToken: !address
       });
 
-      const headers: Record<string, string> = {};
-      if (address) {
-        headers['x-wallet-address'] = address;
-      } else {
-        headers['x-internal-token'] = 'landing-page';
-      }
+      const headers: Record<string, string> = address 
+        ? { 'x-wallet-address': address }
+        : { 'x-internal-token': 'landing-page' };
 
       try {
         const response = await fetch('/api/music/map', { headers });
