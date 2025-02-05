@@ -21,24 +21,39 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Gradient Background */}
+      {/* Background Image with Overlay */}
       <div
-        className="absolute inset-0 z-0 bg-gradient-to-br from-background via-primary/5 to-purple-500/10"
+        className="absolute inset-0 z-0"
+        style={{
+          backgroundImage: 'url("/neo_token_logo_flaukowski.png")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          filter: 'blur(8px)',
+          transform: 'scale(1.1)',
+          opacity: '0.15'
+        }}
       />
 
       <div className="container mx-auto px-4 py-8 relative z-10">
+        {/* Centered Logo with Link and Music Controls */}
         <div className="flex flex-col items-center justify-center min-h-screen space-y-6">
-          {/* Music Controls */}
           <button 
             onClick={togglePlay}
-            className="group relative transition-transform hover:scale-105 focus:outline-none rounded-lg bg-background/80 p-8 backdrop-blur-sm"
+            className="group relative transition-transform hover:scale-105 focus:outline-none rounded-lg"
           >
-            <div className="bg-gradient-to-br from-primary to-purple-500 w-32 h-32 rounded-full flex items-center justify-center">
-              {isPlaying ? (
-                <VolumeX className="h-12 w-12 text-background" />
-              ) : (
-                <Volume2 className="h-12 w-12 text-background" />
-              )}
+            <img 
+              src="/neo_token_logo_flaukowski.png" 
+              alt="Token Logo"
+              className={`w-64 h-64 object-contain ${isPlaying ? 'animate-pulse' : ''}`}
+            />
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="bg-background/80 backdrop-blur-sm p-4 rounded-full">
+                {isPlaying ? (
+                  <VolumeX className="h-12 w-12 text-primary" />
+                ) : (
+                  <Volume2 className="h-12 w-12 text-primary" />
+                )}
+              </div>
             </div>
           </button>
 
