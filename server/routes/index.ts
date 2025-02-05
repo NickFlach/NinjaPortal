@@ -12,7 +12,9 @@ const authMiddleware = (req: any, res: any, next: any) => {
   console.log('Auth middleware check:', {
     path: req.path,
     hasInternalToken: !!internalToken,
-    hasWalletAddress: !!walletAddress
+    hasWalletAddress: !!walletAddress,
+    method: req.method,
+    headers: req.headers
   });
 
   // Allow internal access or wallet address
@@ -35,7 +37,7 @@ export function registerRoutes(app: Express) {
   // Apply auth middleware to API routes
   app.use('/api', authMiddleware);
 
-  // Register routes
+  // Register routes - ensure metadata routes are registered first
   app.use(metadataRoutes); // Register metadata routes first (includes map endpoint)
   app.use(feedRoutes);
   app.use(userRoutes);

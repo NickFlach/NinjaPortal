@@ -3,6 +3,17 @@ import { getMusicStats, getSongMetadata, getMapData } from '../services/music';
 
 const router = Router();
 
+// Debug middleware for map endpoint
+router.use('/api/music/map', (req, res, next) => {
+  console.log('Map endpoint request:', {
+    headers: req.headers,
+    method: req.method,
+    path: req.path,
+    url: req.url
+  });
+  next();
+});
+
 router.get('/api/music/stats', async (_req, res) => {
   try {
     const stats = await getMusicStats();
@@ -30,11 +41,18 @@ router.get('/api/music/metadata/:id', async (req, res) => {
 });
 
 // Map data endpoint with debug logging
-router.get('/api/music/map', async (_req, res) => {
+router.get('/api/music/map', async (req, res) => {
   try {
-    console.log('Map data request received');
+    console.log('Map data request received with auth:', {
+      hasInternalToken: !!req.headers['x-internal-token'],
+      hasWalletAddress: !!req.headers['x-wallet-address'],
+      url: req.url,
+      baseUrl: req.baseUrl,
+      originalUrl: req.originalUrl
+    });
+
     const mapData = await getMapData();
-    console.log('Map data response:', mapData);
+    console.log('Map data response:', JSON.stringify(mapData, null, 2));
     res.json(mapData);
   } catch (error) {
     console.error('Error fetching map data:', error);
