@@ -9,6 +9,12 @@ const authMiddleware = (req: any, res: any, next: any) => {
   const internalToken = req.headers['x-internal-token'];
   const walletAddress = req.headers['x-wallet-address'];
 
+  console.log('Auth middleware check:', {
+    path: req.path,
+    hasInternalToken: !!internalToken,
+    hasWalletAddress: !!walletAddress
+  });
+
   // Allow internal access or wallet address
   if (internalToken === 'landing-page' || walletAddress) {
     return next();

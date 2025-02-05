@@ -6,10 +6,11 @@ import {
   ZoomableGroup,
   Marker
 } from "react-simple-maps";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAccount } from 'wagmi';
 import { Layout } from "@/components/Layout";
 
 // Define types for our map data
@@ -65,27 +66,55 @@ const AnimatedMarker: FC<{
 };
 
 const MapPage: FC = () => {
+  const { address } = useAccount();
   const [tooltipContent, setTooltipContent] = useState("");
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const prevMarkersRef = useRef<MarkerData[]>([]);
 
-  const { data: mapData, isLoading } = useQuery<MapData>({
+  const { data: mapData, isLoading, error } = useQuery<MapData>({
     queryKey: ['/api/music/map'],
     refetchInterval: 15000,
-  });
-
-  // Debug logging
-  useEffect(() => {
-    if (mapData) {
-      console.log('Map data received:', {
-        countries: Object.keys(mapData.countries).length,
-        totalListeners: mapData.totalListeners,
-        hasLocations: Object.values(mapData.countries).some(c => c.locations.length > 0),
-        firstCountryLocations: Object.values(mapData.countries)[0]?.locations
+    queryFn: async () => {
+      console.log('Fetching map data with auth:', {
+        hasAddress: !!address,
+        useInternalToken: !address
       });
+
+      const headers: Record<string, string> = {};
+      if (address) {
+        headers['x-wallet-address'] = address;
+      } else {
+        headers['x-internal-token'] = 'landing-page';
+      }
+
+      try {
+        const response = await fetch('/api/music/map', { headers });
+        console.log('Map response status:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Map fetch failed:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          });
+          throw new Error(`Failed to fetch map data: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('Map data received:', {
+          countryCount: Object.keys(data.countries).length,
+          totalListeners: data.totalListeners,
+          sampleCountry: Object.entries(data.countries)[0]
+        });
+        return data;
+      } catch (err) {
+        console.error('Map data fetch error:', err);
+        throw err;
+      }
     }
-  }, [mapData]);
+  });
 
   // Update markers when map data changes
   useEffect(() => {
@@ -139,7 +168,12 @@ const MapPage: FC = () => {
     <Layout>
       <div className="container mx-auto py-6">
         <h1 className="text-4xl font-bold mb-6">Global Listener Map</h1>
-        {hasNoData ? (
+
+        {error ? (
+          <div className="text-red-500 mb-4">
+            Error loading map data: {(error as Error).message}
+          </div>
+        ) : hasNoData ? (
           <div className="text-sm text-muted-foreground mb-4">
             No listener data available yet. Play some music to see activity on the map!
           </div>
