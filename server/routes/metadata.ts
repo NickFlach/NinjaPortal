@@ -9,7 +9,8 @@ router.use('/api/music/map', (req, res, next) => {
     headers: req.headers,
     method: req.method,
     path: req.path,
-    url: req.url
+    url: req.url,
+    originalUrl: req.originalUrl
   });
   next();
 });
@@ -40,23 +41,33 @@ router.get('/api/music/metadata/:id', async (req, res) => {
   }
 });
 
-// Map data endpoint with debug logging
+// Map data endpoint with improved error handling
 router.get('/api/music/map', async (req, res) => {
   try {
-    console.log('Map data request received with auth:', {
-      hasInternalToken: !!req.headers['x-internal-token'],
-      hasWalletAddress: !!req.headers['x-wallet-address'],
-      url: req.url,
-      baseUrl: req.baseUrl,
-      originalUrl: req.originalUrl
+    console.log('Map data request received:', {
+      headers: req.headers,
+      auth: {
+        hasInternalToken: !!req.headers['x-internal-token'],
+        hasWalletAddress: !!req.headers['x-wallet-address'],
+      }
     });
 
     const mapData = await getMapData();
-    console.log('Map data response:', JSON.stringify(mapData, null, 2));
+
+    if (!mapData) {
+      console.error('Map data is null or undefined');
+      return res.status(500).json({ error: 'Failed to fetch map data - no data returned' });
+    }
+
+    console.log('Map data response size:', JSON.stringify(mapData).length);
     res.json(mapData);
   } catch (error) {
     console.error('Error fetching map data:', error);
-    res.status(500).json({ error: 'Failed to fetch map data' });
+    // Send a proper JSON error response
+    res.status(500).json({ 
+      error: 'Failed to fetch map data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 
