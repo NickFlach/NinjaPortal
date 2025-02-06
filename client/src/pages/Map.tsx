@@ -75,34 +75,17 @@ const MapPage: FC = () => {
     queryKey: ['/api/music/map'],
     refetchInterval: 15000,
     queryFn: async () => {
-      console.log('Fetching map data with auth:', {
-        hasAddress: !!address,
-        useInternalToken: !address
-      });
-
       const headers: Record<string, string> = address 
         ? { 'x-wallet-address': address }
         : { 'x-internal-token': 'landing-page' };
 
-      try {
-        const response = await fetch('/api/music/map', { headers });
-        console.log('Map response status:', response.status);
+      const response = await fetch('/api/music/map', { headers });
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch map data: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('Map data received:', {
-          countryCount: Object.keys(data.countries).length,
-          totalListeners: data.totalListeners,
-          sampleCountry: Object.entries(data.countries)[0]
-        });
-        return data;
-      } catch (err) {
-        console.error('Map data fetch error:', err);
-        throw err;
+      if (!response.ok) {
+        throw new Error(`Failed to fetch map data: ${response.statusText}`);
       }
+
+      return response.json();
     }
   });
 
@@ -110,15 +93,13 @@ const MapPage: FC = () => {
   useEffect(() => {
     if (mapData?.countries) {
       const newMarkers: MarkerData[] = [];
-      const processedLocations = new Set<string>(); // Track unique locations
+      const processedLocations = new Set<string>();
 
       Object.entries(mapData.countries).forEach(([countryCode, data]) => {
         if (data.locations.length > 0) {
           data.locations.forEach((coordinates) => {
-            // Create a unique key for this location
             const locationKey = `${coordinates[0]}-${coordinates[1]}`;
 
-            // Only add if we haven't seen this location before
             if (!processedLocations.has(locationKey)) {
               processedLocations.add(locationKey);
               const id = `${countryCode}-${locationKey}`;
@@ -140,16 +121,14 @@ const MapPage: FC = () => {
   }, [mapData]);
 
   const getColor = (countryCode: string) => {
-    if (!mapData?.countries) return "#1e293b"; // Base color for countries without data
+    if (!mapData?.countries) return "#1e293b";
     const countryData = mapData.countries[countryCode];
-    if (!countryData?.listenerCount) return "#1e293b"; // Base color for inactive countries
+    if (!countryData?.listenerCount) return "#1e293b";
 
-    // Calculate color intensity based on listener count relative to total
     const intensity = Math.min(countryData.listenerCount / (mapData.totalListeners * 0.2), 1);
-    return `rgba(74, 222, 128, ${0.2 + (intensity * 0.6)})`; // Varying opacity based on listener count
+    return `rgba(74, 222, 128, ${0.2 + (intensity * 0.6)})`;
   };
 
-  // Helper function to format tooltip content
   const formatTooltip = (name: string, countryCode: string) => {
     if (!mapData?.countries[countryCode]) return `${name}: No Activity`;
     const listenerCount = mapData.countries[countryCode].listenerCount;
@@ -239,7 +218,6 @@ const MapPage: FC = () => {
                       }
                     </Geographies>
 
-                    {/* Render markers for precise locations */}
                     {markers.map((marker) => (
                       <AnimatedMarker
                         key={marker.id}

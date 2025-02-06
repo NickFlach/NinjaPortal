@@ -7,15 +7,13 @@ export interface MapDataResponse {
   countries: {
     [key: string]: {
       locations: Array<[number, number]>;  // [latitude, longitude] pairs
-      listenerCount: number; // Add listener count per country
+      listenerCount: number;
     };
   };
   totalListeners: number;
 }
 
 export async function getMapData(): Promise<MapDataResponse> {
-  console.log('Starting getMapData');
-
   try {
     // Get all listener data including those without coordinates
     const listenerData = await db.select({
@@ -25,8 +23,6 @@ export async function getMapData(): Promise<MapDataResponse> {
     })
     .from(listeners)
     .where(sql`${listeners.countryCode} is not null`);
-
-    console.log('Raw listener data count:', listenerData.length);
 
     // Process listener data by country
     const countries: { [key: string]: { locations: Array<[number, number]>; listenerCount: number } } = {};
@@ -38,13 +34,11 @@ export async function getMapData(): Promise<MapDataResponse> {
     listenerData.forEach(({ countryCode, latitude, longitude }) => {
       // Skip invalid entries
       if (!countryCode || !validCountryPattern.test(countryCode)) {
-        console.log('Skipping record due to invalid country code:', countryCode);
         return;
       }
 
       // Skip Antarctica and invalid regions
       if (countryCode === 'ATA' || countryCode === 'ANT') {
-        console.log('Skipping Antarctic region');
         return;
       }
 
@@ -64,26 +58,15 @@ export async function getMapData(): Promise<MapDataResponse> {
         if (!isNaN(lat) && !isNaN(lng) && 
             Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
           countries[countryCode].locations.push([lat, lng]);
-          console.log('Added location:', { countryCode, lat, lng });
-        } else {
-          console.log('Skipping invalid coordinates:', { lat, lng });
         }
       }
     });
 
-    const response = {
+    return {
       countries,
       totalListeners
     };
-
-    console.log('Processed map data:', {
-      totalCountries: Object.keys(response.countries).length,
-      totalListeners: response.totalListeners
-    });
-
-    return response;
   } catch (error) {
-    console.error('Error in getMapData:', error);
     throw error;
   }
 }
