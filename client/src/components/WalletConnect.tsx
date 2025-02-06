@@ -16,6 +16,31 @@ export function WalletConnect() {
   // Check if the device is mobile
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
+  const registerUser = async (userAddress: string) => {
+    try {
+      // Try GET first to check if user exists and get recent songs
+      console.log('Checking user registration:', userAddress);
+      const response = await apiRequest("GET", "/api/users/register");
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || "Registration check failed");
+      }
+
+      if (!data.user) {
+        throw new Error("Invalid response from server: missing user data");
+      }
+
+      console.log('User registered:', data.user);
+      console.log('Recent songs:', data.recentSongs);
+
+      return data;
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    }
+  };
+
   const handleConnect = async () => {
     try {
       // Check if we're on mobile
@@ -110,32 +135,10 @@ export function WalletConnect() {
 
       // Registration with retries
       let registrationSuccess = false;
+      let registrationData = null;
       for (let i = 0; i < 3; i++) { // Try registration up to 3 times
         try {
-          const response = await apiRequest("POST", "/api/users/register", { 
-            address: connectedAddress 
-          });
-          const data = await response.json();
-
-          if (!data.success) {
-            throw new Error(data.message || "Registration failed");
-          }
-
-          if (!data.user) {
-            throw new Error("Invalid response from server: missing user data");
-          }
-
-          console.log('User registered:', data.user);
-          console.log('Recent songs:', data.recentSongs);
-
-          // Redirect to home page
-          setLocation('/home');
-
-          toast({
-            title: "Connected",
-            description: data.user.lastSeen ? "Welcome back!" : "Wallet connected successfully!",
-          });
-
+          registrationData = await registerUser(connectedAddress);
           registrationSuccess = true;
           break;
         } catch (error) {
@@ -152,9 +155,17 @@ export function WalletConnect() {
         }
       }
 
-      if (!registrationSuccess) {
+      if (!registrationSuccess || !registrationData) {
         throw new Error("Failed to register after multiple attempts");
       }
+
+      // Redirect to home page
+      setLocation('/home');
+
+      toast({
+        title: "Connected",
+        description: registrationData.user.lastSeen ? "Welcome back!" : "Wallet connected successfully!",
+      });
 
     } catch (error) {
       console.error('Wallet connection error:', error);
