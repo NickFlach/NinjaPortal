@@ -2,6 +2,7 @@ import { Express } from "express";
 import { createServer } from "http";
 import feedRoutes from './feed';
 import metadataRoutes from './metadata';
+import mapRoutes from './map';
 import userRoutes from './users';
 
 // Middleware to check for internal token or user authentication
@@ -43,6 +44,7 @@ export function registerRoutes(app: Express) {
   // Register other routes
   app.use(feedRoutes);
   app.use(userRoutes);
+  app.use(mapRoutes);  // Add map routes
 
   // Handle 404 for non-existent API routes
   app.use('/api/*', (_req, res) => {

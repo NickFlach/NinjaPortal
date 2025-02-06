@@ -140,6 +140,8 @@ export function registerRoutes(app: Express) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
+
+
     // Convert both addresses to lowercase for case-insensitive comparison
     const userSongs = await db.query.songs.findMany({
       where: eq(songs.uploadedBy, userAddress.toLowerCase()),
