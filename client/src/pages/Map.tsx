@@ -18,7 +18,7 @@ interface MapData {
   countries: {
     [key: string]: {
       locations: Array<[number, number]>;  // [longitude, latitude] pairs
-      listenerCount: number;  // Add listener count
+      listenerCount: number;
     };
   };
   totalListeners: number;
@@ -39,7 +39,6 @@ const AnimatedMarker: FC<{
   isSelected: boolean;
   isNew: boolean;
 }> = ({ coordinates, isSelected, isNew }) => {
-  console.log('Rendering marker at:', coordinates);
   return (
     <Marker coordinates={coordinates}>
       <motion.circle
@@ -90,12 +89,6 @@ const MapPage: FC = () => {
         console.log('Map response status:', response.status);
 
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Map fetch failed:', {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorText
-          });
           throw new Error(`Failed to fetch map data: ${response.statusText}`);
         }
 
@@ -117,27 +110,28 @@ const MapPage: FC = () => {
   useEffect(() => {
     if (mapData?.countries) {
       const newMarkers: MarkerData[] = [];
+      const processedLocations = new Set<string>(); // Track unique locations
 
       Object.entries(mapData.countries).forEach(([countryCode, data]) => {
         if (data.locations.length > 0) {
-          console.log(`Processing locations for ${countryCode}:`, data.locations);
           data.locations.forEach((coordinates) => {
-            const id = `${countryCode}-${coordinates[0]}-${coordinates[1]}`;
-            const existingMarker = prevMarkersRef.current.find(m => m.id === id);
-            newMarkers.push({
-              id,
-              coordinates,
-              countryCode,
-              isNew: !existingMarker
-            });
+            // Create a unique key for this location
+            const locationKey = `${coordinates[0]}-${coordinates[1]}`;
+
+            // Only add if we haven't seen this location before
+            if (!processedLocations.has(locationKey)) {
+              processedLocations.add(locationKey);
+              const id = `${countryCode}-${locationKey}`;
+              const existingMarker = prevMarkersRef.current.find(m => m.id === id);
+              newMarkers.push({
+                id,
+                coordinates,
+                countryCode,
+                isNew: !existingMarker
+              });
+            }
           });
         }
-      });
-
-      console.log('Updating markers:', {
-        total: newMarkers.length,
-        new: newMarkers.filter(m => m.isNew).length,
-        coordinates: newMarkers.map(m => m.coordinates)
       });
 
       setMarkers(newMarkers);
@@ -149,14 +143,18 @@ const MapPage: FC = () => {
     if (!mapData?.countries) return "#1e293b"; // Base color for countries without data
     const countryData = mapData.countries[countryCode];
     if (!countryData?.listenerCount) return "#1e293b"; // Base color for inactive countries
-    return `rgba(74, 222, 128, 0.5)`; // Green-500 with fixed opacity for active regions
+
+    // Calculate color intensity based on listener count relative to total
+    const intensity = Math.min(countryData.listenerCount / (mapData.totalListeners * 0.2), 1);
+    return `rgba(74, 222, 128, ${0.2 + (intensity * 0.6)})`; // Varying opacity based on listener count
   };
 
   // Helper function to format tooltip content
   const formatTooltip = (name: string, countryCode: string) => {
     if (!mapData?.countries[countryCode]) return `${name}: No Activity`;
     const listenerCount = mapData.countries[countryCode].listenerCount;
-    return `${name}: ${listenerCount} ${listenerCount === 1 ? 'Listener' : 'Listeners'}`;
+    const percentage = ((listenerCount / mapData.totalListeners) * 100).toFixed(1);
+    return `${name}: ${listenerCount} ${listenerCount === 1 ? 'Listener' : 'Listeners'} (${percentage}%)`;
   };
 
   const hasNoData = !isLoading && (!mapData || mapData.totalListeners === 0);
@@ -241,7 +239,7 @@ const MapPage: FC = () => {
                       }
                     </Geographies>
 
-                    {/* Render markers for precise locations if available */}
+                    {/* Render markers for precise locations */}
                     {markers.map((marker) => (
                       <AnimatedMarker
                         key={marker.id}
