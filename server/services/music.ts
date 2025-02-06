@@ -1,6 +1,7 @@
 import { db } from '@db';
 import { listeners, songs } from '@db/schema';
 import { sql, eq } from 'drizzle-orm';
+import { desc } from 'drizzle-orm/expressions';
 
 export interface MapDataResponse {
   countries: {
@@ -31,9 +32,19 @@ export async function getMapData(): Promise<MapDataResponse> {
     const countries: { [key: string]: { locations: Array<[number, number]>; listenerCount: number } } = {};
     let totalListeners = 0;
 
+    // Valid country code pattern (ISO 3166-1 alpha-3)
+    const validCountryPattern = /^[A-Z]{3}$/;
+
     listenerData.forEach(({ countryCode, latitude, longitude }) => {
-      if (!countryCode) {
-        console.log('Skipping record due to missing country code');
+      // Skip invalid entries
+      if (!countryCode || !validCountryPattern.test(countryCode)) {
+        console.log('Skipping record due to invalid country code:', countryCode);
+        return;
+      }
+
+      // Skip Antarctica and invalid regions
+      if (countryCode === 'ATA' || countryCode === 'ANT') {
+        console.log('Skipping Antarctic region');
         return;
       }
 
@@ -44,14 +55,18 @@ export async function getMapData(): Promise<MapDataResponse> {
       countries[countryCode].listenerCount++;
       totalListeners++;
 
-      // Add coordinates if available
+      // Add coordinates if available and valid
       if (latitude && longitude) {
         const lat = Number(latitude);
         const lng = Number(longitude);
 
-        if (!isNaN(lat) && !isNaN(lng)) {
+        // Validate coordinates are within reasonable bounds
+        if (!isNaN(lat) && !isNaN(lng) && 
+            Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
           countries[countryCode].locations.push([lat, lng]);
           console.log('Added location:', { countryCode, lat, lng });
+        } else {
+          console.log('Skipping invalid coordinates:', { lat, lng });
         }
       }
     });
