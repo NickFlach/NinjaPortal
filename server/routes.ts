@@ -4,7 +4,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { db } from "@db";
 import { songs, users, playlists, followers, playlistSongs, recentlyPlayed, userRewards } from "@db/schema";
 import { eq, desc, and } from "drizzle-orm";
-import { incrementListenCount } from './services/music';
+import { incrementListenCount, getMapData } from './services/music';
 
 // Track connected clients and their song subscriptions
 const clients = new Map<WebSocket, {
@@ -53,6 +53,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // WebSocket connection handling
   wss.on('connection', (ws) => {
     console.log('New client connected');
     clients.set(ws, {});
@@ -115,6 +116,71 @@ export function registerRoutes(app: Express) {
     });
   }, 30000);
 
+  // Map routes
+  // Debug middleware for map endpoint
+  app.use('/api/music/map', (req, res, next) => {
+    console.log('Map endpoint request:', {
+      headers: req.headers,
+      method: req.method,
+      path: req.path,
+      url: req.url,
+      originalUrl: req.originalUrl
+    });
+    next();
+  });
+
+  // Get map data endpoint
+  app.get('/api/music/map', async (req, res) => {
+    try {
+      console.log('Map data request received:', {
+        headers: req.headers,
+        auth: {
+          hasInternalToken: !!req.headers['x-internal-token'],
+          hasWalletAddress: !!req.headers['x-wallet-address'],
+        }
+      });
+
+      const mapData = await getMapData();
+
+      if (!mapData) {
+        console.error('Map data is null or undefined');
+        return res.status(500).json({ error: 'Failed to fetch map data - no data returned' });
+      }
+
+      console.log('Map data response size:', JSON.stringify(mapData).length);
+      res.json(mapData);
+    } catch (error) {
+      console.error('Error fetching map data:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch map data',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Update map data with new listener location
+  app.post('/api/music/map', async (req, res) => {
+    try {
+      const { songId, countryCode, coordinates } = req.body;
+
+      if (!songId || !countryCode) {
+        return res.status(400).json({ 
+          error: 'Missing required fields',
+          details: 'songId and countryCode are required' 
+        });
+      }
+
+      await incrementListenCount(songId, countryCode, coordinates);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating map data:', error);
+      res.status(500).json({ 
+        error: 'Failed to update map data',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Songs
   app.get("/api/songs/recent", async (req, res) => {
     const recentSongs = await db.query.recentlyPlayed.findMany({
@@ -139,8 +205,6 @@ export function registerRoutes(app: Express) {
     if (!userAddress) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-
-
 
     // Convert both addresses to lowercase for case-insensitive comparison
     const userSongs = await db.query.songs.findMany({
