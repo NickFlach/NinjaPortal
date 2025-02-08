@@ -414,14 +414,19 @@ export function registerRoutes(app: Express) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const reaction = await db.query.songReactions.findFirst({
-      where: and(
-        eq(songReactions.songId, songId),
-        eq(songReactions.userAddress, userAddress.toLowerCase())
-      ),
-    });
+    try {
+      const reaction = await db.query.songReactions.findFirst({
+        where: and(
+          eq(songReactions.songId, songId),
+          eq(songReactions.userAddress, userAddress.toLowerCase())
+        ),
+      });
 
-    res.json(reaction);
+      res.json(reaction);
+    } catch (error) {
+      console.error('Error fetching reaction:', error);
+      res.status(500).json({ message: "Failed to fetch reaction" });
+    }
   });
 
   app.post("/api/songs/:id/react", async (req, res) => {
