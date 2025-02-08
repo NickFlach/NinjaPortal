@@ -25,4 +25,6 @@ export default {
   'app.network.warning': 'Network Warning',
   'app.network.switch': 'Please approve the network switch in your Opera Wallet',
   'app.network.connect': 'Please make sure you\'re connected to the NEO X network',
+  'app.disconnect.success': 'Wallet disconnected successfully!',
+  'app.disconnect.error': 'Failed to disconnect wallet',
 } as const;

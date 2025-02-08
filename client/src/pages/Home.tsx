@@ -10,9 +10,10 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Library } from "lucide-react";
+import { Upload, Library, Loader2 } from "lucide-react";
 import { uploadToIPFS } from "@/lib/ipfs";
 import { EditSongDialog } from "@/components/EditSongDialog";
+import { useIntl } from 'react-intl';
 
 interface Song {
   id: number;
@@ -25,6 +26,7 @@ interface Song {
 }
 
 export default function Home() {
+  const intl = useIntl();
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [pendingUpload, setPendingUpload] = useState<File>();
   const { toast } = useToast();
@@ -34,7 +36,7 @@ export default function Home() {
 
   const handleBackgroundClick = () => {
     const baseUrl = window.location.origin;
-    const redirectUrl = address 
+    const redirectUrl = address
       ? `${baseUrl}?wallet=${address}`
       : baseUrl;
     window.location.href = redirectUrl;
@@ -54,7 +56,7 @@ export default function Home() {
 
       try {
         // Register user first if needed
-        const registerResponse = await apiRequest("POST", "/api/users/register", { 
+        const registerResponse = await apiRequest("POST", "/api/users/register", {
           address,
           // Include geolocation if available
           geolocation: null // We'll add this later
@@ -107,15 +109,15 @@ export default function Home() {
   const uploadMutation = useMutation({
     mutationFn: async ({ file, title, artist }: { file: File; title: string; artist: string }) => {
       if (!address) {
-        throw new Error("Please connect your wallet to upload songs");
+        throw new Error(intl.formatMessage({ id: 'app.errors.wallet' }));
       }
 
       try {
         // Register user first if needed
-        const registerResponse = await apiRequest("POST", "/api/users/register", { 
+        const registerResponse = await apiRequest("POST", "/api/users/register", {
           address,
           // Include geolocation if available
-          geolocation: null 
+          geolocation: null
         });
 
         if (!registerResponse.ok) {
@@ -126,8 +128,8 @@ export default function Home() {
         console.log('Registration successful:', registerData);
 
         toast({
-          title: "Upload Started",
-          description: "Uploading your song to IPFS...",
+          title: intl.formatMessage({ id: 'app.upload.started' }),
+          description: intl.formatMessage({ id: 'app.upload.progress' }),
         });
 
         try {
@@ -159,8 +161,8 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ["/api/songs/library"] });
       queryClient.invalidateQueries({ queryKey: ["/api/songs/recent"] });
       toast({
-        title: "Success",
-        description: "Song uploaded successfully!",
+        title: intl.formatMessage({ id: 'app.upload.success' }),
+        description: intl.formatMessage({ id: 'app.upload.success' }),
       });
       setPendingUpload(undefined);
       setUploadDialogOpen(false);
@@ -205,13 +207,13 @@ export default function Home() {
     <Layout>
       <div className="flex flex-col min-h-screen">
         {/* Add clickable background div */}
-        <div 
+        <div
           onClick={handleBackgroundClick}
           className="absolute inset-0 z-0 cursor-pointer"
-          style={{ 
-            top: '64px', 
+          style={{
+            top: '64px',
             bottom: 'auto',
-            height: 'calc(30vh)', 
+            height: 'calc(30vh)',
           }}
         />
 
@@ -223,11 +225,13 @@ export default function Home() {
           {address ? (
             <section className="px-4">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-semibold">Your Library</h2>
+                <h2 className="text-2xl font-semibold">
+                  {intl.formatMessage({ id: 'app.library' })}
+                </h2>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center text-muted-foreground">
                     <Library className="mr-2 h-4 w-4" />
-                    {librarySongs?.length || 0} songs
+                    {librarySongs?.length || 0} {intl.formatMessage({ id: 'app.songs' })}
                   </div>
                   <Input
                     type="file"
@@ -235,12 +239,22 @@ export default function Home() {
                     onChange={handleFileUpload}
                     className="hidden"
                     id="song-upload"
+                    disabled={uploadMutation.isPending}
                   />
                   <label htmlFor="song-upload">
-                    <Button variant="outline" asChild>
+                    <Button variant="outline" asChild disabled={uploadMutation.isPending}>
                       <span>
-                        <Upload className="mr-2 h-4 w-4" />
-                        Upload Song
+                        {uploadMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            {intl.formatMessage({ id: 'app.upload.progress' })}
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="mr-2 h-4 w-4" />
+                            {intl.formatMessage({ id: 'app.upload' })}
+                          </>
+                        )}
                       </span>
                     </Button>
                   </label>
