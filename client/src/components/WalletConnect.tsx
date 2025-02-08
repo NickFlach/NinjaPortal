@@ -4,7 +4,7 @@ import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from 'wouter';
-import { switchToNeoXNetwork, isNeoXNetwork, autoConfigureNeoXNetwork, isOperaWallet } from "@/lib/web3";
+import { isOperaWallet, autoConfigureNeoXNetwork } from "@/lib/web3";
 
 export function WalletConnect() {
   const { address } = useAccount();
@@ -18,7 +18,6 @@ export function WalletConnect() {
 
   const registerUser = async (userAddress: string) => {
     try {
-      // Try GET first to check if user exists and get recent songs
       console.log('Checking user registration:', userAddress);
       const response = await apiRequest("GET", "/api/users/register");
       const data = await response.json();
@@ -45,25 +44,11 @@ export function WalletConnect() {
     try {
       // Check if we're on mobile
       if (isMobile) {
-        // Check if MetaMask app is installed via deep link
-        const metamaskAppDeepLink = 'https://metamask.app.link/dapp/' + window.location.host;
-
-        // First try to connect to injected provider in case MetaMask or Opera is available
         if (typeof window.ethereum !== 'undefined') {
-          await connect({ 
-            connector: injected({
-              target: ({ type }) => {
-                // Check for Opera Wallet first
-                if (type === 'opera' || window.ethereum?.isOpera) {
-                  return 'opera';
-                }
-                // Default to MetaMask
-                return 'metaMask';
-              }
-            })
-          });
+          await connect({ connector: injected() });
         } else {
-          // If no injected provider, redirect to MetaMask app
+          // Redirect to MetaMask app if no injected provider
+          const metamaskAppDeepLink = 'https://metamask.app.link/dapp/' + window.location.host;
           window.location.href = metamaskAppDeepLink;
           toast({
             title: "Opening MetaMask App",
@@ -72,7 +57,7 @@ export function WalletConnect() {
           return;
         }
       } else {
-        // Desktop flow - check for wallet extensions
+        // Desktop flow
         if (typeof window.ethereum === 'undefined') {
           window.open('https://metamask.io/download/', '_blank');
           toast({
@@ -83,17 +68,7 @@ export function WalletConnect() {
           return;
         }
 
-        // Connect using the extension
-        await connect({ 
-          connector: injected({
-            target: ({ type }) => {
-              if (type === 'opera' || window.ethereum?.isOpera) {
-                return 'opera';
-              }
-              return 'metaMask';
-            }
-          })
-        });
+        await connect({ connector: injected() });
       }
 
       // Initial delay to allow wallet connection to settle
@@ -101,7 +76,7 @@ export function WalletConnect() {
 
       // Get wallet address with retries
       let connectedAddress = null;
-      for (let i = 0; i < 5; i++) { // Try for up to 5 seconds (5 * 1000ms)
+      for (let i = 0; i < 5; i++) {
         try {
           const accounts = await window.ethereum.request({ method: 'eth_accounts' });
           connectedAddress = accounts[0];
@@ -125,7 +100,6 @@ export function WalletConnect() {
         });
         await autoConfigureNeoXNetwork();
       } catch (error: any) {
-        // Show network configuration error but don't stop the flow
         toast({
           title: "Network Warning",
           description: isOperaWallet() 
@@ -140,20 +114,20 @@ export function WalletConnect() {
       // Registration with retries
       let registrationSuccess = false;
       let registrationData = null;
-      for (let i = 0; i < 3; i++) { // Try registration up to 3 times
+      for (let i = 0; i < 3; i++) {
         try {
           registrationData = await registerUser(connectedAddress);
           registrationSuccess = true;
           break;
         } catch (error) {
           console.error('Registration attempt', i + 1, 'failed:', error);
-          if (i === 2) { // Only show error toast on final attempt
+          if (i === 2) {
             toast({
               title: "Registration Error",
               description: error instanceof Error ? error.message : "Failed to register wallet. Please try again.",
               variant: "destructive",
             });
-            throw error; // Re-throw on final attempt
+            throw error;
           }
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
@@ -163,7 +137,6 @@ export function WalletConnect() {
         throw new Error("Failed to register after multiple attempts");
       }
 
-      // Redirect to home page
       setLocation('/home');
 
       toast({

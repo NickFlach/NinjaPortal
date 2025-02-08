@@ -39,9 +39,7 @@ export const config = createConfig({
     [neoXChain.id]: http(),
   },
   connectors: [
-    injected({
-      target: 'metaMask'
-    })
+    injected()
   ],
 });
 
@@ -49,8 +47,7 @@ export const config = createConfig({
 export const isOperaWallet = () => {
   return typeof window !== 'undefined' && (
     window.ethereum?.isOpera || 
-    /OPR|Opera/.test(navigator.userAgent) || 
-    (navigator.userAgent.match(/iPhone|iPad|iPod/i) && window.ethereum?.isOpera)
+    /OPR|Opera/.test(navigator.userAgent)
   );
 };
 
@@ -81,23 +78,17 @@ export const addNeoXNetwork = async () => {
   try {
     await window.ethereum.request({
       method: 'wallet_addEthereumChain',
-      params: [
-        {
-          chainId: `0x${neoXChain.id.toString(16)}`,
-          chainName: neoXChain.name,
-          nativeCurrency: neoXChain.nativeCurrency,
-          rpcUrls: neoXChain.rpcUrls.public.http,
-          blockExplorerUrls: [neoXChain.blockExplorers.default.url],
-        },
-      ],
+      params: [{
+        chainId: `0x${neoXChain.id.toString(16)}`,
+        chainName: neoXChain.name,
+        nativeCurrency: neoXChain.nativeCurrency,
+        rpcUrls: neoXChain.rpcUrls.public.http,
+        blockExplorerUrls: [neoXChain.blockExplorers.default.url],
+      }],
     });
     return true;
   } catch (error: any) {
     console.error('Error adding NEO X network:', error);
-    // Handle Opera-specific errors
-    if (isOperaWallet() && error.code === 4001) {
-      throw new Error('Please approve the network addition in your Opera Wallet');
-    }
     throw error;
   }
 };
@@ -114,19 +105,13 @@ export const switchToNeoXNetwork = async () => {
     });
     return true;
   } catch (error: any) {
-    // If the error code is 4902, the chain hasn't been added
     if (error.code === 4902) {
       return addNeoXNetwork();
-    }
-    // Handle Opera-specific network switching
-    if (isOperaWallet() && error.code === 4001) {
-      throw new Error('Please approve the network switch in your Opera Wallet');
     }
     throw error;
   }
 };
 
-// Auto-configure NEO X network
 export const autoConfigureNeoXNetwork = async () => {
   try {
     const isCorrectNetwork = await isNeoXNetwork();
