@@ -1,89 +1,122 @@
 import { motion, useAnimation, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useIntl } from "react-intl";
 
-const NinjaSVG = () => (
-  <motion.svg
-    width="120"
-    height="120"
-    viewBox="0 0 120 120"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className="text-primary"
-  >
-    {/* Ninja Body */}
-    <motion.path
-      d="M60 95c16.569 0 30-13.431 30-30S76.569 35 60 35 30 48.431 30 65s13.431 30 30 30z"
-      fill="currentColor"
-      initial={{ scale: 0 }}
-      animate={{ scale: 1 }}
-      transition={{ type: "spring", stiffness: 260, damping: 20 }}
-    />
+const NinjaSVG = ({ beatIntensity = 0 }) => {
+  // Scale factor based on beat intensity (0-1)
+  const scale = 1 + (beatIntensity * 0.2);
 
-    {/* Ninja Headband */}
-    <motion.path
-      d="M35 55c0 0 10-5 25-5s25 5 25 5"
-      stroke="white"
-      strokeWidth="4"
-      strokeLinecap="round"
-      initial={{ pathLength: 0 }}
-      animate={{ pathLength: 1 }}
-      transition={{ duration: 1 }}
-    />
-
-    {/* Ninja Belt */}
-    <motion.path
-      d="M40 75h40"
-      stroke="white"
-      strokeWidth="4"
-      strokeLinecap="round"
-      initial={{ pathLength: 0 }}
-      animate={{ pathLength: 1 }}
-      transition={{ duration: 1, delay: 0.5 }}
-    />
-
-    {/* Ninja Eyes */}
-    <motion.g>
-      <motion.circle
-        cx="50"
-        cy="60"
-        r="4"
-        fill="white"
-        initial={{ scale: 0 }}
-        animate={{ scale: [0, 1.2, 1] }}
-        transition={{ delay: 0.5, duration: 0.3 }}
-      />
-      <motion.circle
-        cx="70"
-        cy="60"
-        r="4"
-        fill="white"
-        initial={{ scale: 0 }}
-        animate={{ scale: [0, 1.2, 1] }}
-        transition={{ delay: 0.5, duration: 0.3 }}
-      />
-    </motion.g>
-
-    {/* Ninja Stars (Decoration) */}
-    <motion.g>
+  return (
+    <motion.svg
+      width="120"
+      height="120"
+      viewBox="0 0 120 120"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="text-primary"
+    >
+      {/* Ninja Body with beat-reactive scaling */}
       <motion.path
-        d="M85 45l5-5 5 5-5 5z"
-        fill="white"
-        initial={{ rotate: 0, scale: 0 }}
-        animate={{ rotate: 180, scale: 1 }}
-        transition={{ duration: 1, delay: 0.8 }}
+        d="M60 95c16.569 0 30-13.431 30-30S76.569 35 60 35 30 48.431 30 65s13.431 30 30 30z"
+        fill="currentColor"
+        initial={{ scale: 0 }}
+        animate={{ 
+          scale: scale,
+          rotate: beatIntensity > 0.5 ? [-5, 5] : 0
+        }}
+        transition={{ 
+          type: "spring",
+          stiffness: 260 + (beatIntensity * 100),
+          damping: 20
+        }}
       />
+
+      {/* Ninja Headband with beat-reactive movement */}
       <motion.path
-        d="M25 45l5-5 5 5-5 5z"
-        fill="white"
-        initial={{ rotate: 0, scale: 0 }}
-        animate={{ rotate: -180, scale: 1 }}
-        transition={{ duration: 1, delay: 0.8 }}
+        d="M35 55c0 0 10-5 25-5s25 5 25 5"
+        stroke="white"
+        strokeWidth="4"
+        strokeLinecap="round"
+        animate={{ 
+          y: beatIntensity > 0.3 ? [-2, 2] : 0,
+          pathLength: [0.8, 1]
+        }}
+        transition={{ 
+          duration: 0.2,
+          repeat: Infinity,
+          repeatType: "reverse"
+        }}
       />
-    </motion.g>
-  </motion.svg>
-);
+
+      {/* Ninja Belt with beat-reactive wave */}
+      <motion.path
+        d="M40 75h40"
+        stroke="white"
+        strokeWidth="4"
+        strokeLinecap="round"
+        animate={{ 
+          pathLength: [0.9, 1],
+          y: beatIntensity > 0.4 ? [-1, 1] : 0
+        }}
+        transition={{ 
+          duration: 0.15,
+          repeat: Infinity,
+          repeatType: "reverse"
+        }}
+      />
+
+      {/* Ninja Eyes with beat-reactive blinking */}
+      <motion.g>
+        {[
+          { cx: 50, cy: 60 },
+          { cx: 70, cy: 60 }
+        ].map((eye, i) => (
+          <motion.circle
+            key={i}
+            {...eye}
+            r="4"
+            fill="white"
+            animate={{ 
+              scale: beatIntensity > 0.7 ? [1, 1.2, 1] : 1,
+              opacity: beatIntensity > 0.8 ? [1, 0.5, 1] : 1
+            }}
+            transition={{ 
+              duration: 0.2,
+              repeat: Infinity,
+              repeatType: "reverse"
+            }}
+          />
+        ))}
+      </motion.g>
+
+      {/* Ninja Stars with beat-reactive spinning */}
+      <motion.g>
+        {[
+          { x: 85, rotation: 180 },
+          { x: 25, rotation: -180 }
+        ].map((star, i) => (
+          <motion.path
+            key={i}
+            d={`M${star.x} 45l5-5 5 5-5 5z`}
+            fill="white"
+            animate={{ 
+              rotate: beatIntensity > 0.6 
+                ? [0, star.rotation]
+                : star.rotation / 2,
+              scale: beatIntensity > 0.5 ? [0.8, 1.2] : 1
+            }}
+            transition={{ 
+              duration: 0.3,
+              repeat: Infinity,
+              repeatType: "reverse"
+            }}
+          />
+        ))}
+      </motion.g>
+    </motion.svg>
+  );
+};
 
 interface TourStep {
   message: string;
@@ -95,8 +128,10 @@ export function NinjaTour() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
   const controls = useAnimation();
-  const { isPlaying, currentSong } = useMusicPlayer();
+  const { isPlaying, currentSong, audioContext, audioAnalyser } = useMusicPlayer();
   const intl = useIntl();
+  const animationFrameRef = useRef(0);
+  const [beatIntensity, setBeatIntensity] = useState(0);
 
   const tourSteps: TourStep[] = [
     {
@@ -116,39 +151,45 @@ export function NinjaTour() {
     }
   ];
 
-  // Dancing animation sequence synchronized with music
+  // Beat detection and animation
   useEffect(() => {
-    if (isPlaying) {
-      controls.start({
-        y: [0, -20, 0],
-        rotate: [0, -15, 15, -15, 0],
-        scale: [1, 1.1, 1],
-        transition: {
-          y: {
-            duration: 0.5,
-            repeat: Infinity,
-            repeatType: "reverse",
-            ease: "easeInOut"
-          },
-          rotate: {
-            duration: 1,
-            repeat: Infinity,
-            repeatType: "reverse",
-            ease: "easeInOut"
-          },
-          scale: {
-            duration: 0.5,
-            repeat: Infinity,
-            repeatType: "reverse",
-            ease: "easeInOut"
-          }
+    if (isPlaying && audioAnalyser) {
+      const dataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
+
+      const analyzeBeat = () => {
+        audioAnalyser.getByteFrequencyData(dataArray);
+
+        // Calculate average intensity from lower frequencies (bass)
+        const bassRange = dataArray.slice(0, 10);
+        const averageIntensity = bassRange.reduce((acc, val) => acc + val, 0) / bassRange.length;
+
+        // Normalize to 0-1 range and add some randomness
+        const normalizedIntensity = (averageIntensity / 255) * 
+          (0.8 + Math.random() * 0.4); // Random factor between 0.8-1.2
+
+        setBeatIntensity(normalizedIntensity);
+
+        // Random position jitter based on beat intensity
+        if (normalizedIntensity > 0.6) {
+          controls.start({
+            x: Math.random() * 10 - 5,
+            y: Math.random() * 10 - 5,
+            transition: { duration: 0.1 }
+          });
         }
-      });
-    } else {
-      controls.stop();
-      controls.set({ y: 0, rotate: 0, scale: 1 });
+
+        animationFrameRef.current = requestAnimationFrame(analyzeBeat);
+      };
+
+      analyzeBeat();
+
+      return () => {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+      };
     }
-  }, [isPlaying, controls]);
+  }, [isPlaying, audioAnalyser, controls]);
 
   // Auto-advance tour steps
   useEffect(() => {
@@ -180,7 +221,7 @@ export function NinjaTour() {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.8 }}
         >
-          <NinjaSVG />
+          <NinjaSVG beatIntensity={beatIntensity} />
           <motion.div
             className="absolute left-full ml-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg shadow-lg pointer-events-auto"
             style={{ width: "max-content", maxWidth: "300px" }}
