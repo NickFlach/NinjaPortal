@@ -30,7 +30,7 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false,
   // Query user's reaction to this song
   const { data: userReaction } = useQuery<SongReaction>({
     queryKey: [`/api/songs/${song.id}/reaction`],
-    enabled: false, // Disable until we have authentication
+    enabled: true, // Enable the query to check for existing reactions
   });
 
   // Add/update reaction mutation
