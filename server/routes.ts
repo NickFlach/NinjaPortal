@@ -190,7 +190,7 @@ export function registerRoutes(app: Express) {
       console.log('Fetching recent songs feed');
 
       // Get user's reactions if authenticated
-      let userReactions = [];
+      let userReactions: typeof songReactions.$inferSelect[] = [];
       if (userAddress) {
         userReactions = await db.query.songReactions.findMany({
           where: eq(songReactions.userAddress, userAddress),
@@ -236,12 +236,10 @@ export function registerRoutes(app: Express) {
       }
 
       // Combine and deduplicate songs
-      const allSongs = [...recentlyPlayedSongs.map(rp => rp.song), ...recommendedSongs];
+      const allSongs = [...recentlyPlayedSongs.map(rp => rp.song), ...recommendedSongs].filter(Boolean);
       const uniqueSongs = Array.from(
         new Map(
-          allSongs
-            .filter(Boolean)
-            .map(song => [song.id, song])
+          allSongs.map(song => [song.id, song])
         ).values()
       );
 

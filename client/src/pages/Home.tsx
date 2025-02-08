@@ -14,16 +14,7 @@ import { Upload, Library, Loader2 } from "lucide-react";
 import { uploadToIPFS } from "@/lib/ipfs";
 import { EditSongDialog } from "@/components/EditSongDialog";
 import { useIntl } from 'react-intl';
-
-interface Song {
-  id: number;
-  title: string;
-  artist: string;
-  ipfsHash: string;
-  uploadedBy: string | null;
-  createdAt: string | null;
-  votes: number | null;
-}
+import type { Song } from "@/types/song";
 
 export default function Home() {
   const intl = useIntl();
@@ -58,8 +49,6 @@ export default function Home() {
         // Register user first if needed
         const registerResponse = await apiRequest("POST", "/api/users/register", {
           address,
-          // Include geolocation if available
-          geolocation: null // We'll add this later
         });
 
         if (!registerResponse.ok) {
