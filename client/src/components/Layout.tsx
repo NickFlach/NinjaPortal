@@ -7,6 +7,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { Button } from "@/components/ui/button";
 import { Globe } from "lucide-react";
 import { messages, languageNames } from "@/i18n";
+import { NinjaTour } from "@/components/NinjaTour";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +27,9 @@ export function Layout({ children }: LayoutProps) {
     <div className="relative min-h-screen">
       {/* Background layer */}
       <div className="fixed inset-0 bg-background/95" />
+
+      {/* Ninja Tour */}
+      <NinjaTour />
 
       {/* Content layers */}
       <header className="relative z-50 border-b bg-background/80 backdrop-blur-md">

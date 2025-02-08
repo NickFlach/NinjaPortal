@@ -27,4 +27,9 @@ export default {
   'app.network.connect': 'Please make sure you\'re connected to the NEO X network',
   'app.disconnect.success': 'Wallet disconnected successfully!',
   'app.disconnect.error': 'Failed to disconnect wallet',
+  // Tour messages
+  'tour.welcome': 'Welcome to Ninja-Portal! I\'ll be your guide.',
+  'tour.connect': 'Connect your wallet to start exploring music.',
+  'tour.upload': 'Upload your favorite tunes and share them with the world!',
+  'tour.gotIt': 'Got it!',
 } as const;
