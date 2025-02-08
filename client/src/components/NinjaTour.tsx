@@ -5,7 +5,6 @@ import { useIntl } from "react-intl";
 
 interface TourStep {
   message: string;
-  position: { x: number; y: number };
   messageId: string;
 }
 
@@ -21,17 +20,14 @@ export function NinjaTour() {
   const tourSteps: TourStep[] = [
     {
       message: "Welcome to Ninja-Portal! I'll be your guide.",
-      position: { x: 50, y: 50 },
       messageId: "tour.welcome"
     },
     {
       message: "Connect your wallet to start exploring music.",
-      position: { x: 80, y: 20 },
       messageId: "tour.connect"
     },
     {
       message: "Upload your favorite tunes and share them with the world!",
-      position: { x: 60, y: 70 },
       messageId: "tour.upload"
     }
   ];
@@ -71,16 +67,17 @@ export function NinjaTour() {
 
   if (!isVisible) return null;
 
-  const currentTourStep = tourSteps[currentStep];
-
   return (
     <AnimatePresence>
+      {/* Position the ninja in the MusicVisualizer section */}
       <motion.div
-        className="fixed z-50 pointer-events-none"
-        animate={controls}
+        className="absolute inset-0 pointer-events-none"
         style={{
-          left: `${currentTourStep.position.x}%`,
-          top: `${currentTourStep.position.y}%`,
+          top: '64px', // Header height
+          height: '30vh', // MusicVisualizer height
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
         <motion.div
@@ -219,7 +216,7 @@ export function NinjaTour() {
             transition={{ delay: 0.2 }}
           >
             <p className="text-sm">
-              {intl.formatMessage({ id: currentTourStep.messageId })}
+              {intl.formatMessage({ id: tourSteps[currentStep].messageId })}
             </p>
             {currentStep === tourSteps.length - 1 && (
               <motion.button
