@@ -41,9 +41,6 @@ export const config = createConfig({
   connectors: [
     injected({
       target: 'metaMask'
-    }),
-    injected({
-      target: 'opera'
     })
   ],
 });
