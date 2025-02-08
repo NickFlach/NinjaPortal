@@ -10,31 +10,45 @@ const NinjaSVG = () => (
     viewBox="0 0 120 120"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
+    className="text-primary"
   >
     {/* Ninja Body */}
     <motion.path
-      d="M60 100c16.569 0 30-13.431 30-30C90 53.431 76.569 40 60 40c-16.569 0-30 13.431-30 30 0 16.569 13.431 30 30 30z"
+      d="M60 95c16.569 0 30-13.431 30-30S76.569 35 60 35 30 48.431 30 65s13.431 30 30 30z"
       fill="currentColor"
       initial={{ scale: 0 }}
       animate={{ scale: 1 }}
       transition={{ type: "spring", stiffness: 260, damping: 20 }}
     />
-    {/* Ninja Mask */}
+
+    {/* Ninja Headband */}
     <motion.path
-      d="M45 65h30M40 55h40"
+      d="M35 55c0 0 10-5 25-5s25 5 25 5"
       stroke="white"
-      strokeWidth="3"
+      strokeWidth="4"
       strokeLinecap="round"
       initial={{ pathLength: 0 }}
       animate={{ pathLength: 1 }}
       transition={{ duration: 1 }}
     />
+
+    {/* Ninja Belt */}
+    <motion.path
+      d="M40 75h40"
+      stroke="white"
+      strokeWidth="4"
+      strokeLinecap="round"
+      initial={{ pathLength: 0 }}
+      animate={{ pathLength: 1 }}
+      transition={{ duration: 1, delay: 0.5 }}
+    />
+
     {/* Ninja Eyes */}
     <motion.g>
       <motion.circle
         cx="50"
         cy="60"
-        r="3"
+        r="4"
         fill="white"
         initial={{ scale: 0 }}
         animate={{ scale: [0, 1.2, 1] }}
@@ -43,11 +57,29 @@ const NinjaSVG = () => (
       <motion.circle
         cx="70"
         cy="60"
-        r="3"
+        r="4"
         fill="white"
         initial={{ scale: 0 }}
         animate={{ scale: [0, 1.2, 1] }}
         transition={{ delay: 0.5, duration: 0.3 }}
+      />
+    </motion.g>
+
+    {/* Ninja Stars (Decoration) */}
+    <motion.g>
+      <motion.path
+        d="M85 45l5-5 5 5-5 5z"
+        fill="white"
+        initial={{ rotate: 0, scale: 0 }}
+        animate={{ rotate: 180, scale: 1 }}
+        transition={{ duration: 1, delay: 0.8 }}
+      />
+      <motion.path
+        d="M25 45l5-5 5 5-5 5z"
+        fill="white"
+        initial={{ rotate: 0, scale: 0 }}
+        animate={{ rotate: -180, scale: 1 }}
+        transition={{ duration: 1, delay: 0.8 }}
       />
     </motion.g>
   </motion.svg>
@@ -84,28 +116,37 @@ export function NinjaTour() {
     }
   ];
 
-  // Dancing animation sequence
+  // Dancing animation sequence synchronized with music
   useEffect(() => {
     if (isPlaying) {
       controls.start({
         y: [0, -20, 0],
-        rotate: [0, -5, 5, -5, 0],
+        rotate: [0, -15, 15, -15, 0],
+        scale: [1, 1.1, 1],
         transition: {
           y: {
             duration: 0.5,
             repeat: Infinity,
-            repeatType: "reverse"
+            repeatType: "reverse",
+            ease: "easeInOut"
           },
           rotate: {
             duration: 1,
             repeat: Infinity,
-            repeatType: "reverse"
+            repeatType: "reverse",
+            ease: "easeInOut"
+          },
+          scale: {
+            duration: 0.5,
+            repeat: Infinity,
+            repeatType: "reverse",
+            ease: "easeInOut"
           }
         }
       });
     } else {
       controls.stop();
-      controls.set({ y: 0, rotate: 0 });
+      controls.set({ y: 0, rotate: 0, scale: 1 });
     }
   }, [isPlaying, controls]);
 
