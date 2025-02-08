@@ -40,10 +40,30 @@ export const config = createConfig({
   },
   connectors: [
     injected({
-      target: 'metaMask'
+      // Use a function that safely checks for wallet type
+      target: () => {
+        // Check for Opera Wallet first (both mobile and desktop)
+        if (typeof window !== 'undefined' && 
+            (window.ethereum?.isOpera || 
+             /OPR|Opera/.test(navigator.userAgent) || 
+             (navigator.userAgent.match(/iPhone|iPad|iPod/i) && window.ethereum?.isOpera))) {
+          return 'opera';
+        }
+        // Default to MetaMask
+        return 'metaMask';
+      }
     }),
   ],
 });
+
+// Helper function to detect Opera Wallet
+export const isOperaWallet = () => {
+  return typeof window !== 'undefined' && (
+    window.ethereum?.isOpera || 
+    /OPR|Opera/.test(navigator.userAgent) || 
+    (navigator.userAgent.match(/iPhone|iPad|iPod/i) && window.ethereum?.isOpera)
+  );
+};
 
 // Helper functions
 export const isConnected = () => {
@@ -65,8 +85,8 @@ export const getBalance = async (address: `0x${string}`) => {
 
 // NEO X Network Management
 export const addNeoXNetwork = async () => {
-  if (!window.ethereum) {
-    throw new Error('MetaMask is not installed');
+  if (typeof window === 'undefined' || !window.ethereum) {
+    throw new Error('No web3 wallet detected');
   }
 
   try {
@@ -83,15 +103,19 @@ export const addNeoXNetwork = async () => {
       ],
     });
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error adding NEO X network:', error);
+    // Handle Opera-specific errors
+    if (isOperaWallet() && error.code === 4001) {
+      throw new Error('Please approve the network addition in your Opera Wallet');
+    }
     throw error;
   }
 };
 
 export const switchToNeoXNetwork = async () => {
-  if (!window.ethereum) {
-    throw new Error('MetaMask is not installed');
+  if (typeof window === 'undefined' || !window.ethereum) {
+    throw new Error('No web3 wallet detected');
   }
 
   try {
@@ -105,12 +129,30 @@ export const switchToNeoXNetwork = async () => {
     if (error.code === 4902) {
       return addNeoXNetwork();
     }
+    // Handle Opera-specific network switching
+    if (isOperaWallet() && error.code === 4001) {
+      throw new Error('Please approve the network switch in your Opera Wallet');
+    }
+    throw error;
+  }
+};
+
+// Auto-configure NEO X network
+export const autoConfigureNeoXNetwork = async () => {
+  try {
+    const isCorrectNetwork = await isNeoXNetwork();
+    if (!isCorrectNetwork) {
+      await switchToNeoXNetwork();
+    }
+    return true;
+  } catch (error) {
+    console.error('Error auto-configuring NEO X network:', error);
     throw error;
   }
 };
 
 export const isNeoXNetwork = async () => {
-  if (!window.ethereum) return false;
+  if (typeof window === 'undefined' || !window.ethereum) return false;
 
   try {
     const chainId = await window.ethereum.request({ method: 'eth_chainId' });
