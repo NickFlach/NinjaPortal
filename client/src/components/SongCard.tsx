@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { MoreVertical, Plus, Trash2, ListMusic, Coins, Edit } from "lucide-react";
+import { MoreVertical, Plus, Trash2, ListMusic, Coins, Edit, Heart, HeartCrack } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useContractWrite, useAccount } from 'wagmi';
@@ -24,13 +24,7 @@ interface Song {
   uploadedBy: string | null;
   createdAt: string | null;
   votes: number | null;
-}
-
-interface Playlist {
-  id: number;
-  name: string;
-  createdBy: string | null;
-  createdAt: string | null;
+  creatorMood: 'happy' | 'sad' | 'neutral';
 }
 
 interface SongCardProps {
@@ -38,35 +32,29 @@ interface SongCardProps {
   onClick: () => void;
   variant?: "ghost" | "default";
   showDelete?: boolean;
+  isPlaying?: boolean;
 }
 
-export function SongCard({ song, onClick, variant = "ghost", showDelete = false }: SongCardProps) {
+export function SongCard({ song, onClick, variant = "ghost", showDelete = false, isPlaying = false }: SongCardProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { address } = useAccount();
 
-  const { data: playlists } = useQuery<Playlist[]>({
-    queryKey: ["/api/playlists"],
+  // Query user's reaction to this song
+  const { data: userReaction } = useQuery({
+    queryKey: [`/api/songs/${song.id}/reaction`, address],
+    enabled: !!address,
   });
 
-  // Contract write for minting NFT
-  const { writeAsync: mintSongNFT } = useContractWrite({
-    address: PLAYLIST_NFT_ADDRESS,
-    abi: PLAYLIST_NFT_ABI,
-    functionName: 'mintSong',
-  });
-
-  const addToPlaylistMutation = useMutation({
-    mutationFn: async ({ playlistId, songId }: { playlistId: number; songId: number }) => {
-      await apiRequest("POST", `/api/playlists/${playlistId}/songs`, { songId });
+  // Add/update reaction mutation
+  const reactionMutation = useMutation({
+    mutationFn: async ({ songId, reaction }: { songId: number; reaction: 'happy' | 'sad' }) => {
+      await apiRequest("POST", `/api/songs/${songId}/react`, { reaction });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/playlists"] });
-      toast({
-        title: "Success",
-        description: "Song added to playlist",
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/songs"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/songs/${song.id}/reaction`] });
     },
     onError: (error: Error) => {
       toast({
@@ -77,103 +65,76 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
     },
   });
 
-  const mintNFTMutation = useMutation({
-    mutationFn: async () => {
-      if (!mintSongNFT) throw new Error("Contract write not ready");
-      if (!address) throw new Error("Wallet not connected");
-
-      const metadataUri = `ipfs://${song.ipfsHash}`;
-
-      try {
-        const tx = await mintSongNFT({
-          args: [
-            address,
-            song.title,
-            song.artist,
-            song.ipfsHash,
-            metadataUri
-          ],
-          value: parseEther("1"), // 1 GAS
-        });
-
-        // Wait for transaction confirmation
-        await tx.wait();
-      } catch (error: any) {
-        throw new Error(error.message || "Failed to mint NFT");
-      }
-    },
-    onSuccess: () => {
+  const handleReaction = (reaction: 'happy' | 'sad') => {
+    if (!address) {
       toast({
-        title: "Success",
-        description: "NFT minting initiated. Please wait for the transaction to be mined.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
+        title: "Connect Wallet",
+        description: "Please connect your wallet to react to songs",
         variant: "destructive",
       });
-    },
-  });
-
-  const deleteSongMutation = useMutation({
-    mutationFn: async (songId: number) => {
-      await apiRequest("DELETE", `/api/songs/${songId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/songs/library"] });
-      toast({
-        title: "Success",
-        description: "Song deleted from library",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
+      return;
+    }
+    reactionMutation.mutate({ songId: song.id, reaction });
+  };
 
   return (
     <>
       <div className="flex items-center justify-between group">
         <Button
           variant={variant}
-          className="flex-1 justify-start"
+          className={`flex-1 justify-start ${isPlaying ? 'bg-primary/10' : ''}`}
           onClick={onClick}
         >
           <span className="truncate">{song.title}</span>
           <span className="ml-2 text-muted-foreground">- {song.artist}</span>
+          {song.creatorMood !== 'neutral' && (
+            <span className="ml-2 text-muted-foreground">
+              {song.creatorMood === 'happy' ? '😊' : '😢'}
+            </span>
+          )}
         </Button>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="icon"
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            {showDelete && (
-              <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Details
-              </DropdownMenuItem>
-            )}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`${
+              userReaction?.reaction === 'happy' ? 'text-green-500' : ''
+            } opacity-0 group-hover:opacity-100 transition-opacity`}
+            onClick={() => handleReaction('happy')}
+          >
+            <Heart className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`${
+              userReaction?.reaction === 'sad' ? 'text-red-500' : ''
+            } opacity-0 group-hover:opacity-100 transition-opacity`}
+            onClick={() => handleReaction('sad')}
+          >
+            <HeartCrack className="h-4 w-4" />
+          </Button>
 
-            {!playlists?.length ? (
-              <DropdownMenuItem className="text-muted-foreground" disabled>
-                <ListMusic className="mr-2 h-4 w-4" />
-                Create a playlist first
-              </DropdownMenuItem>
-            ) : (
-              playlists.map((playlist) => (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {showDelete && (
+                <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Details
+                </DropdownMenuItem>
+              )}
+
+              {playlists?.map((playlist) => (
                 <DropdownMenuItem
                   key={playlist.id}
                   onClick={() => {
@@ -186,41 +147,41 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
                   <Plus className="mr-2 h-4 w-4" />
                   Add to {playlist.name}
                 </DropdownMenuItem>
-              ))
-            )}
+              ))}
 
-            <DropdownMenuSeparator />
+              <DropdownMenuSeparator />
 
-            <DropdownMenuItem
-              onClick={() => {
-                if (window.confirm("Minting an NFT costs 1 GAS. Continue?")) {
-                  mintNFTMutation.mutate();
-                }
-              }}
-              disabled={mintNFTMutation.isPending || !address}
-            >
-              <Coins className="mr-2 h-4 w-4" />
-              Mint as NFT
-            </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (window.confirm("Minting an NFT costs 1 GAS. Continue?")) {
+                    mintNFTMutation.mutate();
+                  }
+                }}
+                disabled={mintNFTMutation.isPending || !address}
+              >
+                <Coins className="mr-2 h-4 w-4" />
+                Mint as NFT
+              </DropdownMenuItem>
 
-            {showDelete && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={() => {
-                    if (window.confirm("Are you sure you want to delete this song?")) {
-                      deleteSongMutation.mutate(song.id);
-                    }
-                  }}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete from Library
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {showDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to delete this song?")) {
+                        deleteSongMutation.mutate(song.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete from Library
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <EditSongDialog

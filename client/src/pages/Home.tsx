@@ -107,7 +107,17 @@ export default function Home() {
   };
 
   const uploadMutation = useMutation({
-    mutationFn: async ({ file, title, artist }: { file: File; title: string; artist: string }) => {
+    mutationFn: async ({ 
+      file, 
+      title, 
+      artist, 
+      creatorMood 
+    }: { 
+      file: File; 
+      title: string; 
+      artist: string; 
+      creatorMood: 'happy' | 'sad' | 'neutral';
+    }) => {
       if (!address) {
         throw new Error(intl.formatMessage({ id: 'app.errors.wallet' }));
       }
@@ -116,8 +126,6 @@ export default function Home() {
         // Register user first if needed
         const registerResponse = await apiRequest("POST", "/api/users/register", {
           address,
-          // Include geolocation if available
-          geolocation: null
         });
 
         if (!registerResponse.ok) {
@@ -146,6 +154,7 @@ export default function Home() {
             title,
             artist,
             ipfsHash,
+            creatorMood,
           });
           return await response.json();
         } catch (error) {
@@ -312,12 +321,13 @@ export default function Home() {
           if (!open) setPendingUpload(undefined);
         }}
         mode="create"
-        onSubmit={({ title, artist }) => {
+        onSubmit={({ title, artist, creatorMood }) => {
           if (pendingUpload) {
             uploadMutation.mutate({
               file: pendingUpload,
               title,
               artist,
+              creatorMood,
             });
           }
         }}

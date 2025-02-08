@@ -26,6 +26,15 @@ export const songs = pgTable("songs", {
   uploadedBy: text("uploaded_by").references(() => users.address),
   createdAt: timestamp("created_at").defaultNow(),
   votes: integer("votes").default(0),
+  creatorMood: text("creator_mood").notNull().default('neutral'), // 'happy', 'sad', or 'neutral'
+});
+
+export const songReactions = pgTable("song_reactions", {
+  id: serial("id").primaryKey(),
+  songId: integer("song_id").references(() => songs.id),
+  userAddress: text("user_address").references(() => users.address),
+  reaction: text("reaction").notNull(), // 'happy' or 'sad'
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const recentlyPlayed = pgTable("recently_played", {
@@ -118,7 +127,19 @@ export const listenersRelations = relations(listeners, ({ one }) => ({
   }),
 }));
 
+export const songReactionsRelations = relations(songReactions, ({ one }) => ({
+  song: one(songs, {
+    fields: [songReactions.songId],
+    references: [songs.id],
+  }),
+  user: one(users, {
+    fields: [songReactions.userAddress],
+    references: [users.address],
+  }),
+}));
+
 export type User = typeof users.$inferSelect;
 export type Song = typeof songs.$inferSelect;
 export type Playlist = typeof playlists.$inferSelect;
 export type UserRewards = typeof userRewards.$inferSelect;
+export type SongReaction = typeof songReactions.$inferSelect;
