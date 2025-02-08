@@ -2,12 +2,24 @@ import { WalletConnect } from "@/components/WalletConnect";
 import { Navigation } from "@/components/Navigation";
 import { Link } from "wouter";
 import { MusicPlayer } from "@/components/MusicPlayer";
+import { useIntl } from "react-intl";
+import { useLocale } from "@/contexts/LocaleContext";
+import { Button } from "@/components/ui/button";
+import { Globe } from "lucide-react";
+import { messages } from "@/i18n";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 export function Layout({ children }: LayoutProps) {
+  const intl = useIntl();
+  const { locale, setLocale } = useLocale();
+
+  const toggleLocale = () => {
+    setLocale(locale === 'en' ? 'es' : 'en');
+  };
+
   return (
     <div className="relative min-h-screen">
       {/* Background layer */}
@@ -19,12 +31,23 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center">
             <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-                Ninja-Portal
+                {intl.formatMessage({ id: 'app.title' })}
               </h1>
             </Link>
             <Navigation />
           </div>
-          <WalletConnect />
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={toggleLocale}
+              className="hover:bg-accent"
+            >
+              <Globe className="h-4 w-4" />
+              <span className="sr-only">Toggle Language</span>
+            </Button>
+            <WalletConnect />
+          </div>
         </div>
       </header>
 

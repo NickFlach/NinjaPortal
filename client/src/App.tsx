@@ -15,6 +15,7 @@ import { useAccount } from 'wagmi';
 import { MusicPlayerProvider } from "@/contexts/MusicPlayerContext";
 import { MusicSyncProvider } from "@/contexts/MusicSyncContext";
 import { useEffect } from "react";
+import { LocaleProvider } from "./contexts/LocaleContext";
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<
@@ -118,12 +119,14 @@ function App() {
     <ErrorBoundary>
       <WagmiConfig config={config}>
         <QueryClientProvider client={queryClient}>
-          <MusicPlayerProvider>
-            <MusicSyncProvider>
-              <Router />
-              <Toaster />
-            </MusicSyncProvider>
-          </MusicPlayerProvider>
+          <LocaleProvider>
+            <MusicPlayerProvider>
+              <MusicSyncProvider>
+                <Router />
+                <Toaster />
+              </MusicSyncProvider>
+            </MusicPlayerProvider>
+          </LocaleProvider>
         </QueryClientProvider>
       </WagmiConfig>
     </ErrorBoundary>
