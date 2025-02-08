@@ -3,6 +3,18 @@ import { mainnet } from 'wagmi/chains';
 import { injected } from 'wagmi/connectors';
 import { createPublicClient, defineChain } from 'viem';
 
+// Helper function to detect Opera Wallet - defined before usage
+const isOperaWallet = () => {
+  try {
+    return typeof window !== 'undefined' && (
+      window.ethereum?.isOpera || 
+      /OPR|Opera/.test(navigator.userAgent)
+    );
+  } catch {
+    return false;
+  }
+};
+
 // Define NEO X network
 export const neoXChain = defineChain({
   id: 47763, // NEO X Chain ID
@@ -40,21 +52,13 @@ export const config = createConfig({
   },
   connectors: [
     injected({
-      target: ({ type }) => {
-        if (isOperaWallet()) return 'opera';
-        return 'metaMask';
-      }
+      target: isOperaWallet() ? 'opera' : 'metaMask'
     })
   ],
 });
 
-// Helper function to detect Opera Wallet
-export const isOperaWallet = () => {
-  return typeof window !== 'undefined' && (
-    window.ethereum?.isOpera || 
-    /OPR|Opera/.test(navigator.userAgent)
-  );
-};
+// Export the Opera detection function
+export { isOperaWallet };
 
 // Helper functions
 export const isConnected = () => {
@@ -74,7 +78,6 @@ export const getBalance = async (address: `0x${string}`) => {
   return publicClient.getBalance({ address });
 };
 
-// NEO X Network Management
 export const addNeoXNetwork = async () => {
   if (typeof window === 'undefined' || !window.ethereum) {
     throw new Error('No web3 wallet detected');
