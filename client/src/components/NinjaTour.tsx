@@ -97,9 +97,9 @@ export function NinjaTour() {
             xmlns="http://www.w3.org/2000/svg"
             className="text-primary"
           >
-            {/* Ninja Head - reacts to mid-high frequencies */}
+            {/* Ninja Head */}
             <motion.path
-              d="M60 35c-8.284 0-15 6.716-15 15 0 8.284 6.716 15 15 15s15-6.716 15-15c0-8.284-6.716-15-15-15z"
+              d="M60 25c-6 0-11 4-11 9s5 9 11 9 11-4 11-9-5-9-11-9z"
               fill="currentColor"
               animate={freqData ? {
                 scale: 1 + ((freqData[30] || 0) / 255) * 0.1,
@@ -111,123 +111,104 @@ export function NinjaTour() {
               transition={{ type: "tween", duration: 0.1 }}
             />
 
-            {/* Ninja Body - reacts to bass frequencies */}
+            {/* Ninja Body */}
             <motion.path
-              d="M45 65v20c0 8.284 6.716 15 15 15s15-6.716 15-15V65H45z"
+              d="M52 34v36c0 4.4 3.6 8 8 8s8-3.6 8-8V34H52z"
               fill="currentColor"
               animate={freqData ? {
                 scaleY: 1 + ((freqData[0] || 0) / 255) * 0.2,
-                scaleX: 1 + ((freqData[1] || 0) / 255) * 0.1
+                rotate: ((freqData[1] || 0) / 255) * 10 - 5
               } : {
                 scaleY: 1,
-                scaleX: 1
+                rotate: 0
               }}
               transition={{ type: "tween", duration: 0.1 }}
             />
 
-            {/* Ninja Headband - reacts to mid frequencies */}
+            {/* Left Leg */}
             <motion.path
-              d="M40 45c0 0 10-5 20-5s20 5 20 5"
-              stroke="white"
-              strokeWidth="3"
+              d="M52 70l-3 20"
+              stroke="currentColor"
+              strokeWidth="6"
               strokeLinecap="round"
               animate={freqData ? {
-                y: ((freqData[15] || 0) / 255) * 4 - 2,
-                pathLength: 0.8 + ((freqData[16] || 0) / 255) * 0.2
+                rotate: ((freqData[5] || 0) / 255) * 20 - 10,
+                x: ((freqData[6] || 0) / 255) * 2 - 1
               } : {
-                y: 0,
-                pathLength: 1
+                rotate: 0,
+                x: 0
               }}
+              style={{ transformOrigin: '52px 70px' }}
               transition={{ type: "tween", duration: 0.1 }}
             />
 
-            {/* Ninja Arms - react to mid-high frequencies */}
-            <motion.g>
-              {/* Left Arm */}
-              <motion.path
-                d="M45 65c-5 0-10 5-10 15s5 15 10 15"
-                stroke="currentColor"
-                strokeWidth="6"
-                strokeLinecap="round"
-                animate={freqData ? {
-                  rotate: ((freqData[20] || 0) / 255) * 30 - 15,
-                  x: ((freqData[21] || 0) / 255) * 4 - 2
-                } : {
-                  rotate: 0,
-                  x: 0
-                }}
-                transition={{ type: "tween", duration: 0.1 }}
-              />
-              {/* Right Arm */}
-              <motion.path
-                d="M75 65c5 0 10 5 10 15s-5 15-10 15"
-                stroke="currentColor"
-                strokeWidth="6"
-                strokeLinecap="round"
-                animate={freqData ? {
-                  rotate: ((freqData[22] || 0) / 255) * -30 + 15,
-                  x: ((freqData[23] || 0) / 255) * -4 + 2
-                } : {
-                  rotate: 0,
-                  x: 0
-                }}
-                transition={{ type: "tween", duration: 0.1 }}
-              />
-            </motion.g>
+            {/* Right Leg */}
+            <motion.path
+              d="M68 70l3 20"
+              stroke="currentColor"
+              strokeWidth="6"
+              strokeLinecap="round"
+              animate={freqData ? {
+                rotate: ((freqData[7] || 0) / 255) * -20 + 10,
+                x: ((freqData[8] || 0) / 255) * -2 + 1
+              } : {
+                rotate: 0,
+                x: 0
+              }}
+              style={{ transformOrigin: '68px 70px' }}
+              transition={{ type: "tween", duration: 0.1 }}
+            />
 
-            {/* Ninja Eyes - blink with high frequencies */}
-            <motion.g>
-              {[{ cx: 53, cy: 45 }, { cx: 67, cy: 45 }].map((eye, i) => (
-                <motion.circle
-                  key={i}
-                  {...eye}
-                  r="3"
-                  fill="white"
-                  animate={freqData ? {
-                    scale: 1 + ((freqData[40 + i] || 0) / 255) * 0.3,
-                    opacity: 0.7 + ((freqData[42 + i] || 0) / 255) * 0.3
-                  } : {
-                    scale: 1,
-                    opacity: 1
-                  }}
-                  transition={{ type: "tween", duration: 0.1 }}
-                />
-              ))}
-            </motion.g>
+            {/* Left Arm */}
+            <motion.path
+              d="M52 34c-4 0-8 4-8 12s4 12 8 12"
+              stroke="currentColor"
+              strokeWidth="4"
+              strokeLinecap="round"
+              animate={freqData ? {
+                rotate: ((freqData[20] || 0) / 255) * 30 - 15,
+                x: ((freqData[21] || 0) / 255) * 4 - 2
+              } : {
+                rotate: 0,
+                x: 0
+              }}
+              style={{ transformOrigin: '52px 34px' }}
+              transition={{ type: "tween", duration: 0.1 }}
+            />
 
-            {/* Ninja Weapons - spin with high frequencies */}
-            <motion.g>
-              {/* Katana */}
-              <motion.path
-                d="M85 35l15-15M87 33l10-10"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                animate={freqData ? {
-                  rotate: ((freqData[50] || 0) / 255) * 45 - 22.5,
-                  scale: 1 + ((freqData[51] || 0) / 255) * 0.2
-                } : {
-                  rotate: 0,
-                  scale: 1
-                }}
-                style={{ transformOrigin: '85px 35px' }}
-                transition={{ type: "tween", duration: 0.1 }}
-              />
-              {/* Shuriken */}
-              <motion.path
-                d="M20 35l5-5 5 5-5 5z"
-                fill="white"
-                animate={freqData ? {
-                  rotate: 360 * ((freqData[55] || 0) / 255),
-                  scale: 0.8 + ((freqData[56] || 0) / 255) * 0.4
-                } : {
-                  rotate: 0,
-                  scale: 1
-                }}
-                style={{ transformOrigin: '25px 35px' }}
-                transition={{ type: "tween", duration: 0.1 }}
-              />
-            </motion.g>
+            {/* Right Arm */}
+            <motion.path
+              d="M68 34c4 0 8 4 8 12s-4 12-8 12"
+              stroke="currentColor"
+              strokeWidth="4"
+              strokeLinecap="round"
+              animate={freqData ? {
+                rotate: ((freqData[22] || 0) / 255) * -30 + 15,
+                x: ((freqData[23] || 0) / 255) * -4 + 2
+              } : {
+                rotate: 0,
+                x: 0
+              }}
+              style={{ transformOrigin: '68px 34px' }}
+              transition={{ type: "tween", duration: 0.1 }}
+            />
+
+            {/* Katana */}
+            <motion.path
+              d="M60 15v-10M60 5l2 3M60 5l-2 3"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              animate={freqData ? {
+                rotate: ((freqData[50] || 0) / 255) * 20 - 10,
+                scale: 1 + ((freqData[51] || 0) / 255) * 0.1
+              } : {
+                rotate: 0,
+                scale: 1
+              }}
+              style={{ transformOrigin: '60px 15px' }}
+              transition={{ type: "tween", duration: 0.1 }}
+            />
           </motion.svg>
 
           <motion.div
