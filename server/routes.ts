@@ -5,6 +5,7 @@ import { db } from "@db";
 import { songs, users, playlists, followers, playlistSongs, recentlyPlayed, userRewards, songReactions } from "@db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { incrementListenCount, getMapData } from './services/music';
+import { analyzeMood } from './services/mood';
 
 // Track connected clients and their song subscriptions
 const clients = new Map<WebSocket, {
@@ -326,21 +327,36 @@ export function registerRoutes(app: Express) {
   });
 
   app.post("/api/songs", async (req, res) => {
-    const { title, artist, ipfsHash } = req.body;
+    const { title, artist, ipfsHash, creatorMood } = req.body;
     const uploadedBy = req.headers['x-wallet-address'] as string;
 
     if (!uploadedBy) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const newSong = await db.insert(songs).values({
-      title,
-      artist,
-      ipfsHash,
-      uploadedBy,
-    }).returning();
+    try {
+      // Analyze mood if not provided by creator
+      let mood = creatorMood;
+      if (!mood) {
+        console.log('Analyzing mood for song:', title);
+        const moodAnalysis = await analyzeMood(title);
+        mood = moodAnalysis.mood;
+        console.log('Mood analysis result:', mood);
+      }
 
-    res.json(newSong[0]);
+      const newSong = await db.insert(songs).values({
+        title,
+        artist,
+        ipfsHash,
+        uploadedBy: uploadedBy.toLowerCase(),
+        creatorMood: mood,
+      }).returning();
+
+      res.json(newSong[0]);
+    } catch (error) {
+      console.error('Error creating song:', error);
+      res.status(500).json({ message: "Failed to create song" });
+    }
   });
 
   app.delete("/api/songs/:id", async (req, res) => {
