@@ -3,17 +3,22 @@ import en from './messages/en';
 import es from './messages/es';
 import zh from './messages/zh';
 import ja from './messages/ja';
-import ko from './messages/ko'; // Added Korean
-import fr from './messages/fr'; // Added French
-
+import ko from './messages/ko';
+import fr from './messages/fr';
+import ru from './messages/ru';
+import uk from './messages/uk';
+import ar from './messages/ar';
 
 export const messages = {
   en,
   es,
   zh,
   ja,
-  ko, // Added Korean
-  fr, // Added French
+  ko,
+  fr,
+  ru,
+  uk,
+  ar,
 } as const;
 
 export type LocaleType = keyof typeof messages;
@@ -28,6 +33,7 @@ export function getIntl(locale: LocaleType) {
     {
       locale,
       messages: messages[locale],
+      defaultLocale: 'en', // Set English as default
     },
     cache
   );
@@ -39,8 +45,11 @@ export const languageNames = {
   es: 'Español',
   zh: '中文',
   ja: '日本語',
-  ko: '한국어', // Added Korean
-  fr: 'Français', // Added French
+  ko: '한국어',
+  fr: 'Français',
+  ru: 'Русский',
+  uk: 'Українська',
+  ar: 'العربية',
 } as const;
 
 // Function to detect user's preferred language
@@ -51,7 +60,7 @@ export function getPreferredLanguage(): LocaleType {
   }
 
   const browserLocale = navigator.language.split('-')[0] as LocaleType;
-  return messages[browserLocale] ? browserLocale : 'en';
+  return messages[browserLocale] ? browserLocale : 'en'; // Fallback to English
 }
 
 // Function to set user's preferred language
