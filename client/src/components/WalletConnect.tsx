@@ -5,6 +5,7 @@ import { injected } from 'wagmi/connectors';
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from 'wouter';
 import { isOperaWallet, autoConfigureNeoXNetwork } from "@/lib/web3";
+import { useIntl } from 'react-intl';
 
 export function WalletConnect() {
   const { address } = useAccount();
@@ -12,6 +13,7 @@ export function WalletConnect() {
   const { disconnect } = useDisconnect();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const intl = useIntl();
 
   // Check if the device is mobile
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -50,8 +52,8 @@ export function WalletConnect() {
           // For Opera mobile browser, check if it's Opera first
           if (isOperaWallet()) {
             toast({
-              title: "Opera Wallet",
-              description: "Please use the built-in wallet in your Opera browser",
+              title: intl.formatMessage({ id: 'app.network.opera' }),
+              description: intl.formatMessage({ id: 'app.network.opera' }),
             });
             return;
           }
@@ -59,8 +61,8 @@ export function WalletConnect() {
           const metamaskAppDeepLink = 'https://metamask.app.link/dapp/' + window.location.host;
           window.location.href = metamaskAppDeepLink;
           toast({
-            title: "Opening MetaMask App",
-            description: "Please open this site in the MetaMask browser after installation",
+            title: intl.formatMessage({ id: 'app.network.setup' }),
+            description: intl.formatMessage({ id: 'app.network.configuring' }),
           });
           return;
         }
@@ -69,15 +71,15 @@ export function WalletConnect() {
         if (typeof window.ethereum === 'undefined') {
           if (isOperaWallet()) {
             toast({
-              title: "Opera Wallet Required",
-              description: "Please enable the Opera Wallet in your browser settings",
+              title: intl.formatMessage({ id: 'app.network.warning' }),
+              description: intl.formatMessage({ id: 'app.network.switch' }),
               variant: "destructive",
             });
           } else {
             window.open('https://metamask.io/download/', '_blank');
             toast({
-              title: "Web3 Wallet Required",
-              description: "Please install MetaMask to connect",
+              title: intl.formatMessage({ id: 'app.errors.wallet' }),
+              description: intl.formatMessage({ id: 'app.errors.wallet' }),
               variant: "destructive",
             });
           }
@@ -111,18 +113,18 @@ export function WalletConnect() {
       // Auto-configure NEO X network
       try {
         toast({
-          title: "Network Setup",
+          title: intl.formatMessage({ id: 'app.network.setup' }),
           description: isOperaWallet() 
-            ? "Please approve the network setup in Opera Wallet..."
-            : "Configuring NEO X network...",
+            ? intl.formatMessage({ id: 'app.network.opera' })
+            : intl.formatMessage({ id: 'app.network.configuring' }),
         });
         await autoConfigureNeoXNetwork();
       } catch (error: any) {
         toast({
-          title: "Network Warning",
+          title: intl.formatMessage({ id: 'app.network.warning' }),
           description: isOperaWallet() 
-            ? "Please approve the network switch in your Opera Wallet"
-            : "Please make sure you're connected to the NEO X network",
+            ? intl.formatMessage({ id: 'app.network.switch' })
+            : intl.formatMessage({ id: 'app.network.connect' }),
           variant: "destructive",
         });
       }
@@ -158,10 +160,12 @@ export function WalletConnect() {
       setLocation('/home');
 
       toast({
-        title: "Connected",
+        title: intl.formatMessage({ id: 'app.connect' }),
         description: registrationData.user.lastSeen 
-          ? isOperaWallet() ? "Welcome back to Opera Wallet!" : "Welcome back!" 
-          : "Wallet connected successfully!",
+          ? isOperaWallet() 
+            ? intl.formatMessage({ id: 'app.welcome.opera' })
+            : intl.formatMessage({ id: 'app.welcome.back' })
+          : intl.formatMessage({ id: 'app.welcome.new' }),
       });
 
     } catch (error) {
@@ -181,13 +185,13 @@ export function WalletConnect() {
       await disconnect();
       setLocation('/');
       toast({
-        title: "Disconnected",
-        description: "Wallet disconnected successfully!",
+        title: intl.formatMessage({ id: 'app.disconnect' }),
+        description: intl.formatMessage({id: 'app.disconnect.success'}),
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to disconnect wallet",
+        description: intl.formatMessage({id: 'app.disconnect.error'}),
         variant: "destructive",
       });
     }
@@ -196,14 +200,16 @@ export function WalletConnect() {
   return (
     <div>
       {!address ? (
-        <Button onClick={handleConnect}>Connect Wallet</Button>
+        <Button onClick={handleConnect}>
+          {intl.formatMessage({ id: 'app.connect' })}
+        </Button>
       ) : (
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
             {address?.slice(0, 6)}...{address?.slice(-4)}
           </span>
           <Button variant="outline" onClick={handleDisconnect}>
-            Disconnect
+            {intl.formatMessage({ id: 'app.disconnect' })}
           </Button>
         </div>
       )}
