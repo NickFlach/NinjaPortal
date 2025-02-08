@@ -39,7 +39,12 @@ export const config = createConfig({
     [neoXChain.id]: http(),
   },
   connectors: [
-    injected()
+    injected({
+      target: ({ type }) => {
+        if (isOperaWallet()) return 'opera';
+        return 'metaMask';
+      }
+    })
   ],
 });
 
@@ -89,6 +94,9 @@ export const addNeoXNetwork = async () => {
     return true;
   } catch (error: any) {
     console.error('Error adding NEO X network:', error);
+    if (isOperaWallet() && error.code === 4001) {
+      throw new Error('Please approve the network addition in Opera Wallet');
+    }
     throw error;
   }
 };
@@ -107,6 +115,9 @@ export const switchToNeoXNetwork = async () => {
   } catch (error: any) {
     if (error.code === 4902) {
       return addNeoXNetwork();
+    }
+    if (isOperaWallet() && error.code === 4001) {
+      throw new Error('Please approve the network switch in Opera Wallet');
     }
     throw error;
   }

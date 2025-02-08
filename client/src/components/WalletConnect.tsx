@@ -47,7 +47,15 @@ export function WalletConnect() {
         if (typeof window.ethereum !== 'undefined') {
           await connect({ connector: injected() });
         } else {
-          // Redirect to MetaMask app if no injected provider
+          // For Opera mobile browser, check if it's Opera first
+          if (isOperaWallet()) {
+            toast({
+              title: "Opera Wallet",
+              description: "Please use the built-in wallet in your Opera browser",
+            });
+            return;
+          }
+          // Otherwise redirect to MetaMask app
           const metamaskAppDeepLink = 'https://metamask.app.link/dapp/' + window.location.host;
           window.location.href = metamaskAppDeepLink;
           toast({
@@ -59,12 +67,20 @@ export function WalletConnect() {
       } else {
         // Desktop flow
         if (typeof window.ethereum === 'undefined') {
-          window.open('https://metamask.io/download/', '_blank');
-          toast({
-            title: "Web3 Wallet Required",
-            description: "Please install MetaMask or Opera Wallet to connect",
-            variant: "destructive",
-          });
+          if (isOperaWallet()) {
+            toast({
+              title: "Opera Wallet Required",
+              description: "Please enable the Opera Wallet in your browser settings",
+              variant: "destructive",
+            });
+          } else {
+            window.open('https://metamask.io/download/', '_blank');
+            toast({
+              title: "Web3 Wallet Required",
+              description: "Please install MetaMask to connect",
+              variant: "destructive",
+            });
+          }
           return;
         }
 
@@ -96,7 +112,9 @@ export function WalletConnect() {
       try {
         toast({
           title: "Network Setup",
-          description: "Configuring NEO X network...",
+          description: isOperaWallet() 
+            ? "Please approve the network setup in Opera Wallet..."
+            : "Configuring NEO X network...",
         });
         await autoConfigureNeoXNetwork();
       } catch (error: any) {
@@ -141,7 +159,9 @@ export function WalletConnect() {
 
       toast({
         title: "Connected",
-        description: registrationData.user.lastSeen ? "Welcome back!" : "Wallet connected successfully!",
+        description: registrationData.user.lastSeen 
+          ? isOperaWallet() ? "Welcome back to Opera Wallet!" : "Welcome back!" 
+          : "Wallet connected successfully!",
       });
 
     } catch (error) {
