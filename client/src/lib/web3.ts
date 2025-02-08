@@ -40,19 +40,11 @@ export const config = createConfig({
   },
   connectors: [
     injected({
-      // Use a function that safely checks for wallet type
-      target: () => {
-        // Check for Opera Wallet first (both mobile and desktop)
-        if (typeof window !== 'undefined' && 
-            (window.ethereum?.isOpera || 
-             /OPR|Opera/.test(navigator.userAgent) || 
-             (navigator.userAgent.match(/iPhone|iPad|iPod/i) && window.ethereum?.isOpera))) {
-          return 'opera';
-        }
-        // Default to MetaMask
-        return 'metaMask';
-      }
+      target: 'metaMask'
     }),
+    injected({
+      target: 'opera'
+    })
   ],
 });
 
