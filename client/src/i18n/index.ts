@@ -1,10 +1,19 @@
 import { createIntl, createIntlCache } from 'react-intl';
 import en from './messages/en';
 import es from './messages/es';
+import zh from './messages/zh';
+import ja from './messages/ja';
+import ko from './messages/ko'; // Added Korean
+import fr from './messages/fr'; // Added French
+
 
 export const messages = {
   en,
   es,
+  zh,
+  ja,
+  ko, // Added Korean
+  fr, // Added French
 } as const;
 
 export type LocaleType = keyof typeof messages;
@@ -23,6 +32,16 @@ export function getIntl(locale: LocaleType) {
     cache
   );
 }
+
+// Language names in their native form
+export const languageNames = {
+  en: 'English',
+  es: 'Español',
+  zh: '中文',
+  ja: '日本語',
+  ko: '한국어', // Added Korean
+  fr: 'Français', // Added French
+} as const;
 
 // Function to detect user's preferred language
 export function getPreferredLanguage(): LocaleType {

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { IntlProvider } from 'react-intl';
 import { LocaleType, messages, getPreferredLanguage } from '../i18n';
 
@@ -13,13 +13,20 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<LocaleType>(getPreferredLanguage());
 
   const setLocale = useCallback((newLocale: LocaleType) => {
+    console.log('Setting new locale:', newLocale); // Debug log
     setLocaleState(newLocale);
     localStorage.setItem('preferred-locale', newLocale);
   }, []);
 
+  // Debug effect
+  useEffect(() => {
+    console.log('Current locale:', locale);
+    console.log('Available messages:', Object.keys(messages[locale]));
+  }, [locale]);
+
   return (
     <LocaleContext.Provider value={{ locale, setLocale }}>
-      <IntlProvider messages={messages[locale]} locale={locale}>
+      <IntlProvider messages={messages[locale]} locale={locale} defaultLocale="en">
         {children}
       </IntlProvider>
     </LocaleContext.Provider>

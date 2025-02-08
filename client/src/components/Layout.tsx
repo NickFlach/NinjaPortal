@@ -6,7 +6,13 @@ import { useIntl } from "react-intl";
 import { useLocale } from "@/contexts/LocaleContext";
 import { Button } from "@/components/ui/button";
 import { Globe } from "lucide-react";
-import { messages } from "@/i18n";
+import { messages, languageNames } from "@/i18n";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -15,10 +21,6 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const intl = useIntl();
   const { locale, setLocale } = useLocale();
-
-  const toggleLocale = () => {
-    setLocale(locale === 'en' ? 'es' : 'en');
-  };
 
   return (
     <div className="relative min-h-screen">
@@ -37,15 +39,32 @@ export function Layout({ children }: LayoutProps) {
             <Navigation />
           </div>
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={toggleLocale}
-              className="hover:bg-accent"
-            >
-              <Globe className="h-4 w-4" />
-              <span className="sr-only">Toggle Language</span>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="hover:bg-accent"
+                >
+                  <Globe className="h-4 w-4" />
+                  <span className="sr-only">Select Language</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {Object.entries(languageNames).map(([code, name]) => (
+                  <DropdownMenuItem
+                    key={code}
+                    onClick={() => {
+                      console.log('Setting locale to:', code); 
+                      setLocale(code as keyof typeof messages);
+                    }}
+                    className={locale === code ? 'bg-accent' : ''}
+                  >
+                    {name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <WalletConnect />
           </div>
         </div>
