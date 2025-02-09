@@ -2,23 +2,14 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useQuery } from "@tanstack/react-query";
 import { getFromIPFS } from "@/lib/ipfs";
 import { useAccount } from 'wagmi';
-
-interface Song {
-  id: number;
-  title: string;
-  artist: string;
-  ipfsHash: string;
-  uploadedBy: string | null;
-  createdAt: string | null;
-  votes: number | null;
-}
+import type { Song } from "@/types/song";
 
 type PlaylistContext = 'landing' | 'library' | 'feed';
 
 interface MusicPlayerContextType {
   currentSong: Song | undefined;
   isPlaying: boolean;
-  togglePlay: () => void;
+  togglePlay: () => Promise<void>;
   playSong: (song: Song, context?: PlaylistContext) => Promise<void>;
   recentSongs?: Song[];
   isLandingPage: boolean;
@@ -42,14 +33,13 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
   // Initialize audio element
   useEffect(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.preload = 'auto';
-    }
+    const audio = new Audio();
+    audio.preload = 'auto';
+    audioRef.current = audio;
+
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current = null;
       }
     };
   }, []);
@@ -63,7 +53,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           'X-Internal-Token': 'landing-page'
         };
 
-        // Add wallet address header if available
         if (landingAddress) {
           headers['X-Wallet-Address'] = landingAddress;
         }
@@ -81,20 +70,18 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         return data;
       } catch (error) {
         console.error('Error fetching recent songs:', error);
-        return []; // Return empty array on error to prevent undefined issues
+        return [];
       }
     },
-    refetchInterval: isLandingPage ? 30000 : false, // Refetch every 30s on landing page
+    refetchInterval: isLandingPage ? 30000 : false,
   });
 
-  // Function to get next song in the current context
   const getNextSong = (currentSongId: number): Song | undefined => {
     if (!recentSongs?.length) return undefined;
 
     const currentIndex = recentSongs.findIndex(song => song.id === currentSongId);
     if (currentIndex === -1) return recentSongs[0];
 
-    // Get next song, or loop back to the beginning
     return recentSongs[(currentIndex + 1) % recentSongs.length];
   };
 
@@ -115,41 +102,41 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
-
   const playSong = async (song: Song, context?: PlaylistContext) => {
     try {
-      // Cancel any existing fetch request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
 
-      // Create new abort controller for this request
       abortControllerRef.current = new AbortController();
 
-      // Update context if provided
       if (context) {
         setCurrentContext(context);
       }
 
-      // Get IPFS data
       console.log('Fetching from IPFS gateway:', song.ipfsHash);
       const audioData = await getFromIPFS(song.ipfsHash);
 
       const blob = new Blob([audioData], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
 
-      // Set source and load
+      if (!audioRef.current) {
+        throw new Error('Audio element not initialized');
+      }
+
       audioRef.current.src = url;
-      await new Promise((resolve, reject) => {
-        audioRef.current.addEventListener('loadeddata', resolve);
-        audioRef.current.addEventListener('error', reject);
+      await new Promise<void>((resolve, reject) => {
+        if (!audioRef.current) {
+          reject(new Error('Audio element not initialized'));
+          return;
+        }
+        audioRef.current.addEventListener('loadeddata', () => resolve());
+        audioRef.current.addEventListener('error', (e) => reject(e));
         audioRef.current.load();
       });
 
-      // Update refs and state
       setCurrentSong(song);
 
-      // Try to play
       const playPromise = audioRef.current.play();
       if (playPromise !== undefined) {
         try {
@@ -162,7 +149,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         }
       }
 
-      // Record play
       try {
         await fetch(`/api/songs/play/${song.id}`, {
           method: 'POST',
@@ -188,7 +174,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   };
 
-  // Simple volume toggle for landing page
   const togglePlay = async () => {
     if (!audioRef.current) return;
 
@@ -212,7 +197,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   // Initialize music once on load - only if we're on landing page
   useEffect(() => {
     async function initializeMusic() {
-      if (!recentSongs?.length || audioRef.current?.src) return;
+      if (!recentSongs?.length || (audioRef.current && audioRef.current.src)) return;
 
       try {
         const firstSong = recentSongs[0];
@@ -229,7 +214,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [recentSongs, isLandingPage]);
 
-  // Add event listener for song end
   useEffect(() => {
     if (!audioRef.current) return;
 
@@ -237,7 +221,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       if (!currentSong) return;
 
       try {
-        // Get the next song in the current context
         const nextSong = getNextSong(currentSong.id);
         if (nextSong) {
           console.log('Current song ended, playing next:', nextSong.title);
@@ -255,7 +238,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, [currentSong, currentContext]);
 
-  // Clean up on unmount
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -263,7 +245,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       }
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current = null;
       }
     };
   }, []);

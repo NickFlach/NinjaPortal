@@ -5,13 +5,24 @@ interface MoodAnalysisResult {
   confidence: number;
 }
 
+// Initialize OpenAI client with API key from environment
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || '',
+  timeout: 30000, // 30 second timeout
+  maxRetries: 3,
 });
 
 export async function analyzeMood(text: string): Promise<MoodAnalysisResult> {
   try {
     console.log('Analyzing mood for text:', text);
+
+    if (!process.env.OPENAI_API_KEY) {
+      console.warn('OpenAI API key not configured, defaulting to neutral mood');
+      return {
+        mood: 'neutral',
+        confidence: 0
+      };
+    }
 
     const prompt = `Analyze the emotional tone of this song title and determine if it's happy, sad, or neutral: "${text}"
     Only respond with one of these words: happy, sad, neutral`;
