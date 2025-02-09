@@ -24,7 +24,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
   // Initialize WebSocket connection
   useEffect(() => {
     if (!syncEnabled) {
-      if (wsRef.current) {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         console.log('Closing WebSocket connection due to sync being disabled');
         wsRef.current.close();
         wsRef.current = null;
@@ -34,6 +34,10 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
     function connect() {
       try {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          return; // Already connected
+        }
+
         // Get the current protocol and host
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsHost = window.location.host;
@@ -54,69 +58,11 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
             clearTimeout(reconnectTimeoutRef.current);
             reconnectTimeoutRef.current = undefined;
           }
-          toast({
-            title: "Sync Connected",
-            description: "Music sync is now active",
-          });
-        };
-
-        ws.onmessage = async (event) => {
-          try {
-            const message = JSON.parse(event.data);
-            console.log('Received WebSocket message:', message);
-
-            if (message.type === 'sync' && audioRef.current && message.songId === currentSong?.id) {
-              const currentTime = audioRef.current.currentTime;
-              const timeDiff = Math.abs(currentTime - message.timestamp);
-
-              // Prevent sync feedback loops
-              const now = Date.now();
-              if (lastSyncRef.current && 
-                  now - lastSyncRef.current.timestamp < 1000 && 
-                  lastSyncRef.current.playing === message.playing) {
-                return;
-              }
-
-              console.log('Processing sync message:', {
-                timeDiff,
-                currentTime,
-                messageTimestamp: message.timestamp,
-                playing: message.playing
-              });
-
-              // Only sync if time difference is significant
-              if (timeDiff > 1) {
-                audioRef.current.currentTime = message.timestamp;
-              }
-
-              // Handle play/pause state
-              if (message.playing !== isPlaying) {
-                await togglePlay();
-              }
-
-              // Update last sync state
-              lastSyncRef.current = {
-                timestamp: now,
-                playing: message.playing
-              };
-            }
-          } catch (error) {
-            console.error('Error processing sync message:', error);
-          }
-        };
-
-        ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          toast({
-            title: "Sync Error",
-            description: "Failed to connect to sync service",
-            variant: "destructive",
-          });
-          setSyncEnabled(false);
         };
 
         ws.onclose = (event) => {
           console.log('WebSocket connection closed:', event.code, event.reason);
+          wsRef.current = null;
 
           if (syncEnabled && !reconnectTimeoutRef.current && reconnectAttemptRef.current < maxReconnectAttempts) {
             const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
@@ -126,29 +72,23 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
               reconnectTimeoutRef.current = undefined;
               reconnectAttemptRef.current++;
               if (syncEnabled) {
-                console.log('Initiating reconnection attempt');
                 connect();
               }
             }, delay);
           } else if (reconnectAttemptRef.current >= maxReconnectAttempts) {
             console.log('Max reconnection attempts reached');
-            toast({
-              title: "Sync Disabled",
-              description: "Unable to establish connection after multiple attempts",
-              variant: "destructive",
-            });
             setSyncEnabled(false);
           }
+        };
+
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          // Don't automatically disable sync on error, let the close handler handle reconnection
         };
 
         wsRef.current = ws;
       } catch (error) {
         console.error('Error creating WebSocket connection:', error);
-        toast({
-          title: "Connection Error",
-          description: "Failed to establish sync connection",
-          variant: "destructive",
-        });
         setSyncEnabled(false);
       }
     }
@@ -157,7 +97,6 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       if (wsRef.current) {
-        console.log('Cleaning up WebSocket connection');
         wsRef.current.close();
         wsRef.current = null;
       }
@@ -166,7 +105,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
         reconnectTimeoutRef.current = undefined;
       }
     };
-  }, [syncEnabled, address, togglePlay, currentSong?.id, isPlaying, toast]);
+  }, [syncEnabled, address]);
 
   // Send sync messages when playback state changes
   useEffect(() => {

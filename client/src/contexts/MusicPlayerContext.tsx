@@ -14,7 +14,7 @@ interface MusicPlayerContextType {
   recentSongs?: Song[];
   isLandingPage: boolean;
   currentContext: PlaylistContext;
-  audioRef: React.RefObject<HTMLAudioElement>;
+  audioRef: React.RefObject<HTMLAudioElement | null>;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -23,43 +23,47 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [currentSong, setCurrentSong] = useState<Song>();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentContext, setCurrentContext] = useState<PlaylistContext>('landing');
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { address: userAddress } = useAccount();
   const defaultWallet = "REDACTED_WALLET_ADDRESS";
   const landingAddress = userAddress || defaultWallet;
   const isLandingPage = !userAddress;
-  const audioContextRef = useRef<AudioContext>();
 
-  // Initialize audio element
+  // Initialize audio element safely
   useEffect(() => {
-    const audio = new Audio();
-    audio.preload = 'auto';
-    audioRef.current = audio;
-
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
+    try {
+      if (!audioRef.current) {
+        const audio = new Audio();
+        audio.preload = 'auto';
+        audioRef.current = audio;
       }
-    };
+
+      return () => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
+      };
+    } catch (error) {
+      console.error('Error initializing audio:', error);
+    }
   }, []);
 
-  // Fetch landing page feed (recent songs)
+  // Fetch recent songs with error handling
   const { data: recentSongs } = useQuery<Song[]>({
     queryKey: ["/api/songs/recent"],
     queryFn: async () => {
       try {
         const headers: Record<string, string> = {
-          'X-Internal-Token': 'landing-page'
+          'Content-Type': 'application/json'
         };
 
         if (landingAddress) {
           headers['X-Wallet-Address'] = landingAddress;
         }
 
-        const response = await fetch("/api/songs/recent", {
-          headers
-        });
+        const response = await fetch("/api/songs/recent", { headers });
 
         if (!response.ok) {
           throw new Error(`Failed to fetch recent songs: ${response.statusText}`);
@@ -76,38 +80,16 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     refetchInterval: isLandingPage ? 30000 : false,
   });
 
-  const getNextSong = (currentSongId: number): Song | undefined => {
-    if (!recentSongs?.length) return undefined;
-
-    const currentIndex = recentSongs.findIndex(song => song.id === currentSongId);
-    if (currentIndex === -1) return recentSongs[0];
-
-    return recentSongs[(currentIndex + 1) % recentSongs.length];
-  };
-
-  // Reset to landing context when wallet disconnects
-  useEffect(() => {
-    if (!userAddress) {
-      setCurrentContext('landing');
-    }
-  }, [userAddress]);
-
-  // Initialize audio context
-  useEffect(() => {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    audioContextRef.current = new AudioContext();
-
-    return () => {
-      audioContextRef.current?.close();
-    };
-  }, []);
-
   const playSong = async (song: Song, context?: PlaylistContext) => {
     try {
+      if (!song.ipfsHash) {
+        console.error('Invalid song data:', song);
+        return;
+      }
+
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-
       abortControllerRef.current = new AbortController();
 
       if (context) {
@@ -117,6 +99,10 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       console.log('Fetching from IPFS gateway:', song.ipfsHash);
       const audioData = await getFromIPFS(song.ipfsHash);
 
+      if (!audioData) {
+        throw new Error('Failed to fetch audio data from IPFS');
+      }
+
       const blob = new Blob([audioData], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
 
@@ -125,50 +111,20 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       }
 
       audioRef.current.src = url;
-      await new Promise<void>((resolve, reject) => {
-        if (!audioRef.current) {
-          reject(new Error('Audio element not initialized'));
-          return;
-        }
-        audioRef.current.addEventListener('loadeddata', () => resolve());
-        audioRef.current.addEventListener('error', (e) => reject(e));
-        audioRef.current.load();
-      });
-
+      await audioRef.current.load();
       setCurrentSong(song);
 
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        try {
-          await playPromise;
-          setIsPlaying(true);
-          console.log('IPFS fetch and playback successful');
-        } catch (error) {
-          console.error('Playback prevented:', error);
-          setIsPlaying(false);
-        }
-      }
-
       try {
-        await fetch(`/api/songs/play/${song.id}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(userAddress && { 'X-Wallet-Address': userAddress })
-          }
-        });
-      } catch (error) {
-        console.error('Error recording play:', error);
+        await audioRef.current.play();
+        setIsPlaying(true);
+      } catch (playError) {
+        console.error('Playback error:', playError);
+        setIsPlaying(false);
       }
 
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.log('IPFS fetch aborted');
-        return;
-      }
       console.error('Error playing song:', error);
       setIsPlaying(false);
-      throw error;
     } finally {
       abortControllerRef.current = null;
     }
@@ -182,61 +138,14 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         audioRef.current.pause();
         setIsPlaying(false);
       } else {
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          await playPromise;
-          setIsPlaying(true);
-        }
+        await audioRef.current.play();
+        setIsPlaying(true);
       }
     } catch (error) {
       console.error('Error toggling play:', error);
       setIsPlaying(false);
     }
   };
-
-  // Initialize music once on load - only if we're on landing page
-  useEffect(() => {
-    async function initializeMusic() {
-      if (!recentSongs?.length || (audioRef.current && audioRef.current.src)) return;
-
-      try {
-        const firstSong = recentSongs[0];
-        console.log('Initializing music with:', firstSong.title);
-        await playSong(firstSong, 'landing');
-      } catch (error) {
-        console.error('Error initializing music:', error);
-        setIsPlaying(false);
-      }
-    }
-
-    if (isLandingPage) {
-      initializeMusic();
-    }
-  }, [recentSongs, isLandingPage]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-
-    const handleSongEnd = async () => {
-      if (!currentSong) return;
-
-      try {
-        const nextSong = getNextSong(currentSong.id);
-        if (nextSong) {
-          console.log('Current song ended, playing next:', nextSong.title);
-          await playSong(nextSong, currentContext);
-        }
-      } catch (error) {
-        console.error('Error auto-playing next song:', error);
-        setIsPlaying(false);
-      }
-    };
-
-    audioRef.current.addEventListener('ended', handleSongEnd);
-    return () => {
-      audioRef.current?.removeEventListener('ended', handleSongEnd);
-    };
-  }, [currentSong, currentContext]);
 
   useEffect(() => {
     return () => {
@@ -249,19 +158,19 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
+  const value: MusicPlayerContextType = {
+    currentSong,
+    isPlaying,
+    togglePlay,
+    playSong,
+    recentSongs,
+    isLandingPage,
+    currentContext,
+    audioRef
+  };
+
   return (
-    <MusicPlayerContext.Provider
-      value={{
-        currentSong,
-        isPlaying,
-        togglePlay,
-        playSong,
-        recentSongs,
-        isLandingPage,
-        currentContext,
-        audioRef
-      }}
-    >
+    <MusicPlayerContext.Provider value={value}>
       {children}
     </MusicPlayerContext.Provider>
   );
