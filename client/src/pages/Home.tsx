@@ -42,7 +42,6 @@ export default function Home() {
     window.location.href = redirectUrl;
   };
 
-  // Only fetch library songs when wallet is connected
   const { data: librarySongs, isLoading: libraryLoading } = useQuery<Song[]>({
     queryKey: ["/api/songs/library"],
     enabled: !!address,
@@ -55,11 +54,9 @@ export default function Home() {
       }
 
       try {
-        // Register user first if needed
         const registerResponse = await apiRequest("POST", "/api/users/register", {
           address,
-          // Include geolocation if available
-          geolocation: null // We'll add this later
+          geolocation: null 
         });
 
         if (!registerResponse.ok) {
@@ -69,7 +66,6 @@ export default function Home() {
         const registerData = await registerResponse.json();
         console.log('Registration successful before play:', registerData);
 
-        // Now play the song
         await apiRequest("POST", `/api/songs/play/${songId}`);
       } catch (error) {
         console.error('Play mutation error:', error);
@@ -92,9 +88,7 @@ export default function Home() {
     }
 
     try {
-      // Play the song with the specified context
       playSong(song, context);
-      // Then update play count
       await playMutation.mutate(song.id);
     } catch (error) {
       console.error('Error playing song:', error);
@@ -113,10 +107,8 @@ export default function Home() {
       }
 
       try {
-        // Register user first if needed
         const registerResponse = await apiRequest("POST", "/api/users/register", {
           address,
-          // Include geolocation if available
           geolocation: null
         });
 
@@ -189,7 +181,6 @@ export default function Home() {
 
     const file = e.target.files[0];
 
-    // Check specifically for MP3 MIME type
     if (file.type !== 'audio/mpeg') {
       toast({
         title: "Invalid File Type",
@@ -206,7 +197,6 @@ export default function Home() {
   return (
     <Layout>
       <div className="flex flex-col min-h-screen">
-        {/* Add clickable background div */}
         <div
           onClick={handleBackgroundClick}
           className="absolute inset-0 z-0 cursor-pointer"
@@ -283,13 +273,19 @@ export default function Home() {
 
           <section className="px-4">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-semibold">Discovery Feed</h2>
-              <p className="text-sm text-muted-foreground">Latest plays from the community</p>
+              <h2 className="text-2xl font-semibold">
+                {intl.formatMessage({ id: 'app.discovery' })}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {intl.formatMessage({ id: 'app.recent' })}
+              </p>
             </div>
 
             <div className="grid gap-2">
               {recentSongs?.length === 0 ? (
-                <p className="text-muted-foreground">No songs played yet</p>
+                <p className="text-muted-foreground">
+                  {intl.formatMessage({ id: 'app.noRecentSongs' })}
+                </p>
               ) : (
                 recentSongs?.map((song) => (
                   <SongCard

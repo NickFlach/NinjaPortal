@@ -9,6 +9,7 @@ export default {
   'app.songs': 'песни',
   'app.recent': 'Последние прослушивания сообщества',
   'app.noSongs': 'В вашей библиотеке пока нет песен',
+  'app.noRecentSongs': 'Песни еще не воспроизводились',
   'app.loading': 'Загрузка вашей библиотеки...',
   'app.welcome.back': 'С возвращением!',
   'app.welcome.opera': 'С возвращением в Opera Wallet!',

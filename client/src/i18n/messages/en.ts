@@ -9,6 +9,7 @@ export default {
   'app.songs': 'songs',
   'app.recent': 'Latest plays from the community',
   'app.noSongs': 'No songs in your library yet',
+  'app.noRecentSongs': 'No songs played yet',
   'app.loading': 'Loading your library...',
   'app.welcome.back': 'Welcome back!',
   'app.welcome.opera': 'Welcome back to Opera Wallet!',

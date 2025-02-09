@@ -9,6 +9,7 @@ export default {
   'app.songs': 'أغاني',
   'app.recent': 'آخر تشغيل من المجتمع',
   'app.noSongs': 'لا توجد أغاني في مكتبتك بعد',
+  'app.noRecentSongs': 'لم يتم تشغيل أي أغاني بعد',
   'app.loading': 'جاري تحميل مكتبتك...',
   'app.welcome.back': 'مرحباً بعودتك!',
   'app.welcome.opera': 'مرحباً بعودتك إلى محفظة Opera!',
