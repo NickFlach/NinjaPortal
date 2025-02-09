@@ -14,7 +14,7 @@ const openai = new OpenAI({
 export async function analyzeMoodWithAI(song: SongInput): Promise<string | undefined> {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4",
       messages: [
         {
           role: "system",
