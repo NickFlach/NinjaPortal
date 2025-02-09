@@ -14,7 +14,16 @@ import { Upload, Library, Loader2 } from "lucide-react";
 import { uploadToIPFS } from "@/lib/ipfs";
 import { EditSongDialog } from "@/components/EditSongDialog";
 import { useIntl } from 'react-intl';
-import type { Song } from "@/types/song";
+
+interface Song {
+  id: number;
+  title: string;
+  artist: string;
+  ipfsHash: string;
+  uploadedBy: string | null;
+  createdAt: string | null;
+  votes: number | null;
+}
 
 export default function Home() {
   const intl = useIntl();
@@ -49,6 +58,8 @@ export default function Home() {
         // Register user first if needed
         const registerResponse = await apiRequest("POST", "/api/users/register", {
           address,
+          // Include geolocation if available
+          geolocation: null // We'll add this later
         });
 
         if (!registerResponse.ok) {
@@ -96,17 +107,7 @@ export default function Home() {
   };
 
   const uploadMutation = useMutation({
-    mutationFn: async ({ 
-      file, 
-      title, 
-      artist, 
-      creatorMood 
-    }: { 
-      file: File; 
-      title: string; 
-      artist: string; 
-      creatorMood: 'happy' | 'sad' | 'neutral';
-    }) => {
+    mutationFn: async ({ file, title, artist }: { file: File; title: string; artist: string }) => {
       if (!address) {
         throw new Error(intl.formatMessage({ id: 'app.errors.wallet' }));
       }
@@ -115,6 +116,8 @@ export default function Home() {
         // Register user first if needed
         const registerResponse = await apiRequest("POST", "/api/users/register", {
           address,
+          // Include geolocation if available
+          geolocation: null
         });
 
         if (!registerResponse.ok) {
@@ -143,7 +146,6 @@ export default function Home() {
             title,
             artist,
             ipfsHash,
-            creatorMood,
           });
           return await response.json();
         } catch (error) {
@@ -310,13 +312,12 @@ export default function Home() {
           if (!open) setPendingUpload(undefined);
         }}
         mode="create"
-        onSubmit={({ title, artist, creatorMood }) => {
+        onSubmit={({ title, artist }) => {
           if (pendingUpload) {
             uploadMutation.mutate({
               file: pendingUpload,
               title,
               artist,
-              creatorMood,
             });
           }
         }}

@@ -6,12 +6,4 @@ export interface Song {
   uploadedBy: string | null;
   createdAt: string | null;
   votes: number | null;
-  creatorMood: 'happy' | 'sad' | 'neutral';
-}
-
-export interface SongReaction {
-  songId: number;
-  userAddress: string;
-  reaction: 'happy' | 'sad';
-  createdAt: string;
 }

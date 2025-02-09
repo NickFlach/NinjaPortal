@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer } from "http";
 import { WebSocketServer, WebSocket } from 'ws';
 import { db } from "@db";
-import { songs, users, playlists, followers, playlistSongs, recentlyPlayed, userRewards, songReactions } from "@db/schema";
+import { songs, users, playlists, followers, playlistSongs, recentlyPlayed, userRewards } from "@db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { incrementListenCount, getMapData } from './services/music';
 
@@ -183,72 +183,20 @@ export function registerRoutes(app: Express) {
 
   // Songs
   app.get("/api/songs/recent", async (req, res) => {
-    const walletAddress = req.headers['x-wallet-address'] as string;
-    const userAddress = walletAddress ? walletAddress.toLowerCase() : undefined;
-
-    try {
-      console.log('Fetching recent songs feed');
-
-      // Get user's reactions if authenticated
-      let userReactions: typeof songReactions.$inferSelect[] = [];
-      if (userAddress) {
-        userReactions = await db.query.songReactions.findMany({
-          where: eq(songReactions.userAddress, userAddress),
-        });
+    const recentSongs = await db.query.recentlyPlayed.findMany({
+      orderBy: desc(recentlyPlayed.playedAt),
+      limit: 100,
+      with: {
+        song: true,
       }
+    });
 
-      // Get recently played songs
-      const recentlyPlayedSongs = await db.query.recentlyPlayed.findMany({
-        orderBy: desc(recentlyPlayed.playedAt),
-        limit: 100,
-        with: {
-          song: {
-            columns: {
-              id: true,
-              title: true,
-              artist: true,
-              ipfsHash: true,
-              uploadedBy: true,
-              createdAt: true,
-              votes: true,
-              creatorMood: true
-            }
-          },
-        }
-      });
+    // Map to return only unique songs in order of most recently played
+    const uniqueSongs = Array.from(
+      new Map(recentSongs.map(item => [item.songId, item.song])).values()
+    );
 
-      console.log('Found recently played songs:', recentlyPlayedSongs.length);
-
-      // Get recommended songs based on user's reactions
-      let recommendedSongs: typeof songs.$inferSelect[] = [];
-      if (userAddress && userReactions.length > 0) {
-        // Find songs with similar moods to what the user likes
-        const userPreferredMood = userReactions.filter(r => r.reaction === 'happy').length >
-                                 userReactions.filter(r => r.reaction === 'sad').length
-                                 ? 'happy' : 'sad';
-
-        const moodBasedSongs = await db.query.songs.findMany({
-          where: eq(songs.creatorMood, userPreferredMood),
-          limit: 50,
-        });
-
-        recommendedSongs = moodBasedSongs;
-      }
-
-      // Combine and deduplicate songs
-      const allSongs = [...recentlyPlayedSongs.map(rp => rp.song), ...recommendedSongs].filter(Boolean);
-      const uniqueSongs = Array.from(
-        new Map(
-          allSongs.map(song => [song.id, song])
-        ).values()
-      );
-
-      console.log('Returning unique songs:', uniqueSongs.length);
-      res.json(uniqueSongs);
-    } catch (error) {
-      console.error('Error fetching recent activity:', error);
-      res.status(500).json({ message: "Failed to fetch recent activity" });
-    }
+    res.json(uniqueSongs);
   });
 
   app.get("/api/songs/library", async (req, res) => {
@@ -405,63 +353,6 @@ export function registerRoutes(app: Express) {
     res.json(updatedSong);
   });
 
-
-  app.get("/api/songs/:id/reaction", async (req, res) => {
-    const songId = parseInt(req.params.id);
-    const userAddress = req.headers['x-wallet-address'] as string;
-
-    if (!userAddress) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    try {
-      const reaction = await db.query.songReactions.findFirst({
-        where: and(
-          eq(songReactions.songId, songId),
-          eq(songReactions.userAddress, userAddress.toLowerCase())
-        ),
-      });
-
-      res.json(reaction);
-    } catch (error) {
-      console.error('Error fetching reaction:', error);
-      res.status(500).json({ message: "Failed to fetch reaction" });
-    }
-  });
-
-  app.post("/api/songs/:id/react", async (req, res) => {
-    const songId = parseInt(req.params.id);
-    const { reaction } = req.body;
-    const userAddress = req.headers['x-wallet-address'] as string;
-
-    if (!userAddress) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    if (!['happy', 'sad'].includes(reaction)) {
-      return res.status(400).json({ message: "Invalid reaction" });
-    }
-
-    try {
-      // Upsert the reaction
-      await db
-        .insert(songReactions)
-        .values({
-          songId,
-          userAddress: userAddress.toLowerCase(),
-          reaction,
-        })
-        .onConflictDoUpdate({
-          target: [songReactions.songId, songReactions.userAddress],
-          set: { reaction },
-        });
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error recording reaction:', error);
-      res.status(500).json({ message: "Failed to record reaction" });
-    }
-  });
 
   // Playlists
   app.get("/api/playlists", async (req, res) => {

@@ -12,20 +12,12 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 interface Song {
   id: number;
   title: string;
   artist: string;
   ipfsHash: string;
-  creatorMood: 'happy' | 'sad' | 'neutral';
 }
 
 interface EditSongDialogProps {
@@ -33,7 +25,7 @@ interface EditSongDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: 'edit' | 'create';
-  onSubmit?: (data: { title: string; artist: string; creatorMood: 'happy' | 'sad' | 'neutral' }) => void;
+  onSubmit?: (data: { title: string; artist: string }) => void;
 }
 
 export function EditSongDialog({ 
@@ -45,7 +37,6 @@ export function EditSongDialog({
 }: EditSongDialogProps) {
   const [title, setTitle] = React.useState(song?.title || '');
   const [artist, setArtist] = React.useState(song?.artist || '');
-  const [creatorMood, setCreatorMood] = React.useState<'happy' | 'sad' | 'neutral'>(song?.creatorMood || 'neutral');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -53,12 +44,11 @@ export function EditSongDialog({
     if (song) {
       setTitle(song.title);
       setArtist(song.artist);
-      setCreatorMood(song.creatorMood);
     }
   }, [song]);
 
   const editSongMutation = useMutation({
-    mutationFn: async (data: { title: string; artist: string; creatorMood: 'happy' | 'sad' | 'neutral' }) => {
+    mutationFn: async (data: { title: string; artist: string }) => {
       const response = await apiRequest(
         "PATCH",
         `/api/songs/${song?.id}`,
@@ -96,9 +86,9 @@ export function EditSongDialog({
     }
 
     if (mode === 'edit') {
-      editSongMutation.mutate({ title, artist, creatorMood });
+      editSongMutation.mutate({ title, artist });
     } else if (onSubmit) {
-      onSubmit({ title, artist, creatorMood });
+      onSubmit({ title, artist });
       onOpenChange(false);
     }
   };
@@ -137,24 +127,6 @@ export function EditSongDialog({
                 onChange={(e) => setArtist(e.target.value)}
                 placeholder="Enter artist name"
               />
-            </div>
-            <div className="grid gap-2">
-              <label htmlFor="mood" className="text-sm font-medium">
-                Song Mood
-              </label>
-              <Select
-                value={creatorMood}
-                onValueChange={(value: 'happy' | 'sad' | 'neutral') => setCreatorMood(value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select mood" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="happy">Happy 😊</SelectItem>
-                  <SelectItem value="sad">Sad 😢</SelectItem>
-                  <SelectItem value="neutral">Neutral 😐</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
           <DialogFooter>
