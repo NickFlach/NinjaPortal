@@ -24,7 +24,7 @@ export default {
   'app.network.configuring': 'Configuring NEO X network...',
   'app.network.opera': 'Please approve the network setup in Opera Wallet...',
   'app.network.warning': 'Network Warning',
-  'app.network.switch': 'Please approve the network switch in your Opera Wallet',
+  'app.network.switch': 'Please approve the network switch in Opera Wallet',
   'app.network.connect': 'Please make sure you\'re connected to the NEO X network',
   'app.disconnect.success': 'Wallet disconnected successfully!',
   'app.disconnect.error': 'Failed to disconnect wallet',
@@ -33,4 +33,7 @@ export default {
   'tour.connect': 'Connect your wallet to start exploring music.',
   'tour.upload': 'Upload your favorite tunes and share them with the world!',
   'tour.gotIt': 'Got it!',
+  // Map location messages
+  'map.location.error.title': 'Location Access',
+  'map.location.error.description': 'Unable to access your location. You can still use the map, but your plays won\'t be geotagged.',
 } as const;
