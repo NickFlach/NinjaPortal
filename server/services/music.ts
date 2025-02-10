@@ -8,6 +8,7 @@ export interface MapDataResponse {
     [key: string]: {
       locations: Array<[number, number]>;  // [latitude, longitude] pairs
       listenerCount: number;
+      anonCount: number;    // Count of non-geotagged plays
     };
   };
   totalListeners: number;
@@ -25,7 +26,13 @@ export async function getMapData(): Promise<MapDataResponse> {
     .where(sql`${listeners.countryCode} is not null`);
 
     // Process listener data by country
-    const countries: { [key: string]: { locations: Array<[number, number]>; listenerCount: number } } = {};
+    const countries: { 
+      [key: string]: { 
+        locations: Array<[number, number]>; 
+        listenerCount: number;
+        anonCount: number;
+      } 
+    } = {};
     let totalListeners = 0;
 
     // Valid country code pattern (ISO 3166-1 alpha-3)
@@ -43,7 +50,11 @@ export async function getMapData(): Promise<MapDataResponse> {
       }
 
       if (!countries[countryCode]) {
-        countries[countryCode] = { locations: [], listenerCount: 0 };
+        countries[countryCode] = { 
+          locations: [], 
+          listenerCount: 0,
+          anonCount: 0 
+        };
       }
 
       countries[countryCode].listenerCount++;
@@ -58,7 +69,13 @@ export async function getMapData(): Promise<MapDataResponse> {
         if (!isNaN(lat) && !isNaN(lng) && 
             Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
           countries[countryCode].locations.push([lat, lng]);
+        } else {
+          // If coordinates are invalid, count as anonymous
+          countries[countryCode].anonCount++;
         }
+      } else {
+        // No coordinates provided, count as anonymous
+        countries[countryCode].anonCount++;
       }
     });
 
@@ -67,6 +84,7 @@ export async function getMapData(): Promise<MapDataResponse> {
       totalListeners
     };
   } catch (error) {
+    console.error('Error in getMapData:', error);
     throw error;
   }
 }
@@ -171,7 +189,7 @@ export async function incrementListenCount(id: number, countryCode: string, coor
   console.log('Received play request:', {
     songId: id,
     countryCode,
-    hasLocation: true, // Changed to true since we have country code
+    hasLocation: coords ? true : false,
     coordinates: coords ? `${coords.lat},${coords.lng}` : 'Country-level only'
   });
 
@@ -181,11 +199,20 @@ export async function incrementListenCount(id: number, countryCode: string, coor
       .set({ votes: sql`coalesce(${songs.votes}, 0) + 1` })
       .where(eq(songs.id, id));
 
-    // Record listener with coordinates if provided
+    // Record listener with coordinates if provided and valid
     if (coords?.lat && coords?.lng) {
       // Validate coordinates
       if (Math.abs(coords.lat) > 90 || Math.abs(coords.lng) > 180) {
         console.warn('Invalid coordinates received:', coords);
+        // Fall back to country-level recording
+        await tx.insert(listeners)
+          .values({
+            songId: id,
+            countryCode,
+            latitude: null,
+            longitude: null,
+            timestamp: new Date()
+          });
         return;
       }
 
@@ -193,7 +220,7 @@ export async function incrementListenCount(id: number, countryCode: string, coor
       const latitude = Math.round(coords.lat * 10) / 10;
       const longitude = Math.round(coords.lng * 10) / 10;
 
-      console.log('Recording location:', {
+      console.log('Recording precise location:', {
         songId: id,
         countryCode,
         latitude,
