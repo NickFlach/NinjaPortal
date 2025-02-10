@@ -25,9 +25,45 @@ const mapContainerStyle = {
   height: '600px'
 };
 
-const center = {
-  lat: 20,
+// Center coordinates to show the whole world
+const defaultCenter = {
+  lat: 30,
   lng: 0
+};
+
+// Default map options
+const defaultMapOptions = {
+  minZoom: 2, // Prevent zooming out too far
+  maxZoom: 7, // Limit max zoom to maintain heatmap visibility
+  streetViewControl: false,
+  mapTypeControl: false,
+  fullscreenControl: false,
+  restriction: {
+    latLngBounds: {
+      north: 85,
+      south: -85,
+      west: -180,
+      east: 180
+    },
+    strictBounds: true
+  },
+  styles: [
+    {
+      featureType: "all",
+      elementType: "labels",
+      stylers: [{ visibility: "off" }]
+    },
+    {
+      featureType: "water",
+      elementType: "geometry",
+      stylers: [{ color: "#193341" }]
+    },
+    {
+      featureType: "landscape",
+      elementType: "geometry",
+      stylers: [{ color: "#2c5a71" }]
+    }
+  ]
 };
 
 const MapPage: FC = () => {
@@ -79,12 +115,11 @@ const MapPage: FC = () => {
     // Update heatmap
     heatmapRef.current.setData(heatmapData);
 
-
     // Clear existing markers
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = markers;
 
-    // Create marker clusterer
+    // Create marker clusterer if we have markers
     if (markers.length > 0) {
       new MarkerClusterer({
         map: mapRef.current,
@@ -97,7 +132,7 @@ const MapPage: FC = () => {
   const onLoad = (map: google.maps.Map) => {
     mapRef.current = map;
 
-    // Initialize heatmap layer
+    // Initialize heatmap layer with custom gradient
     heatmapRef.current = new google.maps.visualization.HeatmapLayer({
       map,
       data: [],
@@ -122,6 +157,13 @@ const MapPage: FC = () => {
         ]
       }
     });
+
+    // Set initial bounds to show the whole world
+    const worldBounds = new google.maps.LatLngBounds(
+      new google.maps.LatLng(-60, -180), // Southwest corner
+      new google.maps.LatLng(75, 180)    // Northeast corner
+    );
+    map.fitBounds(worldBounds);
   };
 
   const onUnmount = () => {
@@ -167,24 +209,13 @@ const MapPage: FC = () => {
           <div className="relative w-full rounded-lg overflow-hidden" style={{ height: '600px' }}>
             <GoogleMap
               mapContainerStyle={mapContainerStyle}
-              center={center}
-              zoom={3}
+              center={defaultCenter}
+              zoom={2}
               onLoad={onLoad}
               onUnmount={onUnmount}
-              options={{
-                styles: [
-                  {
-                    featureType: "all",
-                    elementType: "labels",
-                    stylers: [{ visibility: "off" }]
-                  }
-                ],
-                mapTypeControl: false,
-                streetViewControl: false,
-                minZoom: 2
-              }}
+              options={defaultMapOptions}
             >
-              {/* HeatmapLayer will be managed by the useEffect hook */}
+              {/* HeatmapLayer is managed by the useEffect hook */}
             </GoogleMap>
           </div>
         </Card>
