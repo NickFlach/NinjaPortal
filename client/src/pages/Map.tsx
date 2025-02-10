@@ -1,6 +1,7 @@
 import { FC, useEffect, useRef, useState } from "react";
-import { GoogleMap, useJsApiLoader, HeatmapLayer, Marker } from "@react-google-maps/api";
-import { MarkerClusterer } from "@googlemaps/markerclusterer";
+import { MapContainer, TileLayer, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -20,66 +21,51 @@ interface MapData {
   totalListeners: number;
 }
 
-const mapContainerStyle = {
-  width: '100%',
-  height: '600px'
-};
+// HeatmapLayer component
+const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
+  const map = useMap();
+  const heatmapLayerRef = useRef<any>(null);
 
-// Center coordinates to show the whole world
-const defaultCenter = {
-  lat: 30,
-  lng: 0
-};
+  useEffect(() => {
+    if (!map || !data.length) return;
 
-// Default map options
-const defaultMapOptions = {
-  minZoom: 2, // Prevent zooming out too far
-  maxZoom: 7, // Limit max zoom to maintain heatmap visibility
-  streetViewControl: false,
-  mapTypeControl: false,
-  fullscreenControl: false,
-  restriction: {
-    latLngBounds: {
-      north: 85,
-      south: -85,
-      west: -180,
-      east: 180
-    },
-    strictBounds: true
-  },
-  styles: [
-    {
-      featureType: "all",
-      elementType: "labels",
-      stylers: [{ visibility: "off" }]
-    },
-    {
-      featureType: "water",
-      elementType: "geometry",
-      stylers: [{ color: "#193341" }]
-    },
-    {
-      featureType: "landscape",
-      elementType: "geometry",
-      stylers: [{ color: "#2c5a71" }]
+    // Convert data to format expected by leaflet-heat
+    const points = data.map(([lat, lng]) => {
+      return [lat, lng, 0.5]; // intensity of 0.5 for each point
+    });
+
+    // Remove existing heatmap layer if it exists
+    if (heatmapLayerRef.current) {
+      map.removeLayer(heatmapLayerRef.current);
     }
-  ]
+
+    // Create new heatmap layer
+    heatmapLayerRef.current = L.heatLayer(points, {
+      radius: 25,
+      blur: 15,
+      maxZoom: 10,
+      minOpacity: 0.3,
+      gradient: {
+        0.4: '#3b82f6',
+        0.6: '#60a5fa',
+        0.8: '#93c5fd',
+        1.0: '#bfdbfe'
+      }
+    }).addTo(map);
+
+    return () => {
+      if (heatmapLayerRef.current) {
+        map.removeLayer(heatmapLayerRef.current);
+      }
+    };
+  }, [map, data]);
+
+  return null;
 };
 
 const MapPage: FC = () => {
   const { address } = useAccount();
-  const [tooltipContent, setTooltipContent] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
-  const mapRef = useRef<google.maps.Map>();
-  const markersRef = useRef<google.maps.Marker[]>([]);
-  const heatmapRef = useRef<google.maps.visualization.HeatmapLayer>();
   const intl = useIntl();
-
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-    libraries: ['visualization']
-  });
 
   const { data: mapData, isLoading, error } = useQuery<MapData>({
     queryKey: ['/api/music/map'],
@@ -99,82 +85,12 @@ const MapPage: FC = () => {
     }
   });
 
-  // Update heatmap data when map data changes
-  useEffect(() => {
-    if (!mapData?.countries || !mapRef.current || !heatmapRef.current) return;
-
-    const heatmapData: google.maps.LatLng[] = [];
-    const markers: google.maps.Marker[] = [];
-
-    Object.entries(mapData.countries).forEach(([countryCode, data]) => {
-      data.locations.forEach(([lat, lng]) => {
-        heatmapData.push(new google.maps.LatLng(lat, lng));
-      });
-    });
-
-    // Update heatmap
-    heatmapRef.current.setData(heatmapData);
-
-    // Clear existing markers
-    markersRef.current.forEach(marker => marker.setMap(null));
-    markersRef.current = markers;
-
-    // Create marker clusterer if we have markers
-    if (markers.length > 0) {
-      new MarkerClusterer({
-        map: mapRef.current,
-        markers,
-        algorithm: new MarkerClusterer.GridAlgorithm({})
-      });
-    }
-  }, [mapData]);
-
-  const onLoad = (map: google.maps.Map) => {
-    mapRef.current = map;
-
-    // Initialize heatmap layer with custom gradient
-    heatmapRef.current = new google.maps.visualization.HeatmapLayer({
-      map,
-      data: [],
-      options: {
-        radius: 20,
-        opacity: 0.7,
-        gradient: [
-          'rgba(0, 255, 255, 0)',
-          'rgba(0, 255, 255, 1)',
-          'rgba(0, 191, 255, 1)',
-          'rgba(0, 127, 255, 1)',
-          'rgba(0, 63, 255, 1)',
-          'rgba(0, 0, 255, 1)',
-          'rgba(0, 0, 223, 1)',
-          'rgba(0, 0, 191, 1)',
-          'rgba(0, 0, 159, 1)',
-          'rgba(0, 0, 127, 1)',
-          'rgba(63, 0, 91, 1)',
-          'rgba(127, 0, 63, 1)',
-          'rgba(191, 0, 31, 1)',
-          'rgba(255, 0, 0, 1)'
-        ]
-      }
-    });
-
-    // Set initial bounds to show the whole world
-    const worldBounds = new google.maps.LatLngBounds(
-      new google.maps.LatLng(-60, -180), // Southwest corner
-      new google.maps.LatLng(75, 180)    // Northeast corner
-    );
-    map.fitBounds(worldBounds);
-  };
-
-  const onUnmount = () => {
-    mapRef.current = undefined;
-    heatmapRef.current = undefined;
-    markersRef.current = [];
-  };
+  // Process locations for heatmap
+  const heatmapData = mapData ? Object.values(mapData.countries).flatMap(
+    country => country.locations
+  ) : [];
 
   const hasNoData = !isLoading && (!mapData || mapData.totalListeners === 0);
-
-  if (!isLoaded) return <div>Loading Maps...</div>;
 
   return (
     <Layout>
@@ -207,16 +123,24 @@ const MapPage: FC = () => {
 
         <Card className="p-4 bg-background">
           <div className="relative w-full rounded-lg overflow-hidden" style={{ height: '600px' }}>
-            <GoogleMap
-              mapContainerStyle={mapContainerStyle}
-              center={defaultCenter}
+            <MapContainer
+              center={[20, 0]}
               zoom={2}
-              onLoad={onLoad}
-              onUnmount={onUnmount}
-              options={defaultMapOptions}
+              style={{ height: '100%', width: '100%' }}
+              minZoom={2}
+              maxZoom={7}
+              maxBounds={[[-90, -180], [90, 180]]}
+              className="z-0"
             >
-              {/* HeatmapLayer is managed by the useEffect hook */}
-            </GoogleMap>
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                className="dark-tiles"
+              />
+              {heatmapData.length > 0 && (
+                <HeatmapLayer data={heatmapData} />
+              )}
+            </MapContainer>
           </div>
         </Card>
       </div>
