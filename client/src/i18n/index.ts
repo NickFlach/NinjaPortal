@@ -8,6 +8,9 @@ import fr from './messages/fr';
 import ru from './messages/ru';
 import uk from './messages/uk';
 import ar from './messages/ar';
+import de from './messages/de';
+import it from './messages/it';
+import pt from './messages/pt';
 
 export const messages = {
   en,
@@ -19,6 +22,9 @@ export const messages = {
   ru,
   uk,
   ar,
+  de,
+  it,
+  pt,
 } as const;
 
 export type LocaleType = keyof typeof messages;
@@ -50,6 +56,9 @@ export const languageNames = {
   ru: 'Русский',
   uk: 'Українська',
   ar: 'العربية',
+  de: 'Deutsch',
+  it: 'Italiano',
+  pt: 'Português',
 } as const;
 
 // Function to detect user's preferred language
