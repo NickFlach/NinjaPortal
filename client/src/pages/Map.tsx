@@ -1,14 +1,8 @@
-import { FC, Suspense, useEffect, useRef } from "react";
-import {
-  ComposableMap,
-  Geographies,
-  Geography,
-  ZoomableGroup,
-  Marker
-} from "react-simple-maps";
+import { FC, useEffect, useRef, useState } from "react";
+import { GoogleMap, useJsApiLoader, HeatmapLayer, Marker } from "@react-google-maps/api";
+import { MarkerClusterer } from "@googlemaps/markerclusterer";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAccount } from 'wagmi';
 import { Layout } from "@/components/Layout";
@@ -18,7 +12,7 @@ import { useIntl } from "react-intl";
 interface MapData {
   countries: {
     [key: string]: {
-      locations: Array<[number, number]>;  // [longitude, latitude] pairs
+      locations: Array<[number, number]>;  // [latitude, longitude] pairs
       listenerCount: number;
       anonCount: number;    // Count of non-geotagged plays
     };
@@ -26,53 +20,30 @@ interface MapData {
   totalListeners: number;
 }
 
-interface MarkerData {
-  id: string;
-  coordinates: [number, number];
-  countryCode: string;
-  isNew: boolean;
-}
+const mapContainerStyle = {
+  width: '100%',
+  height: '600px'
+};
 
-const geoUrl = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
-
-// Custom animated marker component
-const AnimatedMarker: FC<{
-  coordinates: [number, number];
-  isSelected: boolean;
-  isNew: boolean;
-}> = ({ coordinates, isSelected, isNew }) => {
-  return (
-    <Marker coordinates={coordinates}>
-      <motion.circle
-        initial={{ r: 0, opacity: 0, y: -20 }}
-        animate={{
-          r: 6,
-          opacity: 0.8,
-          y: 0
-        }}
-        exit={{ r: 0, opacity: 0, y: 20 }}
-        transition={{
-          type: "spring",
-          stiffness: 200,
-          damping: 20,
-          duration: 0.5
-        }}
-        fill={isSelected ? "#60A5FA" : "#10B981"}
-        stroke="#fff"
-        strokeWidth={2}
-        className="cursor-pointer hover:opacity-100"
-      />
-    </Marker>
-  );
+const center = {
+  lat: 20,
+  lng: 0
 };
 
 const MapPage: FC = () => {
   const { address } = useAccount();
   const [tooltipContent, setTooltipContent] = useState("");
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
-  const [markers, setMarkers] = useState<MarkerData[]>([]);
-  const prevMarkersRef = useRef<MarkerData[]>([]);
+  const mapRef = useRef<google.maps.Map>();
+  const markersRef = useRef<google.maps.Marker[]>([]);
+  const heatmapRef = useRef<google.maps.visualization.HeatmapLayer>();
   const intl = useIntl();
+
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+    libraries: ['visualization']
+  });
 
   const { data: mapData, isLoading, error } = useQuery<MapData>({
     queryKey: ['/api/music/map'],
@@ -92,70 +63,76 @@ const MapPage: FC = () => {
     }
   });
 
-  // Update markers when map data changes
+  // Update heatmap data when map data changes
   useEffect(() => {
-    if (mapData?.countries) {
-      const newMarkers: MarkerData[] = [];
-      const processedLocations = new Set<string>();
+    if (!mapData?.countries || !mapRef.current || !heatmapRef.current) return;
 
-      Object.entries(mapData.countries).forEach(([countryCode, data]) => {
-        if (data.locations.length > 0) {
-          data.locations.forEach((coordinates) => {
-            const locationKey = `${coordinates[0]}-${coordinates[1]}`;
+    const heatmapData: google.maps.LatLng[] = [];
+    const markers: google.maps.Marker[] = [];
 
-            if (!processedLocations.has(locationKey)) {
-              processedLocations.add(locationKey);
-              const id = `${countryCode}-${locationKey}`;
-              const existingMarker = prevMarkersRef.current.find(m => m.id === id);
-              newMarkers.push({
-                id,
-                coordinates,
-                countryCode,
-                isNew: !existingMarker
-              });
-            }
-          });
-        }
+    Object.entries(mapData.countries).forEach(([countryCode, data]) => {
+      data.locations.forEach(([lat, lng]) => {
+        heatmapData.push(new google.maps.LatLng(lat, lng));
       });
+    });
 
-      setMarkers(newMarkers);
-      prevMarkersRef.current = newMarkers;
+    // Update heatmap
+    heatmapRef.current.setData(heatmapData);
+
+
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current = markers;
+
+    // Create marker clusterer
+    if (markers.length > 0) {
+      new MarkerClusterer({
+        map: mapRef.current,
+        markers,
+        algorithm: new MarkerClusterer.GridAlgorithm({})
+      });
     }
   }, [mapData]);
 
-  const getColor = (countryCode: string) => {
-    if (!mapData?.countries) return "#1e293b";
-    const countryData = mapData.countries[countryCode];
-    if (!countryData?.listenerCount) return "#1e293b";
+  const onLoad = (map: google.maps.Map) => {
+    mapRef.current = map;
 
-    // Calculate color intensity based on total listeners (both geotagged and anonymous)
-    const totalCountryListeners = countryData.listenerCount;
-    const intensity = Math.min(totalCountryListeners / (mapData.totalListeners * 0.2), 1);
-    return `rgba(74, 222, 128, ${0.2 + (intensity * 0.6)})`;
+    // Initialize heatmap layer
+    heatmapRef.current = new google.maps.visualization.HeatmapLayer({
+      map,
+      data: [],
+      options: {
+        radius: 20,
+        opacity: 0.7,
+        gradient: [
+          'rgba(0, 255, 255, 0)',
+          'rgba(0, 255, 255, 1)',
+          'rgba(0, 191, 255, 1)',
+          'rgba(0, 127, 255, 1)',
+          'rgba(0, 63, 255, 1)',
+          'rgba(0, 0, 255, 1)',
+          'rgba(0, 0, 223, 1)',
+          'rgba(0, 0, 191, 1)',
+          'rgba(0, 0, 159, 1)',
+          'rgba(0, 0, 127, 1)',
+          'rgba(63, 0, 91, 1)',
+          'rgba(127, 0, 63, 1)',
+          'rgba(191, 0, 31, 1)',
+          'rgba(255, 0, 0, 1)'
+        ]
+      }
+    });
   };
 
-  const formatTooltip = (name: string, countryCode: string) => {
-    if (!mapData?.countries[countryCode]) return `${name}: ${intl.formatMessage({ id: 'map.noActivity' })}`;
-
-    const countryData = mapData.countries[countryCode];
-    const geotaggedListeners = countryData.locations.length;
-    const anonymousListeners = countryData.anonCount;
-    const totalListeners = countryData.listenerCount;
-    const percentage = ((totalListeners / mapData.totalListeners) * 100).toFixed(1);
-
-    return intl.formatMessage(
-      { id: 'map.tooltipDetail' },
-      {
-        country: name,
-        total: totalListeners,
-        geotagged: geotaggedListeners,
-        anonymous: anonymousListeners,
-        percentage
-      }
-    );
+  const onUnmount = () => {
+    mapRef.current = undefined;
+    heatmapRef.current = undefined;
+    markersRef.current = [];
   };
 
   const hasNoData = !isLoading && (!mapData || mapData.totalListeners === 0);
+
+  if (!isLoaded) return <div>Loading Maps...</div>;
 
   return (
     <Layout>
@@ -185,78 +162,30 @@ const MapPage: FC = () => {
             </div>
           )
         )}
-        <Card className="p-4 bg-background">
-          <div className="relative w-full h-[600px] rounded-lg overflow-hidden">
-            {tooltipContent && (
-              <div className="absolute top-4 left-4 bg-background/90 p-2 rounded-md shadow-lg z-50">
-                {tooltipContent}
-              </div>
-            )}
-            <Suspense fallback={<div className="w-full h-full flex items-center justify-center">{intl.formatMessage({ id: 'map.loading' })}</div>}>
-              {isLoading ? (
-                <div className="w-full h-full flex items-center justify-center">{intl.formatMessage({ id: 'map.loadingData' })}</div>
-              ) : (
-                <ComposableMap
-                  projection="geoEqualEarth"
-                  projectionConfig={{
-                    scale: 200,
-                    center: [0, 0]
-                  }}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    backgroundColor: "transparent"
-                  }}
-                >
-                  <ZoomableGroup>
-                    <Geographies geography={geoUrl}>
-                      {({ geographies }) =>
-                        geographies.map((geo) => {
-                          const countryCode = geo.properties.iso_a3;
-                          const countryData = mapData?.countries?.[countryCode];
-                          return (
-                            <Geography
-                              key={geo.rsmKey}
-                              geography={geo}
-                              fill={getColor(countryCode)}
-                              stroke="#4A5568"
-                              strokeWidth={0.5}
-                              onMouseEnter={() => {
-                                const { name } = geo.properties;
-                                setSelectedCountry(countryCode);
-                                setTooltipContent(formatTooltip(name, countryCode));
-                              }}
-                              onMouseLeave={() => {
-                                setSelectedCountry(null);
-                                setTooltipContent("");
-                              }}
-                              style={{
-                                default: { outline: "none" },
-                                hover: {
-                                  fill: countryData ? "#60A5FA" : "#475569",
-                                  outline: "none",
-                                  cursor: "pointer"
-                                },
-                                pressed: { outline: "none" },
-                              }}
-                            />
-                          );
-                        })
-                      }
-                    </Geographies>
 
-                    {markers.map((marker) => (
-                      <AnimatedMarker
-                        key={marker.id}
-                        coordinates={marker.coordinates}
-                        isSelected={selectedCountry === marker.countryCode}
-                        isNew={marker.isNew}
-                      />
-                    ))}
-                  </ZoomableGroup>
-                </ComposableMap>
-              )}
-            </Suspense>
+        <Card className="p-4 bg-background">
+          <div className="relative w-full rounded-lg overflow-hidden" style={{ height: '600px' }}>
+            <GoogleMap
+              mapContainerStyle={mapContainerStyle}
+              center={center}
+              zoom={3}
+              onLoad={onLoad}
+              onUnmount={onUnmount}
+              options={{
+                styles: [
+                  {
+                    featureType: "all",
+                    elementType: "labels",
+                    stylers: [{ visibility: "off" }]
+                  }
+                ],
+                mapTypeControl: false,
+                streetViewControl: false,
+                minZoom: 2
+              }}
+            >
+              {/* HeatmapLayer will be managed by the useEffect hook */}
+            </GoogleMap>
           </div>
         </Card>
       </div>

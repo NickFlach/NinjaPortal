@@ -15,6 +15,11 @@ interface Song {
 
 type PlaylistContext = 'landing' | 'library' | 'feed';
 
+interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
 interface MusicPlayerContextType {
   currentSong: Song | undefined;
   isPlaying: boolean;
@@ -24,6 +29,7 @@ interface MusicPlayerContextType {
   isLandingPage: boolean;
   currentContext: PlaylistContext;
   audioRef: React.RefObject<HTMLAudioElement>;
+  userCoordinates?: Coordinates;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -32,6 +38,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [currentSong, setCurrentSong] = useState<Song>();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentContext, setCurrentContext] = useState<PlaylistContext>('landing');
+  const [userCoordinates, setUserCoordinates] = useState<Coordinates>();
   const audioRef = useRef<HTMLAudioElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { address: userAddress } = useAccount();
@@ -39,6 +46,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const landingAddress = userAddress || defaultWallet;
   const isLandingPage = !userAddress;
   const audioContextRef = useRef<AudioContext>();
+  const geolocationPermissionAsked = useRef(false);
 
   // Initialize audio element
   useEffect(() => {
@@ -49,10 +57,32 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current = null;
       }
     };
   }, []);
+
+  // Request geolocation when needed
+  const requestGeolocation = async () => {
+    if (!geolocationPermissionAsked.current && 'geolocation' in navigator) {
+      geolocationPermissionAsked.current = true;
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
+          });
+        });
+
+        setUserCoordinates({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+      } catch (error) {
+        console.error('Error getting location:', error);
+      }
+    }
+  };
 
   // Fetch landing page feed (recent songs)
   const { data: recentSongs } = useQuery<Song[]>({
@@ -63,7 +93,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           'X-Internal-Token': 'landing-page'
         };
 
-        // Add wallet address header if available
         if (landingAddress) {
           headers['X-Wallet-Address'] = landingAddress;
         }
@@ -81,10 +110,10 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         return data;
       } catch (error) {
         console.error('Error fetching recent songs:', error);
-        return []; // Return empty array on error to prevent undefined issues
+        return [];
       }
     },
-    refetchInterval: isLandingPage ? 30000 : false, // Refetch every 30s on landing page
+    refetchInterval: isLandingPage ? 30000 : false,
   });
 
   // Function to get next song in the current context
@@ -94,7 +123,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     const currentIndex = recentSongs.findIndex(song => song.id === currentSongId);
     if (currentIndex === -1) return recentSongs[0];
 
-    // Get next song, or loop back to the beginning
     return recentSongs[(currentIndex + 1) % recentSongs.length];
   };
 
@@ -115,9 +143,11 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
-
   const playSong = async (song: Song, context?: PlaylistContext) => {
     try {
+      // Request geolocation if not already asked
+      await requestGeolocation();
+
       // Cancel any existing fetch request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -139,37 +169,46 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       const url = URL.createObjectURL(blob);
 
       // Set source and load
-      audioRef.current.src = url;
-      await new Promise((resolve, reject) => {
-        audioRef.current.addEventListener('loadeddata', resolve);
-        audioRef.current.addEventListener('error', reject);
-        audioRef.current.load();
-      });
+      if (audioRef.current) {
+        audioRef.current.src = url;
+        await new Promise((resolve, reject) => {
+          if (audioRef.current) {
+            audioRef.current.addEventListener('loadeddata', resolve);
+            audioRef.current.addEventListener('error', reject);
+            audioRef.current.load();
+          }
+        });
+      }
 
       // Update refs and state
       setCurrentSong(song);
 
       // Try to play
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        try {
-          await playPromise;
-          setIsPlaying(true);
-          console.log('IPFS fetch and playback successful');
-        } catch (error) {
-          console.error('Playback prevented:', error);
-          setIsPlaying(false);
+      if (audioRef.current) {
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          try {
+            await playPromise;
+            setIsPlaying(true);
+            console.log('IPFS fetch and playback successful');
+          } catch (error) {
+            console.error('Playback prevented:', error);
+            setIsPlaying(false);
+          }
         }
       }
 
-      // Record play
+      // Record play with location
       try {
         await fetch(`/api/songs/play/${song.id}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             ...(userAddress && { 'X-Wallet-Address': userAddress })
-          }
+          },
+          body: JSON.stringify(userCoordinates ? {
+            coords: userCoordinates
+          } : {})
         });
       } catch (error) {
         console.error('Error recording play:', error);
@@ -263,7 +302,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       }
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current = null;
       }
     };
   }, []);
@@ -278,7 +316,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         recentSongs,
         isLandingPage,
         currentContext,
-        audioRef
+        audioRef,
+        userCoordinates
       }}
     >
       {children}
