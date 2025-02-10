@@ -33,6 +33,15 @@ export default {
   'tour.connect': 'Connect your wallet to start exploring music.',
   'tour.upload': 'Upload your favorite tunes and share them with the world!',
   'tour.gotIt': 'Got it!',
+  // Map messages
+  'map.title': 'Global Listener Map',
+  'map.noActivity': 'No Activity',
+  'map.noData': 'No listener data available yet. Play some music to see activity on the map!',
+  'map.totalListeners': '{count} Active Listeners Worldwide',
+  'map.loading': 'Loading map...',
+  'map.loadingData': 'Loading data...',
+  'map.error': 'Error loading map data: {error}',
+  'map.tooltipDetail': '{country}: {total} {total, plural, one {Listener} other {Listeners}} ({percentage}%) - {geotagged} geotagged, {anonymous} anonymous',
   // Map location messages
   'map.location.error.title': 'Location Access',
   'map.location.error.description': 'Unable to access your location. You can still use the map, but your plays won\'t be geotagged.',

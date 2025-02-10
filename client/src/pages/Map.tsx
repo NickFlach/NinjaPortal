@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAccount } from 'wagmi';
 import { Layout } from "@/components/Layout";
+import { useIntl } from "react-intl";
 
 // Define types for our map data
 interface MapData {
@@ -19,6 +20,7 @@ interface MapData {
     [key: string]: {
       locations: Array<[number, number]>;  // [longitude, latitude] pairs
       listenerCount: number;
+      anonCount: number;    // Count of non-geotagged plays
     };
   };
   totalListeners: number;
@@ -70,6 +72,7 @@ const MapPage: FC = () => {
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const prevMarkersRef = useRef<MarkerData[]>([]);
+  const intl = useIntl();
 
   const { data: mapData, isLoading, error } = useQuery<MapData>({
     queryKey: ['/api/music/map'],
@@ -125,15 +128,31 @@ const MapPage: FC = () => {
     const countryData = mapData.countries[countryCode];
     if (!countryData?.listenerCount) return "#1e293b";
 
-    const intensity = Math.min(countryData.listenerCount / (mapData.totalListeners * 0.2), 1);
+    // Calculate color intensity based on total listeners (both geotagged and anonymous)
+    const totalCountryListeners = countryData.listenerCount;
+    const intensity = Math.min(totalCountryListeners / (mapData.totalListeners * 0.2), 1);
     return `rgba(74, 222, 128, ${0.2 + (intensity * 0.6)})`;
   };
 
   const formatTooltip = (name: string, countryCode: string) => {
-    if (!mapData?.countries[countryCode]) return `${name}: No Activity`;
-    const listenerCount = mapData.countries[countryCode].listenerCount;
-    const percentage = ((listenerCount / mapData.totalListeners) * 100).toFixed(1);
-    return `${name}: ${listenerCount} ${listenerCount === 1 ? 'Listener' : 'Listeners'} (${percentage}%)`;
+    if (!mapData?.countries[countryCode]) return `${name}: ${intl.formatMessage({ id: 'map.noActivity' })}`;
+
+    const countryData = mapData.countries[countryCode];
+    const geotaggedListeners = countryData.locations.length;
+    const anonymousListeners = countryData.anonCount;
+    const totalListeners = countryData.listenerCount;
+    const percentage = ((totalListeners / mapData.totalListeners) * 100).toFixed(1);
+
+    return intl.formatMessage(
+      { id: 'map.tooltipDetail' },
+      {
+        country: name,
+        total: totalListeners,
+        geotagged: geotaggedListeners,
+        anonymous: anonymousListeners,
+        percentage
+      }
+    );
   };
 
   const hasNoData = !isLoading && (!mapData || mapData.totalListeners === 0);
@@ -141,20 +160,28 @@ const MapPage: FC = () => {
   return (
     <Layout>
       <div className="container mx-auto py-6">
-        <h1 className="text-4xl font-bold mb-6">Global Listener Map</h1>
+        <h1 className="text-4xl font-bold mb-6">
+          {intl.formatMessage({ id: 'map.title' })}
+        </h1>
 
         {error ? (
           <div className="text-red-500 mb-4">
-            Error loading map data: {(error as Error).message}
+            {intl.formatMessage(
+              { id: 'map.error' },
+              { error: (error as Error).message }
+            )}
           </div>
         ) : hasNoData ? (
           <div className="text-sm text-muted-foreground mb-4">
-            No listener data available yet. Play some music to see activity on the map!
+            {intl.formatMessage({ id: 'map.noData' })}
           </div>
         ) : (
           mapData && (
             <div className="text-sm text-muted-foreground mb-4">
-              Total Active Listeners: {mapData.totalListeners}
+              {intl.formatMessage(
+                { id: 'map.totalListeners' },
+                { count: mapData.totalListeners }
+              )}
             </div>
           )
         )}
@@ -165,9 +192,9 @@ const MapPage: FC = () => {
                 {tooltipContent}
               </div>
             )}
-            <Suspense fallback={<div className="w-full h-full flex items-center justify-center">Loading map...</div>}>
+            <Suspense fallback={<div className="w-full h-full flex items-center justify-center">{intl.formatMessage({ id: 'map.loading' })}</div>}>
               {isLoading ? (
-                <div className="w-full h-full flex items-center justify-center">Loading data...</div>
+                <div className="w-full h-full flex items-center justify-center">{intl.formatMessage({ id: 'map.loadingData' })}</div>
               ) : (
                 <ComposableMap
                   projection="geoEqualEarth"
@@ -206,7 +233,7 @@ const MapPage: FC = () => {
                               style={{
                                 default: { outline: "none" },
                                 hover: {
-                                  fill: countryData?.listenerCount ? "#60A5FA" : "#475569",
+                                  fill: countryData ? "#60A5FA" : "#475569",
                                   outline: "none",
                                   cursor: "pointer"
                                 },
