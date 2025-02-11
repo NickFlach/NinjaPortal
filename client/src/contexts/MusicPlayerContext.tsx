@@ -364,7 +364,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, [userAddress]);
 
-  // Send playing status updates through WebSocket
+  // Send playing status updates through WebSocket and location updates
   useEffect(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN && currentSong) {
       wsRef.current.send(JSON.stringify({
@@ -373,8 +373,35 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         playing: isPlaying,
         timestamp: audioRef.current?.currentTime || 0
       }));
+
+      // Send location update if we have coordinates
+      if (userCoordinates) {
+        // Get country code using the Google Maps Geocoding API
+        fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${userCoordinates.lat},${userCoordinates.lng}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`)
+          .then(response => response.json())
+          .then(data => {
+            const countryComponent = data.results[0]?.address_components?.find(
+              component => component.types.includes('country')
+            );
+
+            if (countryComponent) {
+              wsRef.current?.send(JSON.stringify({
+                type: 'location_update',
+                coordinates: userCoordinates,
+                countryCode: countryComponent.short_name
+              }));
+            }
+          })
+          .catch(error => {
+            console.error('Error getting country code:', error);
+          });
+      }
     }
-  }, [isPlaying, currentSong]);
+  }, [isPlaying, currentSong, userCoordinates]);
+
+  useEffect(() => {
+    requestGeolocation();
+  }, []);
 
 
   return (
