@@ -12,7 +12,6 @@ import { useIntl } from "react-intl";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { GpsVisualizationToolkit, MarkerLayer, PathLayer, HeatmapLayer } from "@/components/GpsVisualizationToolkit";
 
-// Update MapData interface to include allLocations
 interface MapData {
   countries: {
     [key: string]: {
@@ -35,7 +34,7 @@ interface VisualizationOptions {
 
 const MapPage: FC = () => {
   const { address } = useAccount();
-  const { activeListeners, userCoordinates } = useMusicPlayer();
+  const { activeListeners, userCoordinates, isPlaying } = useMusicPlayer();
   const intl = useIntl();
   const [mapError, setMapError] = useState<string | null>(null);
   const [visualizationOptions, setVisualizationOptions] = useState<VisualizationOptions>({
@@ -66,10 +65,10 @@ const MapPage: FC = () => {
 
   // Process locations for heatmap and markers
   const locationData = useMemo(() => {
-    if (!mapData?.allLocations) return [];
+    if (!mapData?.allLocations || !isPlaying) return [];
     console.log('Processing location data, total locations:', mapData.allLocations.length);
     return mapData.allLocations;
-  }, [mapData]);
+  }, [mapData, isPlaying]);
 
   const hasNoData = !isLoading && (!mapData || activeListeners === 0);
 
@@ -93,7 +92,11 @@ const MapPage: FC = () => {
           {intl.formatMessage({ id: 'map.title' })}
         </h1>
 
-        {error ? (
+        {!isPlaying ? (
+          <div className="text-sm text-muted-foreground mb-4">
+            {intl.formatMessage({ id: 'map.noActivity' })}
+          </div>
+        ) : error ? (
           <div className="text-red-500 mb-4">
             {intl.formatMessage(
               { id: 'map.error' },
@@ -135,29 +138,33 @@ const MapPage: FC = () => {
                   className="dark-tiles"
                 />
 
-                {visualizationOptions.showHeatmap && (
-                  <HeatmapLayer data={locationData} />
-                )}
+                {isPlaying && (
+                  <>
+                    {visualizationOptions.showHeatmap && (
+                      <HeatmapLayer data={locationData} />
+                    )}
 
-                {visualizationOptions.showMarkers && (
-                  <MarkerLayer 
-                    data={locationData}
-                    options={visualizationOptions}
-                  />
-                )}
+                    {visualizationOptions.showMarkers && (
+                      <MarkerLayer 
+                        data={locationData}
+                        options={visualizationOptions}
+                      />
+                    )}
 
-                {visualizationOptions.showPaths && userCoordinates && (
-                  <PathLayer 
-                    coordinates={[userCoordinates]} 
-                    options={visualizationOptions}
-                  />
-                )}
+                    {visualizationOptions.showPaths && userCoordinates && (
+                      <PathLayer 
+                        coordinates={[userCoordinates]} 
+                        options={visualizationOptions}
+                      />
+                    )}
 
-                <GpsVisualizationToolkit
-                  data={locationData}
-                  userPath={userCoordinates ? [userCoordinates] : undefined}
-                  onOptionChange={handleVisualizationOptionsChange}
-                />
+                    <GpsVisualizationToolkit
+                      data={locationData}
+                      userPath={userCoordinates ? [userCoordinates] : undefined}
+                      onOptionChange={handleVisualizationOptionsChange}
+                    />
+                  </>
+                )}
               </MapContainer>
             )}
           </div>
