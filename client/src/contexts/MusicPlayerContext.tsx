@@ -391,30 +391,14 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       // Only send location updates if music is playing and we have coordinates
       if (isPlaying && userCoordinates) {
         console.log('Sending location update:', userCoordinates);
-        // Get country code using the Google Maps Geocoding API
-        fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${userCoordinates.lat},${userCoordinates.lng}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`)
-          .then(response => response.json())
-          .then(data => {
-            const countryComponent = data.results[0]?.address_components?.find(
-              component => component.types.includes('country')
-            );
-
-            if (countryComponent && wsRef.current?.readyState === WebSocket.OPEN) {
-              console.log('Sending WebSocket location update with country:', countryComponent.short_name);
-              wsRef.current.send(JSON.stringify({
-                type: 'location_update',
-                coordinates: userCoordinates,
-                countryCode: countryComponent.short_name
-              }));
-            }
-          })
-          .catch(error => {
-            console.error('Error getting country code:', error);
-          });
+        wsRef.current.send(JSON.stringify({
+          type: 'location_update',
+          coordinates: userCoordinates,
+          countryCode: 'US' // Default to US for demo purposes
+        }));
       }
     }
   }, [isPlaying, currentSong, userCoordinates]);
-
 
 
   return (
