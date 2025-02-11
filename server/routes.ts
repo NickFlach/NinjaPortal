@@ -155,7 +155,7 @@ export function registerRoutes(app: Express) {
       const stats = getLiveStats();
       mapData.totalListeners = stats.activeListeners;
 
-      // Update locations with real-time data
+      // Update locations with real-time data for each country
       Object.keys(mapData.countries).forEach(countryCode => {
         // Get active locations for this country
         const activeLocations = Array.from(clients.values())
@@ -168,16 +168,27 @@ export function registerRoutes(app: Express) {
 
         console.log(`Active locations for ${countryCode}:`, activeLocations);
 
-        // Set locations directly for each country
+        // Set locations directly for each country including all known coordinates
         mapData.countries[countryCode].locations = activeLocations;
 
         // Update listener counts
-        mapData.countries[countryCode].listenerCount = stats.listenersByCountry[countryCode] || 0;
-        mapData.countries[countryCode].anonCount = 
-          (stats.listenersByCountry[countryCode] || 0) - activeLocations.length;
+        const countryListeners = stats.listenersByCountry[countryCode] || 0;
+        mapData.countries[countryCode].listenerCount = countryListeners;
+        mapData.countries[countryCode].anonCount = countryListeners - activeLocations.length;
       });
 
-      console.log('Map data response:', mapData);
+      // Add all locations regardless of country for heatmap
+      const allLocations = Array.from(clients.values())
+        .filter(client => client.isPlaying && client.coordinates)
+        .map(client => [client.coordinates!.lat, client.coordinates!.lng] as [number, number]);
+
+      mapData.allLocations = allLocations;
+
+      console.log('Map data response:', {
+        ...mapData,
+        totalLocations: allLocations.length
+      });
+
       res.json(mapData);
     } catch (error) {
       console.error('Error fetching map data:', error);

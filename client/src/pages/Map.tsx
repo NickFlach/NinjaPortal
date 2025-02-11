@@ -12,16 +12,17 @@ import { useIntl } from "react-intl";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { GpsVisualizationToolkit, MarkerLayer, PathLayer, HeatmapLayer } from "@/components/GpsVisualizationToolkit";
 
-// Define types for our map data
+// Update MapData interface to include allLocations
 interface MapData {
   countries: {
     [key: string]: {
-      locations: Array<[number, number]>;  // [latitude, longitude] pairs
+      locations: Array<[number, number]>;
       listenerCount: number;
-      anonCount: number;    // Count of non-geotagged plays
+      anonCount: number;
     };
   };
   totalListeners: number;
+  allLocations: Array<[number, number]>;
 }
 
 interface VisualizationOptions {
@@ -63,17 +64,11 @@ const MapPage: FC = () => {
     }
   });
 
-  // Process locations for heatmap
-  const heatmapData = useMemo(() => {
-    if (!mapData) return [];
-
-    // Collect all locations from all countries
-    const allLocations = Object.values(mapData.countries).flatMap(
-      country => country.locations
-    );
-
-    console.log('Processing heatmap data, total locations:', allLocations.length);
-    return allLocations;
+  // Process locations for heatmap and markers
+  const locationData = useMemo(() => {
+    if (!mapData?.allLocations) return [];
+    console.log('Processing location data, total locations:', mapData.allLocations.length);
+    return mapData.allLocations;
   }, [mapData]);
 
   const hasNoData = !isLoading && (!mapData || activeListeners === 0);
@@ -141,22 +136,25 @@ const MapPage: FC = () => {
                 />
 
                 {visualizationOptions.showHeatmap && (
-                  <HeatmapLayer data={heatmapData} />
+                  <HeatmapLayer data={locationData} />
                 )}
 
                 {visualizationOptions.showMarkers && (
-                  <MarkerLayer data={heatmapData} options={visualizationOptions} />
+                  <MarkerLayer 
+                    data={locationData}
+                    options={visualizationOptions}
+                  />
                 )}
 
                 {visualizationOptions.showPaths && userCoordinates && (
                   <PathLayer 
                     coordinates={[userCoordinates]} 
-                    options={visualizationOptions} 
+                    options={visualizationOptions}
                   />
                 )}
 
                 <GpsVisualizationToolkit
-                  data={heatmapData}
+                  data={locationData}
                   userPath={userCoordinates ? [userCoordinates] : undefined}
                   onOptionChange={handleVisualizationOptionsChange}
                 />
