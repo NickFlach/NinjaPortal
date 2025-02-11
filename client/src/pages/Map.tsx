@@ -23,32 +23,13 @@ interface MapData {
   totalListeners: number;
 }
 
-// Extend the Leaflet namespace to include the heatLayer function
-declare module 'leaflet' {
-  namespace HeatLayer {
-    interface HeatLayerOptions {
-      minOpacity?: number;
-      maxZoom?: number;
-      radius?: number;
-      blur?: number;
-      gradient?: { [key: string]: string };
-    }
-  }
-  function heatLayer(
-    latlngs: Array<[number, number, number]>,
-    options?: HeatLayer.HeatLayerOptions
-  ): L.Layer;
-}
-
 // HeatmapLayer component
 const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
   const map = useMap();
   const heatmapLayerRef = useRef<L.Layer | null>(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
     if (!map || !data.length) {
-      // Clean up existing layer if data is empty
       if (heatmapLayerRef.current) {
         map.removeLayer(heatmapLayerRef.current);
         heatmapLayerRef.current = null;
@@ -56,64 +37,45 @@ const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
       return;
     }
 
-    console.log('Creating heatmap with data:', data);
+    console.log('Creating heatmap with data points:', data.length);
 
-    // Convert data to heatmap points
-    const points = data.map(([lat, lng]) => {
-      return [lat, lng, 0.5] as [number, number, number];
-    });
-
-    const createNewLayer = () => {
-      try {
-        return L.heatLayer(points, {
-          radius: 25,
-          blur: 15,
-          maxZoom: 10,
-          minOpacity: 0.3,
-          gradient: {
-            0.4: '#3b82f6',
-            0.6: '#60a5fa',
-            0.8: '#93c5fd',
-            1.0: '#bfdbfe'
-          }
-        });
-      } catch (error) {
-        console.error('Error creating heatmap layer:', error);
-        return null;
-      }
-    };
-
-    // Update existing layer with transition
-    if (heatmapLayerRef.current && !isTransitioning) {
-      setIsTransitioning(true);
-
-      const currentLayer = heatmapLayerRef.current;
-      const newLayer = createNewLayer();
-
-      if (!newLayer) {
-        setIsTransitioning(false);
-        return;
+    try {
+      // Remove existing layer
+      if (heatmapLayerRef.current) {
+        map.removeLayer(heatmapLayerRef.current);
       }
 
-      try {
-        map.removeLayer(currentLayer);
-        newLayer.addTo(map);
-        heatmapLayerRef.current = newLayer;
-        setIsTransitioning(false);
-      } catch (error) {
-        console.error('Error updating heatmap layer:', error);
-        setIsTransitioning(false);
-      }
-    } 
-    // Initial layer creation
-    else if (!heatmapLayerRef.current) {
-      const newLayer = createNewLayer();
-      if (newLayer) {
-        newLayer.addTo(map);
-        heatmapLayerRef.current = newLayer;
-      }
+      // Convert coordinates to heatmap points with intensity
+      const points = data.map(([lat, lng]) => {
+        return [lat, lng, 0.8] as [number, number, number]; // Increased intensity
+      });
+
+      // Create new heatmap layer with adjusted options
+      const heatLayer = (L as any).heatLayer(points, {
+        radius: 35,          // Increased radius
+        blur: 20,           // Increased blur
+        maxZoom: 10,
+        minOpacity: 0.4,    // Increased minimum opacity
+        maxOpacity: 1,      // Added maximum opacity
+        gradient: {         // Enhanced gradient
+          0.2: '#3b82f6',  // Start with blue
+          0.4: '#60a5fa',
+          0.6: '#93c5fd',
+          0.8: '#bfdbfe',
+          1.0: '#ffffff'   // End with white for intensity
+        }
+      });
+
+      // Add layer to map
+      heatLayer.addTo(map);
+      heatmapLayerRef.current = heatLayer;
+
+      console.log('Heatmap layer created and added to map');
+    } catch (error) {
+      console.error('Error creating/updating heatmap layer:', error);
     }
 
+    // Cleanup function
     return () => {
       if (heatmapLayerRef.current) {
         try {
@@ -124,7 +86,7 @@ const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
         }
       }
     };
-  }, [map, data, isTransitioning]);
+  }, [map, data]); // Only re-run if map or data changes
 
   return null;
 };
@@ -162,16 +124,17 @@ const MapPage: FC = () => {
       country => country.locations
     );
 
-    console.log('Processing heatmap data:', allLocations);
+    console.log('Processing heatmap data, total locations:', allLocations.length);
     return allLocations;
   }, [mapData]);
 
   const hasNoData = !isLoading && (!mapData || activeListeners === 0);
 
-  // Catch any errors from leaflet.heat initialization
+  // Check for leaflet.heat availability
   useEffect(() => {
-    if (typeof L.heatLayer !== 'function') {
+    if (typeof (L as any).heatLayer !== 'function') {
       setMapError('Heatmap functionality not available');
+      console.error('L.heatLayer is not defined');
     }
   }, []);
 
@@ -223,9 +186,7 @@ const MapPage: FC = () => {
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   className="dark-tiles"
                 />
-                {heatmapData.length > 0 && (
-                  <HeatmapLayer data={heatmapData} />
-                )}
+                <HeatmapLayer data={heatmapData} />
               </MapContainer>
             )}
           </div>
