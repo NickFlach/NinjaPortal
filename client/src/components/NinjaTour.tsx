@@ -210,7 +210,12 @@ export function NinjaTour() {
 
           <motion.div
             className="absolute left-full ml-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg shadow-lg pointer-events-auto"
-            style={{ width: "max-content", maxWidth: "300px" }}
+            style={{ 
+              width: "max-content", 
+              maxWidth: "300px",
+              top: "50%",
+              transform: "translateY(-50%)"
+            }}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
