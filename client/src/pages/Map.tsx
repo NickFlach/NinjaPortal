@@ -145,11 +145,14 @@ const MapPage: FC = () => {
                 )}
 
                 {visualizationOptions.showMarkers && (
-                  <MarkerLayer data={heatmapData} />
+                  <MarkerLayer data={heatmapData} options={visualizationOptions} />
                 )}
 
                 {visualizationOptions.showPaths && userCoordinates && (
-                  <PathLayer coordinates={[userCoordinates]} />
+                  <PathLayer 
+                    coordinates={[userCoordinates]} 
+                    options={visualizationOptions} 
+                  />
                 )}
 
                 <GpsVisualizationToolkit

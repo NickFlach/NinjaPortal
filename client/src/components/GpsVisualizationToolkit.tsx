@@ -27,6 +27,53 @@ interface Props {
   onOptionChange?: (options: VisualizationOptions) => void;
 }
 
+// Marker visualization component
+export const MarkerLayer: FC<{ 
+  data: Array<[number, number]>;
+  options: VisualizationOptions;
+}> = ({ data, options }) => {
+  return (
+    <>
+      {data.map(([lat, lng], index) => (
+        <CircleMarker
+          key={`marker-${index}`}
+          center={[lat, lng]}
+          pathOptions={{ 
+            color: options.pathColor,
+            fillColor: options.pathColor,
+            fillOpacity: 0.6
+          }}
+          radius={options.markerSize}
+        />
+      ))}
+    </>
+  );
+};
+
+// Path visualization component
+export const PathLayer: FC<{ 
+  coordinates: Coordinates[];
+  options: VisualizationOptions;
+}> = ({ coordinates, options }) => {
+  if (!coordinates?.length) return null;
+
+  const positions = coordinates.map(coord => [coord.lat, coord.lng]) as [number, number][];
+
+  return (
+    <Polyline
+      positions={positions}
+      pathOptions={{
+        color: options.pathColor,
+        weight: 3,
+        opacity: 0.7,
+        lineCap: 'round',
+        lineJoin: 'round',
+        dashArray: '5, 10'
+      }}
+    />
+  );
+};
+
 // Heatmap Layer Component
 export const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
   const map = useMap();
@@ -154,46 +201,5 @@ export const GpsVisualizationToolkit: FC<Props> = ({
         </Card>
       </motion.div>
     </div>
-  );
-};
-
-// Marker visualization component
-export const MarkerLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
-  return (
-    <>
-      {data.map(([lat, lng], index) => (
-        <CircleMarker
-          key={`marker-${index}`}
-          center={[lat, lng]}
-          pathOptions={{ 
-            color: options.pathColor, //Corrected to use options from parent
-            fillColor: options.pathColor, //Corrected to use options from parent
-            fillOpacity: 0.6
-          }}
-          radius={options.markerSize} //Corrected to use options from parent
-        />
-      ))}
-    </>
-  );
-};
-
-// Path visualization component
-export const PathLayer: FC<{ coordinates: Coordinates[] }> = ({ coordinates }) => {
-  if (!coordinates?.length) return null;
-
-  const positions = coordinates.map(coord => [coord.lat, coord.lng]) as [number, number][];
-
-  return (
-    <Polyline
-      positions={positions}
-      pathOptions={{
-        color: '#3b82f6',
-        weight: 3,
-        opacity: 0.7,
-        lineCap: 'round',
-        lineJoin: 'round',
-        dashArray: '5, 10'
-      }}
-    />
   );
 };
