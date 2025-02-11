@@ -47,61 +47,23 @@ const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
-    if (!map || !data.length) return;
+    if (!map || !data.length) {
+      // Clean up existing layer if data is empty
+      if (heatmapLayerRef.current) {
+        map.removeLayer(heatmapLayerRef.current);
+        heatmapLayerRef.current = null;
+      }
+      return;
+    }
 
-    // Convert data to format expected by leaflet-heat
+    // Convert data to heatmap points
     const points = data.map(([lat, lng]) => {
-      return [lat, lng, 0.5] as [number, number, number]; // intensity of 0.5 for each point
+      return [lat, lng, 0.5] as [number, number, number];
     });
 
-    // If we already have a layer, update it with animation
-    if (heatmapLayerRef.current && !isTransitioning) {
-      setIsTransitioning(true);
-
-      // Fade out current layer
-      const currentLayer = heatmapLayerRef.current as any;
-      if (currentLayer._heat) {
-        currentLayer._heat.style.transition = 'opacity 0.5s ease-in-out';
-        currentLayer._heat.style.opacity = '0';
-      }
-
-      // Create new layer with fade in
-      const newLayer = L.heatLayer(points, {
-        radius: 25,
-        blur: 15,
-        maxZoom: 10,
-        minOpacity: 0,
-        gradient: {
-          0.4: '#3b82f6',
-          0.6: '#60a5fa',
-          0.8: '#93c5fd',
-          1.0: '#bfdbfe'
-        }
-      }).addTo(map);
-
-      // Add transition style to new layer
-      if ((newLayer as any)._heat) {
-        (newLayer as any)._heat.style.transition = 'opacity 0.5s ease-in-out';
-        (newLayer as any)._heat.style.opacity = '0';
-      }
-
-      // Fade in new layer after a short delay
-      setTimeout(() => {
-        if ((newLayer as any)._heat) {
-          (newLayer as any)._heat.style.opacity = '1';
-        }
-        // Remove old layer after fade out
-        if (heatmapLayerRef.current) {
-          map.removeLayer(heatmapLayerRef.current);
-        }
-        heatmapLayerRef.current = newLayer;
-        setIsTransitioning(false);
-      }, 50);
-
-    } else if (!heatmapLayerRef.current) {
-      // Initial layer creation
+    const createNewLayer = () => {
       try {
-        const newLayer = L.heatLayer(points, {
+        return L.heatLayer(points, {
           radius: 25,
           blur: 15,
           maxZoom: 10,
@@ -112,17 +74,78 @@ const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
             0.8: '#93c5fd',
             1.0: '#bfdbfe'
           }
-        }).addTo(map);
-
-        heatmapLayerRef.current = newLayer;
+        });
       } catch (error) {
         console.error('Error creating heatmap layer:', error);
+        return null;
+      }
+    };
+
+    // Update existing layer with transition
+    if (heatmapLayerRef.current && !isTransitioning) {
+      setIsTransitioning(true);
+
+      const currentLayer = heatmapLayerRef.current;
+      const newLayer = createNewLayer();
+
+      if (!newLayer) {
+        setIsTransitioning(false);
+        return;
+      }
+
+      // Safely handle DOM transitions
+      try {
+        const currentHeat = (currentLayer as any)._heat;
+        if (currentHeat && currentHeat.style) {
+          currentHeat.style.transition = 'opacity 0.5s ease-in-out';
+          currentHeat.style.opacity = '0';
+        }
+
+        newLayer.addTo(map);
+        const newHeat = (newLayer as any)._heat;
+        if (newHeat && newHeat.style) {
+          newHeat.style.transition = 'opacity 0.5s ease-in-out';
+          newHeat.style.opacity = '0';
+        }
+
+        // Fade in new layer
+        setTimeout(() => {
+          if (newHeat && newHeat.style) {
+            newHeat.style.opacity = '1';
+          }
+          // Remove old layer after fade
+          if (currentLayer) {
+            map.removeLayer(currentLayer);
+          }
+          heatmapLayerRef.current = newLayer;
+          setIsTransitioning(false);
+        }, 50);
+      } catch (error) {
+        console.error('Error during layer transition:', error);
+        // Fallback to direct layer swap
+        map.removeLayer(currentLayer);
+        newLayer.addTo(map);
+        heatmapLayerRef.current = newLayer;
+        setIsTransitioning(false);
+      }
+    } 
+    // Initial layer creation
+    else if (!heatmapLayerRef.current) {
+      const newLayer = createNewLayer();
+      if (newLayer) {
+        newLayer.addTo(map);
+        heatmapLayerRef.current = newLayer;
       }
     }
 
     return () => {
       if (heatmapLayerRef.current) {
-        map.removeLayer(heatmapLayerRef.current);
+        try {
+          map.removeLayer(heatmapLayerRef.current);
+          heatmapLayerRef.current = null;
+        } catch (error) {
+          console.error('Error cleaning up heatmap layer:', error);
+        }
       }
     };
   }, [map, data, isTransitioning]);
