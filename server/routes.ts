@@ -142,9 +142,26 @@ export function registerRoutes(app: Express) {
         return res.status(500).json({ error: 'Failed to fetch map data - no data returned' });
       }
 
-      // Add real-time stats
+      // Add real-time stats and location data
       const stats = getLiveStats();
       mapData.totalListeners = stats.activeListeners;
+
+      // Update locations with real-time data
+      Object.keys(mapData.countries).forEach(countryCode => {
+        if (stats.listenersByCountry[countryCode]) {
+          const activeLocations = Array.from(clients.values())
+            .filter(client => client.isPlaying && client.countryCode === countryCode && client.coordinates)
+            .map(client => [client.coordinates!.lat, client.coordinates!.lng] as [number, number]);
+
+          mapData.countries[countryCode].locations = [
+            ...mapData.countries[countryCode].locations,
+            ...activeLocations
+          ];
+
+          // Update listener counts
+          mapData.countries[countryCode].listenerCount = stats.listenersByCountry[countryCode];
+        }
+      });
 
       console.log('Map data response size:', JSON.stringify(mapData).length);
       res.json(mapData);

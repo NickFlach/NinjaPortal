@@ -6,6 +6,7 @@ export interface LiveStats {
   geotaggedListeners: number;
   anonymousListeners: number;
   listenersByCountry: Record<string, number>;
+  locations: Array<[number, number]>;
 }
 
 let clients = new Map<WebSocket, ClientInfo>();
@@ -21,11 +22,16 @@ export function setClients(newClients: Map<WebSocket, ClientInfo>) {
 export function getLiveStats(): LiveStats {
   const activePlayers = Array.from(clients.values()).filter(info => info.isPlaying);
   const geotagged = activePlayers.filter(info => info.coordinates).length;
-  
+
   const countryStats: Record<string, number> = {};
+  const locations: Array<[number, number]> = [];
+
   activePlayers.forEach(player => {
     if (player.countryCode) {
       countryStats[player.countryCode] = (countryStats[player.countryCode] || 0) + 1;
+    }
+    if (player.coordinates) {
+      locations.push([player.coordinates.lat, player.coordinates.lng]);
     }
   });
 
@@ -33,7 +39,8 @@ export function getLiveStats(): LiveStats {
     activeListeners: activePlayers.length,
     geotaggedListeners: geotagged,
     anonymousListeners: activePlayers.length - geotagged,
-    listenersByCountry: countryStats
+    listenersByCountry: countryStats,
+    locations
   };
 }
 
