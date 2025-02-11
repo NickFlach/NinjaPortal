@@ -8,11 +8,21 @@ interface TourStep {
   messageId: string;
 }
 
+const wisdomQuotes = [
+  "Music is the harmony of the universe made audible.",
+  "The journey of a thousand songs begins with a single note.",
+  "Like a river, music flows through all lands and connects all souls.",
+  "In silence, find rhythm. In rhythm, find wisdom.",
+  "The greatest master is also the greatest student of music.",
+  "Let your heart be like a bamboo flute, hollow and ready to make music.",
+];
+
 export function NinjaTour() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
+  const [currentQuote, setCurrentQuote] = useState(0);
   const controls = useAnimation();
-  const { isPlaying, currentSong, audioContext, audioAnalyser } = useMusicPlayer();
+  const { isPlaying, currentSong } = useMusicPlayer();
   const intl = useIntl();
   const animationFrameRef = useRef(0);
   const [freqData, setFreqData] = useState<Uint8Array | null>(null);
@@ -32,29 +42,6 @@ export function NinjaTour() {
     }
   ];
 
-  // Beat detection
-  useEffect(() => {
-    if (isPlaying && audioAnalyser) {
-      const dataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
-
-      const analyzeBeat = () => {
-        audioAnalyser.getByteFrequencyData(dataArray);
-        setFreqData(dataArray);
-        animationFrameRef.current = requestAnimationFrame(analyzeBeat);
-      };
-
-      analyzeBeat();
-
-      return () => {
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-        }
-      };
-    } else {
-      setFreqData(null);
-    }
-  }, [isPlaying, audioAnalyser]);
-
   // Auto-advance tour steps
   useEffect(() => {
     if (currentStep < tourSteps.length - 1) {
@@ -65,15 +52,23 @@ export function NinjaTour() {
     }
   }, [currentStep]);
 
+  // Rotate wisdom quotes
+  useEffect(() => {
+    const quoteInterval = setInterval(() => {
+      setCurrentQuote(prev => (prev + 1) % wisdomQuotes.length);
+    }, 8000); // Change quote every 8 seconds
+
+    return () => clearInterval(quoteInterval);
+  }, []);
+
   if (!isVisible) return null;
 
   return (
     <AnimatePresence>
-      {/* Position the ninja at the top of the page */}
       <motion.div
         className="fixed top-20 left-0 right-0 z-50 pointer-events-none"
         style={{
-          height: 'auto', // Allow content to determine height
+          height: 'auto',
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'center',
@@ -220,9 +215,21 @@ export function NinjaTour() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <p className="text-sm">
+            <p className="text-sm mb-2">
               {intl.formatMessage({ id: tourSteps[currentStep].messageId })}
             </p>
+
+            {/* Ancient wisdom quote */}
+            <motion.p
+              className="text-xs italic text-muted-foreground mt-2 border-t border-border pt-2"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              key={currentQuote} // Trigger animation on quote change
+              transition={{ duration: 0.5 }}
+            >
+              "{wisdomQuotes[currentQuote]}"
+            </motion.p>
+
             {currentStep === tourSteps.length - 1 && (
               <motion.button
                 className="mt-2 text-xs text-primary hover:text-primary/80"
