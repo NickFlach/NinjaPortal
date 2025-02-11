@@ -242,5 +242,6 @@ export async function incrementListenCount(id: number, countryCode: string, coor
       
       // Log success
       console.log(`Location data recorded for song ${id} in ${countryCode}`);
-    });
+    }
+  });
 }
