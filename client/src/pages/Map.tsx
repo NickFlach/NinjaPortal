@@ -86,6 +86,11 @@ const MapPage: FC = () => {
     }
   }, []);
 
+  const handleVisualizationOptionsChange = (newOptions: VisualizationOptions) => {
+    console.log('Updating visualization options:', newOptions);
+    setVisualizationOptions(newOptions);
+  };
+
   return (
     <Layout>
       <div className="container mx-auto py-6">
@@ -150,7 +155,7 @@ const MapPage: FC = () => {
                 <GpsVisualizationToolkit
                   data={heatmapData}
                   userPath={userCoordinates ? [userCoordinates] : undefined}
-                  onOptionChange={setVisualizationOptions}
+                  onOptionChange={handleVisualizationOptionsChange}
                 />
               </MapContainer>
             )}

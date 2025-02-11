@@ -166,11 +166,11 @@ export const MarkerLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => 
           key={`marker-${index}`}
           center={[lat, lng]}
           pathOptions={{ 
-            color: '#3b82f6',
-            fillColor: '#3b82f6',
+            color: options.pathColor, //Corrected to use options from parent
+            fillColor: options.pathColor, //Corrected to use options from parent
             fillOpacity: 0.6
           }}
-          radius={6}
+          radius={options.markerSize} //Corrected to use options from parent
         />
       ))}
     </>
