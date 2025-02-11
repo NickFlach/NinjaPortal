@@ -1,5 +1,5 @@
-import { FC, useEffect, useRef, useState, useMemo } from "react";
-import { MapContainer, TileLayer, useMap } from "react-leaflet";
+import { FC, useEffect, useState, useMemo } from "react";
+import { MapContainer, TileLayer } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
@@ -10,6 +10,7 @@ import { useAccount } from 'wagmi';
 import { Layout } from "@/components/Layout";
 import { useIntl } from "react-intl";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
+import { GpsVisualizationToolkit, MarkerLayer, PathLayer, HeatmapLayer } from "@/components/GpsVisualizationToolkit";
 
 // Define types for our map data
 interface MapData {
@@ -23,79 +24,26 @@ interface MapData {
   totalListeners: number;
 }
 
-// HeatmapLayer component
-const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
-  const map = useMap();
-  const heatmapLayerRef = useRef<L.Layer | null>(null);
-
-  useEffect(() => {
-    if (!map || !data.length) {
-      if (heatmapLayerRef.current) {
-        map.removeLayer(heatmapLayerRef.current);
-        heatmapLayerRef.current = null;
-      }
-      return;
-    }
-
-    console.log('Creating heatmap with data points:', data.length);
-
-    try {
-      // Remove existing layer
-      if (heatmapLayerRef.current) {
-        map.removeLayer(heatmapLayerRef.current);
-      }
-
-      // Convert coordinates to heatmap points with intensity
-      const points = data.map(([lat, lng]) => {
-        return [lat, lng, 0.8] as [number, number, number]; // Increased intensity
-      });
-
-      // Create new heatmap layer with adjusted options
-      const heatLayer = (L as any).heatLayer(points, {
-        radius: 35,          // Increased radius
-        blur: 20,           // Increased blur
-        maxZoom: 10,
-        minOpacity: 0.4,    // Increased minimum opacity
-        maxOpacity: 1,      // Added maximum opacity
-        gradient: {         // Enhanced gradient
-          0.2: '#3b82f6',  // Start with blue
-          0.4: '#60a5fa',
-          0.6: '#93c5fd',
-          0.8: '#bfdbfe',
-          1.0: '#ffffff'   // End with white for intensity
-        }
-      });
-
-      // Add layer to map
-      heatLayer.addTo(map);
-      heatmapLayerRef.current = heatLayer;
-
-      console.log('Heatmap layer created and added to map');
-    } catch (error) {
-      console.error('Error creating/updating heatmap layer:', error);
-    }
-
-    // Cleanup function
-    return () => {
-      if (heatmapLayerRef.current) {
-        try {
-          map.removeLayer(heatmapLayerRef.current);
-          heatmapLayerRef.current = null;
-        } catch (error) {
-          console.error('Error cleaning up heatmap layer:', error);
-        }
-      }
-    };
-  }, [map, data]); // Only re-run if map or data changes
-
-  return null;
-};
+interface VisualizationOptions {
+  showHeatmap: boolean;
+  showMarkers: boolean;
+  showPaths: boolean;
+  markerSize: number;
+  pathColor: string;
+}
 
 const MapPage: FC = () => {
   const { address } = useAccount();
-  const { activeListeners } = useMusicPlayer();
+  const { activeListeners, userCoordinates } = useMusicPlayer();
   const intl = useIntl();
   const [mapError, setMapError] = useState<string | null>(null);
+  const [visualizationOptions, setVisualizationOptions] = useState<VisualizationOptions>({
+    showHeatmap: true,
+    showMarkers: false,
+    showPaths: false,
+    markerSize: 8,
+    pathColor: "#3b82f6"
+  });
 
   const { data: mapData, isLoading, error } = useQuery<MapData>({
     queryKey: ['/api/music/map'],
@@ -186,7 +134,24 @@ const MapPage: FC = () => {
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   className="dark-tiles"
                 />
-                <HeatmapLayer data={heatmapData} />
+
+                {visualizationOptions.showHeatmap && (
+                  <HeatmapLayer data={heatmapData} />
+                )}
+
+                {visualizationOptions.showMarkers && (
+                  <MarkerLayer data={heatmapData} />
+                )}
+
+                {visualizationOptions.showPaths && userCoordinates && (
+                  <PathLayer coordinates={[userCoordinates]} />
+                )}
+
+                <GpsVisualizationToolkit
+                  data={heatmapData}
+                  userPath={userCoordinates ? [userCoordinates] : undefined}
+                  onOptionChange={setVisualizationOptions}
+                />
               </MapContainer>
             )}
           </div>
