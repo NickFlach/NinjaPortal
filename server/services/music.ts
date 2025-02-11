@@ -228,25 +228,19 @@ export async function incrementListenCount(id: number, countryCode: string, coor
       });
 
       // Record listener location with reduced precision
-      await tx.insert(listeners)
-        .values({
-          songId: id,
-          countryCode,
-          latitude: latitude.toString(),
-          longitude: longitude.toString(),
-          timestamp: new Date()
-        });
-    } else {
-      console.log('Recording country-level location');
-      // Record just the country
-      await tx.insert(listeners)
-        .values({
-          songId: id,
-          countryCode,
-          latitude: null,
-          longitude: null,
-          timestamp: new Date()
-        });
-    }
-  });
+      const locationData = {
+        songId: id,
+        countryCode,
+        latitude: coords ? coords.lat.toString() : null,
+        longitude: coords ? coords.lng.toString() : null,
+        timestamp: new Date()
+      };
+      
+      console.log('Recording location data:', locationData);
+      
+      await tx.insert(listeners).values(locationData);
+      
+      // Log success
+      console.log(`Location data recorded for song ${id} in ${countryCode}`);
+    });
 }
