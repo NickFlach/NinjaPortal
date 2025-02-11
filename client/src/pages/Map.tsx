@@ -1,4 +1,4 @@
-import { FC, useEffect, useRef, useState } from "react";
+import { FC, useEffect, useRef, useState, useMemo } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -56,6 +56,8 @@ const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
       return;
     }
 
+    console.log('Creating heatmap with data:', data);
+
     // Convert data to heatmap points
     const points = data.map(([lat, lng]) => {
       return [lat, lng, 0.5] as [number, number, number];
@@ -93,39 +95,13 @@ const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
         return;
       }
 
-      // Safely handle DOM transitions
       try {
-        const currentHeat = (currentLayer as any)._heat;
-        if (currentHeat && currentHeat.style) {
-          currentHeat.style.transition = 'opacity 0.5s ease-in-out';
-          currentHeat.style.opacity = '0';
-        }
-
-        newLayer.addTo(map);
-        const newHeat = (newLayer as any)._heat;
-        if (newHeat && newHeat.style) {
-          newHeat.style.transition = 'opacity 0.5s ease-in-out';
-          newHeat.style.opacity = '0';
-        }
-
-        // Fade in new layer
-        setTimeout(() => {
-          if (newHeat && newHeat.style) {
-            newHeat.style.opacity = '1';
-          }
-          // Remove old layer after fade
-          if (currentLayer) {
-            map.removeLayer(currentLayer);
-          }
-          heatmapLayerRef.current = newLayer;
-          setIsTransitioning(false);
-        }, 50);
-      } catch (error) {
-        console.error('Error during layer transition:', error);
-        // Fallback to direct layer swap
         map.removeLayer(currentLayer);
         newLayer.addTo(map);
         heatmapLayerRef.current = newLayer;
+        setIsTransitioning(false);
+      } catch (error) {
+        console.error('Error updating heatmap layer:', error);
         setIsTransitioning(false);
       }
     } 
@@ -178,9 +154,17 @@ const MapPage: FC = () => {
   });
 
   // Process locations for heatmap
-  const heatmapData = mapData ? Object.values(mapData.countries).flatMap(
-    country => country.locations
-  ) : [];
+  const heatmapData = useMemo(() => {
+    if (!mapData) return [];
+
+    // Collect all locations from all countries
+    const allLocations = Object.values(mapData.countries).flatMap(
+      country => country.locations
+    );
+
+    console.log('Processing heatmap data:', allLocations);
+    return allLocations;
+  }, [mapData]);
 
   const hasNoData = !isLoading && (!mapData || activeListeners === 0);
 

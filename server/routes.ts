@@ -141,11 +141,6 @@ export function registerRoutes(app: Express) {
   }, 30000);
 
   // Map routes
-  app.get('/api/music/stats', (req, res) => {
-    const stats = getLiveStats();
-    res.json(stats);
-  });
-
   app.get('/api/music/map', async (req, res) => {
     try {
       console.log('Map data request received');
@@ -162,7 +157,7 @@ export function registerRoutes(app: Express) {
 
       // Update locations with real-time data
       Object.keys(mapData.countries).forEach(countryCode => {
-        // Only include locations for currently playing clients
+        // Get active locations for this country
         const activeLocations = Array.from(clients.values())
           .filter(client => 
             client.isPlaying && 
@@ -171,7 +166,9 @@ export function registerRoutes(app: Express) {
           )
           .map(client => [client.coordinates!.lat, client.coordinates!.lng] as [number, number]);
 
-        // Set locations directly instead of merging with existing
+        console.log(`Active locations for ${countryCode}:`, activeLocations);
+
+        // Set locations directly for each country
         mapData.countries[countryCode].locations = activeLocations;
 
         // Update listener counts
@@ -180,7 +177,7 @@ export function registerRoutes(app: Express) {
           (stats.listenersByCountry[countryCode] || 0) - activeLocations.length;
       });
 
-      console.log('Map data response size:', JSON.stringify(mapData).length);
+      console.log('Map data response:', mapData);
       res.json(mapData);
     } catch (error) {
       console.error('Error fetching map data:', error);
@@ -191,7 +188,6 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Update map data with new listener location - remove auth requirement
   app.post('/api/music/map', async (req, res) => {
     try {
       const { songId, countryCode, coordinates } = req.body;
