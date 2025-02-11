@@ -1,32 +1,98 @@
-# API Documentation
+const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+const wsUrl = `${protocol}//${window.location.host}/ws/music-sync`;
+```
 
-## Authentication
-All API endpoints require a wallet address to be passed in the `x-wallet-address` header.
+**Client Messages:**
+```typescript
+// Authentication
+{ type: 'auth', address: string }
 
-## Endpoints
+// Subscribe to song updates
+{ type: 'subscribe', songId: number }
 
-### Users
+// Sync playback status
+{ type: 'sync', songId: number, timestamp: number, playing: boolean }
 
-#### POST /api/users/register
-Registers a new user or updates an existing user's last seen timestamp.
+// Update location
+{ type: 'location_update', coordinates: { lat: number, lng: number }, countryCode: string }
+```
+
+**Server Messages:**
+```typescript
+// Stats update
+{ 
+  type: 'stats_update',
+  data: {
+    activeListeners: number,
+    geotaggedListeners: number,
+    anonymousListeners: number,
+    listenersByCountry: Record<string, number>
+  }
+}
+
+// Playback sync
+{ type: 'sync', songId: number, timestamp: number, playing: boolean }
+```
+
+## HTTP Endpoints
+
+### Music Map Data
+
+#### GET /api/music/map
+Returns geographical data about music listeners, including real-time listener counts.
 
 **Request Headers:**
-- `x-wallet-address`: Ethereum wallet address
+- `x-wallet-address`: Ethereum wallet address (optional)
+- `x-internal-token`: For landing page access (optional)
 
 **Response:**
-```json
+```typescript
 {
-  "success": true,
-  "user": {
-    "address": "string",
-    "lastSeen": "timestamp"
+  countries: {
+    [countryCode: string]: {
+      locations: [number, number][],  // [latitude, longitude] pairs
+      listenerCount: number,
+      anonCount: number     // non-geotagged plays
+    }
   },
-  "recentSongs": [...]
+  totalListeners: number    // real-time active listener count
 }
 ```
 
-### Songs
+#### POST /api/music/map
+Records a new listener location.
 
+**Request Headers:**
+- `x-wallet-address`: Ethereum wallet address (optional)
+
+**Request Body:**
+```typescript
+{
+  songId: number,
+  countryCode: string,
+  coordinates?: {
+    lat: number,
+    lng: number
+  }
+}
+```
+
+### Real-time Stats
+
+#### GET /api/music/stats
+Returns current platform statistics including active listeners.
+
+**Response:**
+```typescript
+{
+  activeListeners: number,
+  geotaggedListeners: number,
+  anonymousListeners: number,
+  listenersByCountry: Record<string, number>
+}
+```
+
+### Songs and Playlists
 #### GET /api/songs/recent
 Returns the most recently played songs.
 
@@ -68,18 +134,6 @@ Returns songs uploaded by the authenticated user.
 
 ### Music Metadata
 
-#### GET /api/music/stats
-Returns general statistics about the music platform.
-
-**Response:**
-```json
-{
-  "totalSongs": "number",
-  "totalPlays": "number",
-  "totalUsers": "number"
-}
-```
-
 #### GET /api/music/metadata/:id
 Returns metadata for a specific song.
 
@@ -96,30 +150,3 @@ Returns metadata for a specific song.
   "uploadedBy": "string",
   "createdAt": "timestamp"
 }
-```
-
-#### GET /api/music/map
-Returns geographical data about music listeners.
-
-**Response:**
-```json
-{
-  "countries": {
-    "[country_code]": {
-      "votes": "number",
-      "locations": [
-        [latitude, longitude]
-      ]
-    }
-  },
-  "totalListeners": "number"
-}
-```
-
-### Feed
-
-#### GET /api/feed.rss
-Returns an RSS feed of the latest songs.
-
-**Response:**
-Content-Type: application/rss+xml

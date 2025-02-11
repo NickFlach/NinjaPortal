@@ -5,62 +5,12 @@ import { db } from "@db";
 import { songs, users, playlists, followers, playlistSongs, recentlyPlayed, userRewards } from "@db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { incrementListenCount, getMapData } from './services/music';
+import { getLiveStats, broadcastStats, getClients, setClients } from './services/stats';
+import type { WebSocketMessage, ClientInfo } from './types/websocket';
 
 // Track connected clients and their song subscriptions
-const clients = new Map<WebSocket, {
-  address?: string;
-  currentSong?: number;
-  isPlaying?: boolean;
-}>();
-
-// Function to get active listener count
-function getActiveListenerCount(): number {
-  return Array.from(clients.values()).filter(info => info.isPlaying).length;
-}
-
-// Function to broadcast active listener count to all clients
-function broadcastListenerCount() {
-  const count = getActiveListenerCount();
-  const message = JSON.stringify({
-    type: 'listener_count',
-    count
-  });
-
-  Array.from(clients.keys()).forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      try {
-        client.send(message);
-      } catch (error) {
-        console.error('Error sending listener count:', error);
-        clients.delete(client);
-      }
-    }
-  });
-}
-
-// Function to broadcast sync message to all clients listening to a song
-function broadcastSyncMessage(sender: WebSocket, songId: number, timestamp: number, playing: boolean) {
-  const message = JSON.stringify({
-    type: 'sync',
-    timestamp,
-    playing,
-    songId
-  });
-
-  Array.from(clients.entries()).forEach(([client, info]) => {
-    if (client !== sender && 
-        info.currentSong === songId && 
-        client.readyState === WebSocket.OPEN) {
-      try {
-        client.send(message);
-      } catch (error) {
-        console.error('Error sending sync message:', error);
-        // Remove client if send fails
-        clients.delete(client);
-      }
-    }
-  });
-}
+const clients = new Map<WebSocket, ClientInfo>();
+setClients(clients);
 
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
@@ -86,7 +36,7 @@ export function registerRoutes(app: Express) {
 
     ws.on('message', async (data) => {
       try {
-        const message = JSON.parse(data.toString());
+        const message = JSON.parse(data.toString()) as WebSocketMessage;
         const clientInfo = clients.get(ws);
 
         if (!clientInfo) {
@@ -104,20 +54,47 @@ export function registerRoutes(app: Express) {
 
           case 'subscribe': {
             if (message.songId) {
-              clientInfo.currentSong = parseInt(message.songId);
+              clientInfo.currentSong = message.songId;
             }
             break;
           }
 
           case 'sync': {
             const { timestamp, playing, songId } = message;
-            // Update playing status for listener count
             clientInfo.isPlaying = playing;
             if (typeof songId === 'number') {
-              broadcastSyncMessage(ws, songId, timestamp, playing);
+              // Broadcast sync message to other listeners
+              const syncMessage = JSON.stringify({
+                type: 'sync',
+                timestamp,
+                playing,
+                songId
+              });
+
+              Array.from(clients.entries()).forEach(([client, info]) => {
+                if (client !== ws && 
+                    info.currentSong === songId && 
+                    client.readyState === WebSocket.OPEN) {
+                  try {
+                    client.send(syncMessage);
+                  } catch (error) {
+                    console.error('Error sending sync message:', error);
+                    clients.delete(client);
+                  }
+                }
+              });
             }
-            // Broadcast updated listener count
-            broadcastListenerCount();
+            // Broadcast updated stats
+            broadcastStats();
+            break;
+          }
+
+          case 'location_update': {
+            const { coordinates, countryCode } = message;
+            clientInfo.coordinates = coordinates;
+            clientInfo.countryCode = countryCode;
+            // Broadcast updated stats with new location info
+            broadcastStats();
             break;
           }
         }
@@ -129,13 +106,13 @@ export function registerRoutes(app: Express) {
     ws.on('error', (error) => {
       console.error('WebSocket error:', error);
       clients.delete(ws);
-      broadcastListenerCount();
+      broadcastStats();
     });
 
     ws.on('close', () => {
       console.log('Client disconnected');
       clients.delete(ws);
-      broadcastListenerCount();
+      broadcastStats();
     });
   });
 
@@ -146,32 +123,18 @@ export function registerRoutes(app: Express) {
         clients.delete(client);
       }
     });
+    broadcastStats();
   }, 30000);
 
   // Map routes
-  // Debug middleware for map endpoint
-  app.use('/api/music/map', (req, res, next) => {
-    console.log('Map endpoint request:', {
-      headers: req.headers,
-      method: req.method,
-      path: req.path,
-      url: req.url,
-      originalUrl: req.originalUrl
-    });
-    next();
+  app.get('/api/music/stats', (req, res) => {
+    const stats = getLiveStats();
+    res.json(stats);
   });
 
-  // Get map data endpoint
   app.get('/api/music/map', async (req, res) => {
     try {
-      console.log('Map data request received:', {
-        headers: req.headers,
-        auth: {
-          hasInternalToken: !!req.headers['x-internal-token'],
-          hasWalletAddress: !!req.headers['x-wallet-address'],
-        }
-      });
-
+      console.log('Map data request received');
       const mapData = await getMapData();
 
       if (!mapData) {
@@ -179,9 +142,9 @@ export function registerRoutes(app: Express) {
         return res.status(500).json({ error: 'Failed to fetch map data - no data returned' });
       }
 
-      // Add real-time active listener count
-      const activeListeners = getActiveListenerCount();
-      mapData.totalListeners = activeListeners;
+      // Add real-time stats
+      const stats = getLiveStats();
+      mapData.totalListeners = stats.activeListeners;
 
       console.log('Map data response size:', JSON.stringify(mapData).length);
       res.json(mapData);
