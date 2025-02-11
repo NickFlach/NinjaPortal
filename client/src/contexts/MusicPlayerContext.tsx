@@ -333,8 +333,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === 'listener_count') {
-            setActiveListeners(data.count);
+          if (data.type === 'stats_update') {
+            setActiveListeners(data.data.activeListeners);
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
@@ -343,6 +343,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
       ws.onclose = () => {
         console.log('WebSocket disconnected');
+        // Reset active listeners when disconnected
+        setActiveListeners(0);
         // Attempt to reconnect after a delay
         setTimeout(connectWebSocket, 5000);
       };
