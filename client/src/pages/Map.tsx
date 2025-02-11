@@ -44,6 +44,7 @@ declare module 'leaflet' {
 const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
   const map = useMap();
   const heatmapLayerRef = useRef<L.Layer | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
     if (!map || !data.length) return;
@@ -53,18 +54,23 @@ const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
       return [lat, lng, 0.5] as [number, number, number]; // intensity of 0.5 for each point
     });
 
-    // Remove existing heatmap layer if it exists
-    if (heatmapLayerRef.current) {
-      map.removeLayer(heatmapLayerRef.current);
-    }
+    // If we already have a layer, update it with animation
+    if (heatmapLayerRef.current && !isTransitioning) {
+      setIsTransitioning(true);
 
-    // Create new heatmap layer
-    try {
-      heatmapLayerRef.current = L.heatLayer(points, {
+      // Fade out current layer
+      const currentLayer = heatmapLayerRef.current as any;
+      if (currentLayer._heat) {
+        currentLayer._heat.style.transition = 'opacity 0.5s ease-in-out';
+        currentLayer._heat.style.opacity = '0';
+      }
+
+      // Create new layer with fade in
+      const newLayer = L.heatLayer(points, {
         radius: 25,
         blur: 15,
         maxZoom: 10,
-        minOpacity: 0.3,
+        minOpacity: 0,
         gradient: {
           0.4: '#3b82f6',
           0.6: '#60a5fa',
@@ -72,8 +78,46 @@ const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
           1.0: '#bfdbfe'
         }
       }).addTo(map);
-    } catch (error) {
-      console.error('Error creating heatmap layer:', error);
+
+      // Add transition style to new layer
+      if ((newLayer as any)._heat) {
+        (newLayer as any)._heat.style.transition = 'opacity 0.5s ease-in-out';
+        (newLayer as any)._heat.style.opacity = '0';
+      }
+
+      // Fade in new layer after a short delay
+      setTimeout(() => {
+        if ((newLayer as any)._heat) {
+          (newLayer as any)._heat.style.opacity = '1';
+        }
+        // Remove old layer after fade out
+        if (heatmapLayerRef.current) {
+          map.removeLayer(heatmapLayerRef.current);
+        }
+        heatmapLayerRef.current = newLayer;
+        setIsTransitioning(false);
+      }, 50);
+
+    } else if (!heatmapLayerRef.current) {
+      // Initial layer creation
+      try {
+        const newLayer = L.heatLayer(points, {
+          radius: 25,
+          blur: 15,
+          maxZoom: 10,
+          minOpacity: 0.3,
+          gradient: {
+            0.4: '#3b82f6',
+            0.6: '#60a5fa',
+            0.8: '#93c5fd',
+            1.0: '#bfdbfe'
+          }
+        }).addTo(map);
+
+        heatmapLayerRef.current = newLayer;
+      } catch (error) {
+        console.error('Error creating heatmap layer:', error);
+      }
     }
 
     return () => {
@@ -81,7 +125,7 @@ const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
         map.removeLayer(heatmapLayerRef.current);
       }
     };
-  }, [map, data]);
+  }, [map, data, isTransitioning]);
 
   return null;
 };
@@ -96,7 +140,7 @@ const MapPage: FC = () => {
     queryKey: ['/api/music/map'],
     refetchInterval: 15000,
     queryFn: async () => {
-      const headers: Record<string, string> = address 
+      const headers: Record<string, string> = address
         ? { 'x-wallet-address': address }
         : { 'x-internal-token': 'landing-page' };
 
