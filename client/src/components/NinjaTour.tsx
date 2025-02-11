@@ -69,15 +69,15 @@ export function NinjaTour() {
 
   return (
     <AnimatePresence>
-      {/* Position the ninja in the MusicVisualizer section */}
+      {/* Position the ninja at the top of the page */}
       <motion.div
-        className="absolute inset-0 pointer-events-none"
+        className="fixed top-20 left-0 right-0 z-50 pointer-events-none"
         style={{
-          top: '64px', // Header height
-          height: '30vh', // MusicVisualizer height
+          height: 'auto', // Allow content to determine height
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           justifyContent: 'center',
+          paddingTop: '1rem',
         }}
       >
         <motion.div
