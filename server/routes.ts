@@ -62,6 +62,13 @@ export function registerRoutes(app: Express) {
           case 'sync': {
             const { timestamp, playing, songId } = message;
             clientInfo.isPlaying = playing;
+
+            // Clear location data if playback stops
+            if (!playing) {
+              clientInfo.coordinates = undefined;
+              clientInfo.countryCode = undefined;
+            }
+
             if (typeof songId === 'number') {
               // Broadcast sync message to other listeners
               const syncMessage = JSON.stringify({
@@ -148,19 +155,22 @@ export function registerRoutes(app: Express) {
 
       // Update locations with real-time data
       Object.keys(mapData.countries).forEach(countryCode => {
-        if (stats.listenersByCountry[countryCode]) {
-          const activeLocations = Array.from(clients.values())
-            .filter(client => client.isPlaying && client.countryCode === countryCode && client.coordinates)
-            .map(client => [client.coordinates!.lat, client.coordinates!.lng] as [number, number]);
+        // Only include locations for currently playing clients
+        const activeLocations = Array.from(clients.values())
+          .filter(client => 
+            client.isPlaying && 
+            client.countryCode === countryCode && 
+            client.coordinates
+          )
+          .map(client => [client.coordinates!.lat, client.coordinates!.lng] as [number, number]);
 
-          mapData.countries[countryCode].locations = [
-            ...mapData.countries[countryCode].locations,
-            ...activeLocations
-          ];
+        // Set locations directly instead of merging with existing
+        mapData.countries[countryCode].locations = activeLocations;
 
-          // Update listener counts
-          mapData.countries[countryCode].listenerCount = stats.listenersByCountry[countryCode];
-        }
+        // Update listener counts
+        mapData.countries[countryCode].listenerCount = stats.listenersByCountry[countryCode] || 0;
+        mapData.countries[countryCode].anonCount = 
+          (stats.listenersByCountry[countryCode] || 0) - activeLocations.length;
       });
 
       console.log('Map data response size:', JSON.stringify(mapData).length);
@@ -174,7 +184,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Update map data with new listener location
+  // Update map data with new listener location - remove auth requirement
   app.post('/api/music/map', async (req, res) => {
     try {
       const { songId, countryCode, coordinates } = req.body;
