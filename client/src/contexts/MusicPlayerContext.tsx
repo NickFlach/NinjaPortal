@@ -30,6 +30,7 @@ interface MusicPlayerContextType {
   currentContext: PlaylistContext;
   audioRef: React.RefObject<HTMLAudioElement>;
   userCoordinates?: Coordinates;
+  activeListeners: number;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -39,8 +40,10 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentContext, setCurrentContext] = useState<PlaylistContext>('landing');
   const [userCoordinates, setUserCoordinates] = useState<Coordinates>();
+  const [activeListeners, setActiveListeners] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
   const { address: userAddress } = useAccount();
   const defaultWallet = "REDACTED_WALLET_ADDRESS";
   const landingAddress = userAddress || defaultWallet;
@@ -303,8 +306,74 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       if (audioRef.current) {
         audioRef.current.pause();
       }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
     };
   }, []);
+
+  // Initialize WebSocket connection
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/music-sync`;
+
+    const connectWebSocket = () => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        if (userAddress) {
+          ws.send(JSON.stringify({ type: 'auth', address: userAddress }));
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'listener_count') {
+            setActiveListeners(data.count);
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        // Attempt to reconnect after a delay
+        setTimeout(connectWebSocket, 5000);
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [userAddress]);
+
+  // Send playing status updates through WebSocket
+  useEffect(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN && currentSong) {
+      wsRef.current.send(JSON.stringify({
+        type: 'sync',
+        songId: currentSong.id,
+        playing: isPlaying,
+        timestamp: audioRef.current?.currentTime || 0
+      }));
+    }
+  }, [isPlaying, currentSong]);
+
 
   return (
     <MusicPlayerContext.Provider
@@ -317,7 +386,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         isLandingPage,
         currentContext,
         audioRef,
-        userCoordinates
+        userCoordinates,
+        activeListeners
       }}
     >
       {children}

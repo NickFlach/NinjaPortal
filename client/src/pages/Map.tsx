@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAccount } from 'wagmi';
 import { Layout } from "@/components/Layout";
 import { useIntl } from "react-intl";
+import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 
 // Define types for our map data
 interface MapData {
@@ -87,6 +88,7 @@ const HeatmapLayer: FC<{ data: Array<[number, number]> }> = ({ data }) => {
 
 const MapPage: FC = () => {
   const { address } = useAccount();
+  const { activeListeners } = useMusicPlayer();
   const intl = useIntl();
   const [mapError, setMapError] = useState<string | null>(null);
 
@@ -113,7 +115,7 @@ const MapPage: FC = () => {
     country => country.locations
   ) : [];
 
-  const hasNoData = !isLoading && (!mapData || mapData.totalListeners === 0);
+  const hasNoData = !isLoading && (!mapData || activeListeners === 0);
 
   // Catch any errors from leaflet.heat initialization
   useEffect(() => {
@@ -141,14 +143,12 @@ const MapPage: FC = () => {
             {intl.formatMessage({ id: 'map.noData' })}
           </div>
         ) : (
-          mapData && (
-            <div className="text-sm text-muted-foreground mb-4">
-              {intl.formatMessage(
-                { id: 'map.totalListeners' },
-                { count: mapData.totalListeners }
-              )}
-            </div>
-          )
+          <div className="text-sm text-muted-foreground mb-4">
+            {intl.formatMessage(
+              { id: 'map.totalListeners' },
+              { count: activeListeners }
+            )}
+          </div>
         )}
 
         <Card className="p-4 bg-background">

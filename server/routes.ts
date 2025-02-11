@@ -10,7 +10,33 @@ import { incrementListenCount, getMapData } from './services/music';
 const clients = new Map<WebSocket, {
   address?: string;
   currentSong?: number;
+  isPlaying?: boolean;
 }>();
+
+// Function to get active listener count
+function getActiveListenerCount(): number {
+  return Array.from(clients.values()).filter(info => info.isPlaying).length;
+}
+
+// Function to broadcast active listener count to all clients
+function broadcastListenerCount() {
+  const count = getActiveListenerCount();
+  const message = JSON.stringify({
+    type: 'listener_count',
+    count
+  });
+
+  Array.from(clients.keys()).forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      try {
+        client.send(message);
+      } catch (error) {
+        console.error('Error sending listener count:', error);
+        clients.delete(client);
+      }
+    }
+  });
+}
 
 // Function to broadcast sync message to all clients listening to a song
 function broadcastSyncMessage(sender: WebSocket, songId: number, timestamp: number, playing: boolean) {
@@ -85,9 +111,13 @@ export function registerRoutes(app: Express) {
 
           case 'sync': {
             const { timestamp, playing, songId } = message;
+            // Update playing status for listener count
+            clientInfo.isPlaying = playing;
             if (typeof songId === 'number') {
               broadcastSyncMessage(ws, songId, timestamp, playing);
             }
+            // Broadcast updated listener count
+            broadcastListenerCount();
             break;
           }
         }
@@ -99,11 +129,13 @@ export function registerRoutes(app: Express) {
     ws.on('error', (error) => {
       console.error('WebSocket error:', error);
       clients.delete(ws);
+      broadcastListenerCount();
     });
 
     ws.on('close', () => {
       console.log('Client disconnected');
       clients.delete(ws);
+      broadcastListenerCount();
     });
   });
 
@@ -146,6 +178,10 @@ export function registerRoutes(app: Express) {
         console.error('Map data is null or undefined');
         return res.status(500).json({ error: 'Failed to fetch map data - no data returned' });
       }
+
+      // Add real-time active listener count
+      const activeListeners = getActiveListenerCount();
+      mapData.totalListeners = activeListeners;
 
       console.log('Map data response size:', JSON.stringify(mapData).length);
       res.json(mapData);
