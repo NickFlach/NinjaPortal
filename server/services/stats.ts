@@ -31,17 +31,21 @@ export function getLiveStats(): LiveStats {
       countryStats[player.countryCode] = (countryStats[player.countryCode] || 0) + 1;
     }
     if (player.coordinates) {
+      console.log('Adding location to stats:', player.coordinates);
       locations.push([player.coordinates.lat, player.coordinates.lng]);
     }
   });
 
-  return {
+  const stats = {
     activeListeners: activePlayers.length,
     geotaggedListeners: geotagged,
     anonymousListeners: activePlayers.length - geotagged,
     listenersByCountry: countryStats,
     locations
   };
+
+  console.log('Generated stats:', stats);
+  return stats;
 }
 
 export function broadcastStats() {

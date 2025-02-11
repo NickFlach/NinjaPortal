@@ -98,10 +98,17 @@ export function registerRoutes(app: Express) {
 
           case 'location_update': {
             const { coordinates, countryCode } = message;
-            clientInfo.coordinates = coordinates;
-            clientInfo.countryCode = countryCode;
-            // Broadcast updated stats with new location info
-            broadcastStats();
+            console.log('Received location update:', { coordinates, countryCode });
+
+            if (coordinates && countryCode) {
+              clientInfo.coordinates = coordinates;
+              clientInfo.countryCode = countryCode;
+              console.log('Updated client info:', clientInfo);
+              // Broadcast updated stats with new location info
+              broadcastStats();
+            } else {
+              console.log('Invalid location update - missing coordinates or country code');
+            }
             break;
           }
         }

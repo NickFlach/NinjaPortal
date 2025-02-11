@@ -68,6 +68,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const requestGeolocation = async () => {
     if (!geolocationPermissionAsked.current && 'geolocation' in navigator) {
       geolocationPermissionAsked.current = true;
+      console.log('Requesting geolocation permission...');
       try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -75,6 +76,11 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
             timeout: 5000,
             maximumAge: 0
           });
+        });
+
+        console.log('Geolocation obtained:', {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
         });
 
         setUserCoordinates({
@@ -86,6 +92,12 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       }
     }
   };
+
+  // Initialize geolocation on component mount
+  useEffect(() => {
+    console.log('Initializing geolocation...');
+    requestGeolocation();
+  }, []);
 
   // Fetch landing page feed (recent songs)
   const { data: recentSongs } = useQuery<Song[]>({
@@ -210,7 +222,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
             ...(userAddress && { 'X-Wallet-Address': userAddress })
           },
           body: JSON.stringify(userCoordinates ? {
-            coords: userCoordinates
+            latitude: userCoordinates.lat,
+            longitude: userCoordinates.lng
           } : {})
         });
       } catch (error) {
@@ -375,8 +388,9 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         timestamp: audioRef.current?.currentTime || 0
       }));
 
-      // Only send location updates if music is playing
+      // Only send location updates if music is playing and we have coordinates
       if (isPlaying && userCoordinates) {
+        console.log('Sending location update:', userCoordinates);
         // Get country code using the Google Maps Geocoding API
         fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${userCoordinates.lat},${userCoordinates.lng}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`)
           .then(response => response.json())
@@ -386,6 +400,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
             );
 
             if (countryComponent && wsRef.current?.readyState === WebSocket.OPEN) {
+              console.log('Sending WebSocket location update with country:', countryComponent.short_name);
               wsRef.current.send(JSON.stringify({
                 type: 'location_update',
                 coordinates: userCoordinates,
@@ -400,9 +415,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [isPlaying, currentSong, userCoordinates]);
 
-  useEffect(() => {
-    requestGeolocation();
-  }, []);
 
 
   return (
