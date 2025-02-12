@@ -24,25 +24,22 @@ export function Layout({ children }: LayoutProps) {
   const { locale, setLocale } = useLocale();
 
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen flex flex-col">
       {/* Background layer */}
       <div className="fixed inset-0 bg-background/95" />
 
-      {/* Ninja Tour */}
-      <NinjaTour />
-
       {/* Content layers */}
       <header className="relative z-50 border-b bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto py-4 flex items-center justify-between">
+        <div className="container mx-auto py-2 md:py-4 px-4 flex items-center justify-between">
           <div className="flex items-center">
             <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+              <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
                 {intl.formatMessage({ id: 'app.title' })}
               </h1>
             </Link>
             <Navigation />
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
@@ -74,12 +71,24 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </header>
 
-      <main className="relative z-10 container mx-auto pt-24 pb-24">
-        {children}
+      <main className="relative z-10 flex-grow overflow-x-hidden">
+        <div className="container mx-auto pt-16 md:pt-24 pb-32 px-4">
+          {children}
+        </div>
       </main>
 
-      {/* Floating Music Player */}
-      <MusicPlayer />
+      {/* Fixed position elements */}
+      <div className="fixed bottom-0 left-0 right-0 z-50">
+        <div className="container mx-auto px-4 pb-4">
+          {/* Ninja Tour */}
+          <div className="mb-4">
+            <NinjaTour />
+          </div>
+
+          {/* Music Player */}
+          <MusicPlayer />
+        </div>
+      </div>
     </div>
   );
 }

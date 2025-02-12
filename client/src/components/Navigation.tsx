@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { Map, Flag } from "lucide-react";
+import { Map } from "lucide-react";
 import { useCallback } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAccount } from "wagmi";
@@ -107,7 +107,7 @@ export function Navigation() {
           className="text-sm transition-colors hover:text-primary flex items-center gap-2"
           title="Visit Pitchforks"
         >
-          <Flag className="h-4 w-4 animate-pulse" />
+          <span className="text-xl animate-pulse">☠️</span>
         </a>
       )}
     </nav>
