@@ -34,7 +34,7 @@ interface VisualizationOptions {
 
 const MapPage: FC = () => {
   const { address } = useAccount();
-  const { activeListeners, userCoordinates, isPlaying } = useMusicPlayer();
+  const { activeListeners, userCoordinates, isSynced } = useMusicPlayer();
   const intl = useIntl();
   const [mapError, setMapError] = useState<string | null>(null);
   const [visualizationOptions, setVisualizationOptions] = useState<VisualizationOptions>({
@@ -65,10 +65,10 @@ const MapPage: FC = () => {
 
   // Process locations for heatmap and markers
   const locationData = useMemo(() => {
-    if (!mapData?.allLocations || !isPlaying) return [];
+    if (!mapData?.allLocations || !isSynced) return [];
     console.log('Processing location data, total locations:', mapData.allLocations.length);
     return mapData.allLocations;
-  }, [mapData, isPlaying]);
+  }, [mapData, isSynced]);
 
   const hasNoData = !isLoading && (!mapData || activeListeners === 0);
 
@@ -93,7 +93,7 @@ const MapPage: FC = () => {
         </h1>
 
         <div className="text-sm text-muted-foreground mb-4">
-          {!isPlaying ? (
+          {!isSynced ? (
             intl.formatMessage({ id: 'map.noActivity' })
           ) : error ? (
             <span className="text-red-500">
@@ -136,30 +136,28 @@ const MapPage: FC = () => {
                   <div className="bg-background/95 backdrop-blur-sm rounded-lg shadow-lg">
                     {/* Custom zoom controls */}
                     <div className="leaflet-control-zoom leaflet-bar">
-                      <a 
+                      <button 
                         className="leaflet-control-zoom-in"
-                        href="#"
                         title="Zoom in"
-                        role="button"
                         aria-label="Zoom in"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          const map = document.querySelector('.leaflet-container')?.__leaflet_map__;
-                          if (map) map.zoomIn();
+                        onClick={() => {
+                          const map = document.querySelector('.leaflet-container') as HTMLElement;
+                          if (map && (map as any)._leaflet_map) {
+                            (map as any)._leaflet_map.zoomIn();
+                          }
                         }}
-                      >+</a>
-                      <a 
+                      >+</button>
+                      <button 
                         className="leaflet-control-zoom-out"
-                        href="#"
                         title="Zoom out"
-                        role="button"
                         aria-label="Zoom out"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          const map = document.querySelector('.leaflet-container')?.__leaflet_map__;
-                          if (map) map.zoomOut();
+                        onClick={() => {
+                          const map = document.querySelector('.leaflet-container') as HTMLElement;
+                          if (map && (map as any)._leaflet_map) {
+                            (map as any)._leaflet_map.zoomOut();
+                          }
                         }}
-                      >−</a>
+                      >−</button>
                     </div>
                   </div>
                 </div>
@@ -170,7 +168,7 @@ const MapPage: FC = () => {
                   className="dark-tiles"
                 />
 
-                {isPlaying && (
+                {isSynced && (
                   <>
                     {visualizationOptions.showHeatmap && (
                       <HeatmapLayer data={locationData} />
