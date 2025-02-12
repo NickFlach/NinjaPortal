@@ -1,17 +1,19 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { Map } from "lucide-react";
+import { Map, Flag } from "lucide-react";
 import { useCallback } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAccount } from "wagmi";
 import { useToast } from "@/hooks/use-toast";
 import { useIntl } from "react-intl";
+import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 
 export function Navigation() {
   const [location, setLocation] = useLocation();
   const { address } = useAccount();
   const { toast } = useToast();
   const intl = useIntl();
+  const { isPlaying } = useMusicPlayer();
 
   const requestLocation = useCallback(async (e: React.MouseEvent) => {
     // Check if we already have location permission
@@ -95,6 +97,19 @@ export function Navigation() {
           {label}
         </Link>
       ))}
+
+      {/* Pirate flag for sync status */}
+      {isPlaying && (
+        <a
+          href="https://app.pitchforks.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm transition-colors hover:text-primary flex items-center gap-2"
+          title="Visit Pitchforks"
+        >
+          <Flag className="h-4 w-4 animate-pulse" />
+        </a>
+      )}
     </nav>
   );
 }
