@@ -13,7 +13,7 @@ export function Navigation() {
   const { address } = useAccount();
   const { toast } = useToast();
   const intl = useIntl();
-  const { isPlaying } = useMusicPlayer();
+  const { isSynced } = useMusicPlayer();
 
   const requestLocation = useCallback(async (e: React.MouseEvent) => {
     // Check if we already have location permission
@@ -99,7 +99,7 @@ export function Navigation() {
       ))}
 
       {/* Pirate flag for sync status */}
-      {isPlaying && (
+      {isSynced && (
         <a
           href="https://app.pitchforks.com"
           target="_blank"

@@ -31,6 +31,7 @@ interface MusicPlayerContextType {
   audioRef: React.RefObject<HTMLAudioElement>;
   userCoordinates?: Coordinates;
   activeListeners: number;
+  isSynced: boolean; // Add this new property
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -50,6 +51,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const isLandingPage = !userAddress;
   const audioContextRef = useRef<AudioContext>();
   const geolocationPermissionAsked = useRef(false);
+  const [isSynced, setIsSynced] = useState(false);
 
   // Initialize audio element
   useEffect(() => {
@@ -338,6 +340,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
       ws.onopen = () => {
         console.log('WebSocket connected');
+        setIsSynced(true);
         if (userAddress) {
           ws.send(JSON.stringify({ type: 'auth', address: userAddress }));
         }
@@ -356,9 +359,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
       ws.onclose = () => {
         console.log('WebSocket disconnected');
-        // Reset active listeners when disconnected
+        setIsSynced(false);
         setActiveListeners(0);
-        // Attempt to reconnect after a delay
         setTimeout(connectWebSocket, 5000);
       };
 
@@ -373,6 +375,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
+        setIsSynced(false);
       }
     };
   }, [userAddress]);
@@ -413,7 +416,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         currentContext,
         audioRef,
         userCoordinates,
-        activeListeners
+        activeListeners,
+        isSynced // Add this to the context value
       }}
     >
       {children}
