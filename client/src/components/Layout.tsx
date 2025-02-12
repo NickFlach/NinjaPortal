@@ -42,8 +42,8 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center gap-2 md:gap-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
                   className="hover:bg-accent"
                 >
@@ -56,7 +56,7 @@ export function Layout({ children }: LayoutProps) {
                   <DropdownMenuItem
                     key={code}
                     onClick={() => {
-                      console.log('Setting locale to:', code); 
+                      console.log('Setting locale to:', code);
                       setLocale(code as keyof typeof messages);
                     }}
                     className={locale === code ? 'bg-accent' : ''}
@@ -79,14 +79,16 @@ export function Layout({ children }: LayoutProps) {
 
       {/* Fixed position elements */}
       <div className="fixed bottom-0 left-0 right-0 z-50">
-        <div className="container mx-auto px-4 pb-4">
+        <div className="container mx-auto px-2 pb-2 md:px-4 md:pb-4">
           {/* Ninja Tour */}
-          <div className="mb-4">
+          <div className="mb-2 md:mb-4">
             <NinjaTour />
           </div>
 
           {/* Music Player */}
-          <MusicPlayer />
+          <div className="text-sm md:text-base">
+            <MusicPlayer />
+          </div>
         </div>
       </div>
     </div>

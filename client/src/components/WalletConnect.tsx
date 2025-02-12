@@ -15,9 +15,6 @@ export function WalletConnect() {
   const [, setLocation] = useLocation();
   const intl = useIntl();
 
-  // Check if the device is mobile
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
   const registerUser = async (userAddress: string) => {
     try {
       console.log('Checking user registration:', userAddress);
@@ -44,49 +41,17 @@ export function WalletConnect() {
 
   const handleConnect = async () => {
     try {
-      // Check if we're on mobile
-      if (isMobile) {
-        if (typeof window.ethereum !== 'undefined') {
-          await connect({ connector: injected() });
-        } else {
-          // For Opera mobile browser, check if it's Opera first
-          if (isOperaWallet()) {
-            toast({
-              title: intl.formatMessage({ id: 'app.network.opera' }),
-              description: intl.formatMessage({ id: 'app.network.opera' }),
-            });
-            return;
-          }
-          // Otherwise redirect to MetaMask app
-          const metamaskAppDeepLink = 'https://metamask.app.link/dapp/' + window.location.host;
-          window.location.href = metamaskAppDeepLink;
-          toast({
-            title: intl.formatMessage({ id: 'app.network.setup' }),
-            description: intl.formatMessage({ id: 'app.network.configuring' }),
-          });
-          return;
-        }
-      } else {
-        // Desktop flow
-        if (typeof window.ethereum === 'undefined') {
-          if (isOperaWallet()) {
-            toast({
-              title: intl.formatMessage({ id: 'app.network.warning' }),
-              description: intl.formatMessage({ id: 'app.network.switch' }),
-              variant: "destructive",
-            });
-          } else {
-            window.open('https://metamask.io/download/', '_blank');
-            toast({
-              title: intl.formatMessage({ id: 'app.errors.wallet' }),
-              description: intl.formatMessage({ id: 'app.errors.wallet' }),
-              variant: "destructive",
-            });
-          }
-          return;
-        }
-
+      // Always try to connect using injected provider first
+      if (typeof window.ethereum !== 'undefined') {
         await connect({ connector: injected() });
+      } else {
+        // If no wallet is available, show instructions
+        toast({
+          title: intl.formatMessage({ id: 'app.network.setup' }),
+          description: intl.formatMessage({ id: 'app.network.install' }),
+          variant: "destructive",
+        });
+        return;
       }
 
       // Initial delay to allow wallet connection to settle
@@ -198,17 +163,24 @@ export function WalletConnect() {
   };
 
   return (
-    <div>
+    <div className="flex items-center">
       {!address ? (
-        <Button onClick={handleConnect}>
+        <Button 
+          onClick={handleConnect}
+          className="truncate max-w-[120px] md:max-w-none text-sm"
+        >
           {intl.formatMessage({ id: 'app.connect' })}
         </Button>
       ) : (
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs md:text-sm text-muted-foreground truncate max-w-[60px] md:max-w-[80px]">
             {address?.slice(0, 6)}...{address?.slice(-4)}
           </span>
-          <Button variant="outline" onClick={handleDisconnect}>
+          <Button 
+            variant="outline" 
+            onClick={handleDisconnect}
+            className="text-xs md:text-sm px-2 md:px-3"
+          >
             {intl.formatMessage({ id: 'app.disconnect' })}
           </Button>
         </div>
