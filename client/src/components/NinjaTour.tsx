@@ -9,11 +9,29 @@ interface TourStep {
 }
 
 const wisdomQuotes = [
+  // Original music-focused quotes
   "Music is the harmony of the universe made audible.",
   "The journey of a thousand songs begins with a single note.",
-  "Like a river, music flows through all lands and connects all souls.",
+  // Lao Tzu
+  "Music in the heart can be heard by the universe.",
+  "Silence is a source of great strength, but music is the voice of the soul.",
+  // Sun Tzu adaptations
+  "In music, as in war, victory belongs to those who listen carefully.",
+  "The supreme art of creation is to compose without conflict.",
+  // Miyamoto Musashi adaptations
+  "Do nothing that is of no use - in music and in life.",
+  "Like the way of the sword, the way of music requires dedication to master.",
+  // Einstein
+  "I often think in music. I live my daydreams in music.",
+  "If I were not a physicist, I would probably be a musician.",
+  // Leonardo da Vinci adaptations
+  "Art and music are the windows to one's soul.",
+  "Learn to listen as nature listens - in perfect harmony.",
+  // Bansenshukai wisdom
+  "Like a ninja in shadows, true music moves silently through hearts.",
+  "As the bamboo bends with wind, let your rhythm flow with time.",
+  // Additional ninja-themed quotes
   "In silence, find rhythm. In rhythm, find wisdom.",
-  "The greatest master is also the greatest student of music.",
   "Let your heart be like a bamboo flute, hollow and ready to make music.",
 ];
 
@@ -205,8 +223,8 @@ export function NinjaTour() {
 
           <motion.div
             className="absolute left-full ml-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg shadow-lg pointer-events-auto"
-            style={{ 
-              width: "max-content", 
+            style={{
+              width: "max-content",
               maxWidth: "300px",
               top: "50%",
               transform: "translateY(-50%)"
