@@ -101,7 +101,7 @@ export function Navigation() {
       {/* Pirate flag for sync status */}
       {isSynced && (
         <a
-          href="https://app.pitchforks.com"
+          href="https://app.pitchforks.social"
           target="_blank"
           rel="noopener noreferrer"
           className="text-sm transition-colors hover:text-primary flex items-center gap-2"
