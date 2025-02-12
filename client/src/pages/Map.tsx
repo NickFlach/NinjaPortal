@@ -87,39 +87,38 @@ const MapPage: FC = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto py-6">
-        <h1 className="text-4xl font-bold mb-6">
+      <div className="container mx-auto p-4 md:py-6 max-w-full">
+        <h1 className="text-2xl md:text-4xl font-bold mb-4">
           {intl.formatMessage({ id: 'map.title' })}
         </h1>
 
-        {!isPlaying ? (
-          <div className="text-sm text-muted-foreground mb-4">
-            {intl.formatMessage({ id: 'map.noActivity' })}
-          </div>
-        ) : error ? (
-          <div className="text-red-500 mb-4">
-            {intl.formatMessage(
-              { id: 'map.error' },
-              { error: (error as Error).message }
-            )}
-          </div>
-        ) : hasNoData ? (
-          <div className="text-sm text-muted-foreground mb-4">
-            {intl.formatMessage({ id: 'map.noData' })}
-          </div>
-        ) : (
-          <div className="text-sm text-muted-foreground mb-4">
-            {intl.formatMessage(
+        <div className="text-sm text-muted-foreground mb-4">
+          {!isPlaying ? (
+            intl.formatMessage({ id: 'map.noActivity' })
+          ) : error ? (
+            <span className="text-red-500">
+              {intl.formatMessage(
+                { id: 'map.error' },
+                { error: (error as Error).message }
+              )}
+            </span>
+          ) : hasNoData ? (
+            intl.formatMessage({ id: 'map.noData' })
+          ) : (
+            intl.formatMessage(
               { id: 'map.totalListeners' },
               { count: activeListeners }
-            )}
-          </div>
-        )}
+            )
+          )}
+        </div>
 
-        <Card className="p-4 bg-background">
-          <div className="relative w-full rounded-lg overflow-hidden" style={{ height: '600px' }}>
+        <Card className="p-2 md:p-4 bg-background">
+          <div 
+            className="relative w-full rounded-lg overflow-hidden"
+            style={{ height: 'calc(100vh - 200px)' }}
+          >
             {mapError ? (
-              <div className="absolute inset-0 flex items-center justify-center text-red-500">
+              <div className="absolute inset-0 flex items-center justify-center text-red-500 p-4 text-center">
                 {mapError}
               </div>
             ) : (
@@ -131,7 +130,40 @@ const MapPage: FC = () => {
                 maxZoom={7}
                 maxBounds={[[-90, -180], [90, 180]]}
                 className="z-0"
+                zoomControl={false} // Disable default zoom control
               >
+                <div className="absolute top-2 right-2 z-[1000]">
+                  <div className="bg-background/95 backdrop-blur-sm rounded-lg shadow-lg">
+                    {/* Custom zoom controls */}
+                    <div className="leaflet-control-zoom leaflet-bar">
+                      <a 
+                        className="leaflet-control-zoom-in"
+                        href="#"
+                        title="Zoom in"
+                        role="button"
+                        aria-label="Zoom in"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const map = document.querySelector('.leaflet-container')?.__leaflet_map__;
+                          if (map) map.zoomIn();
+                        }}
+                      >+</a>
+                      <a 
+                        className="leaflet-control-zoom-out"
+                        href="#"
+                        title="Zoom out"
+                        role="button"
+                        aria-label="Zoom out"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const map = document.querySelector('.leaflet-container')?.__leaflet_map__;
+                          if (map) map.zoomOut();
+                        }}
+                      >−</a>
+                    </div>
+                  </div>
+                </div>
+
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

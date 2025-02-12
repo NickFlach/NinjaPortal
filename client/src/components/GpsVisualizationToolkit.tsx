@@ -156,13 +156,13 @@ export const GpsVisualizationToolkit: FC<Props> = ({
   };
 
   return (
-    <div className="absolute bottom-4 left-4 z-[400]">
+    <div className="absolute bottom-4 left-0 right-0 mx-auto px-4 z-[400] md:left-4 md:right-auto md:px-0 max-w-[90vw] md:max-w-[300px]">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <Card className="p-4 space-y-4 bg-background/95 backdrop-blur-sm">
+        <Card className="p-4 space-y-3 bg-background/95 backdrop-blur-sm shadow-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Settings2 className="w-4 h-4" />
@@ -170,32 +170,32 @@ export const GpsVisualizationToolkit: FC<Props> = ({
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="show-heatmap" className="text-sm">Heatmap</Label>
               <Switch
                 id="show-heatmap"
                 checked={options.showHeatmap}
                 onCheckedChange={(checked) => handleOptionChange('showHeatmap', checked)}
               />
-              <Label htmlFor="show-heatmap">Heatmap</Label>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="show-markers" className="text-sm">Activity Markers</Label>
               <Switch
                 id="show-markers"
                 checked={options.showMarkers}
                 onCheckedChange={(checked) => handleOptionChange('showMarkers', checked)}
               />
-              <Label htmlFor="show-markers">Activity Markers</Label>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="show-paths" className="text-sm">User Paths</Label>
               <Switch
                 id="show-paths"
                 checked={options.showPaths}
                 onCheckedChange={(checked) => handleOptionChange('showPaths', checked)}
               />
-              <Label htmlFor="show-paths">User Paths</Label>
             </div>
           </div>
         </Card>
