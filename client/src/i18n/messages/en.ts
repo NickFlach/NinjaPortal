@@ -20,12 +20,13 @@ export default {
   'app.upload.started': 'Upload Started',
   'app.upload.progress': 'Uploading your song to IPFS...',
   'app.upload.success': 'Song uploaded successfully!',
-  'app.network.setup': 'Network Setup',
+  'app.network.setup': 'Connect Your Wallet',
   'app.network.configuring': 'Configuring NEO X network...',
   'app.network.opera': 'Please approve the network setup in Opera Wallet...',
   'app.network.warning': 'Network Warning',
   'app.network.switch': 'Please approve the network switch in Opera Wallet',
   'app.network.connect': 'Please make sure you\'re connected to the NEO X network',
+  'app.network.install': 'Please install MetaMask or another Web3 wallet to connect',
   'app.disconnect.success': 'Wallet disconnected successfully!',
   'app.disconnect.error': 'Failed to disconnect wallet',
   // Tour messages
@@ -38,8 +39,6 @@ export default {
   'map.noActivity': 'No Activity',
   'map.noData': 'No listener data available yet. Play some music to see activity on the map!',
   'map.totalListeners': '{count} Active Listeners Worldwide',
-  'map.loading': 'Loading map...',
-  'map.loadingData': 'Loading data...',
   'map.error': 'Error loading map data: {error}',
   'map.tooltipDetail': '{country}: {total} {total, plural, one {Listener} other {Listeners}} ({percentage}%) - {geotagged} geotagged, {anonymous} anonymous',
   // Map location messages
