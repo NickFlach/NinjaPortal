@@ -79,7 +79,8 @@ export function Navigation() {
 
   return (
     <nav className="flex items-center gap-6 ml-8">
-      {links.map(({ href, label, onClick }) => (
+      {/* Only show map link if we're not on the map page */}
+      {location !== '/map' && links.map(({ href, label, onClick }) => (
         <Link
           key={href}
           href={href}
