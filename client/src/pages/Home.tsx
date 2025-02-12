@@ -14,6 +14,7 @@ import { Upload, Library, Loader2 } from "lucide-react";
 import { uploadToIPFS } from "@/lib/ipfs";
 import { EditSongDialog } from "@/components/EditSongDialog";
 import { useIntl } from 'react-intl';
+import { NeoStorage } from "@/components/NeoStorage";
 
 interface Song {
   id: number;
@@ -213,62 +214,67 @@ export default function Home() {
 
         <div className="flex-1 grid grid-cols-1 gap-6 mb-24 relative z-10">
           {address ? (
-            <section className="px-4">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-semibold">
-                  {intl.formatMessage({ id: 'app.library' })}
-                </h2>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center text-muted-foreground">
-                    <Library className="mr-2 h-4 w-4" />
-                    {librarySongs?.length || 0} {intl.formatMessage({ id: 'app.songs' })}
-                  </div>
-                  <Input
-                    type="file"
-                    accept=".mp3,audio/mpeg"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="song-upload"
-                    disabled={uploadMutation.isPending}
-                  />
-                  <label htmlFor="song-upload">
-                    <Button variant="outline" asChild disabled={uploadMutation.isPending}>
-                      <span>
-                        {uploadMutation.isPending ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            {intl.formatMessage({ id: 'app.upload.progress' })}
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="mr-2 h-4 w-4" />
-                            {intl.formatMessage({ id: 'app.upload' })}
-                          </>
-                        )}
-                      </span>
-                    </Button>
-                  </label>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {libraryLoading ? (
-                  <p className="text-muted-foreground">Loading your library...</p>
-                ) : librarySongs?.length === 0 ? (
-                  <p className="text-muted-foreground">No songs in your library yet</p>
-                ) : (
-                  librarySongs?.map((song) => (
-                    <SongCard
-                      key={song.id}
-                      song={song}
-                      onClick={() => handlePlaySong(song, 'library')}
-                      showDelete={true}
-                      isPlaying={currentSong?.id === song.id}
+            <>
+              <section className="px-4 mb-6">
+                <NeoStorage />
+              </section>
+              <section className="px-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-semibold">
+                    {intl.formatMessage({ id: 'app.library' })}
+                  </h2>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center text-muted-foreground">
+                      <Library className="mr-2 h-4 w-4" />
+                      {librarySongs?.length || 0} {intl.formatMessage({ id: 'app.songs' })}
+                    </div>
+                    <Input
+                      type="file"
+                      accept=".mp3,audio/mpeg"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="song-upload"
+                      disabled={uploadMutation.isPending}
                     />
-                  ))
-                )}
-              </div>
-            </section>
+                    <label htmlFor="song-upload">
+                      <Button variant="outline" asChild disabled={uploadMutation.isPending}>
+                        <span>
+                          {uploadMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              {intl.formatMessage({ id: 'app.upload.progress' })}
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="mr-2 h-4 w-4" />
+                              {intl.formatMessage({ id: 'app.upload' })}
+                            </>
+                          )}
+                        </span>
+                      </Button>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {libraryLoading ? (
+                    <p className="text-muted-foreground">Loading your library...</p>
+                  ) : librarySongs?.length === 0 ? (
+                    <p className="text-muted-foreground">No songs in your library yet</p>
+                  ) : (
+                    librarySongs?.map((song) => (
+                      <SongCard
+                        key={song.id}
+                        song={song}
+                        onClick={() => handlePlaySong(song, 'library')}
+                        showDelete={true}
+                        isPlaying={currentSong?.id === song.id}
+                      />
+                    ))
+                  )}
+                </div>
+              </section>
+            </>
           ) : null}
 
           <section className="px-4">

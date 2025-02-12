@@ -7,6 +7,7 @@ import { eq, desc, and } from "drizzle-orm";
 import { incrementListenCount, getMapData } from './services/music';
 import { getLiveStats, broadcastStats, getClients, setClients } from './services/stats';
 import type { WebSocketMessage, ClientInfo } from './types/websocket';
+import neoStorageRouter from './routes/neo-storage';
 
 // Track connected clients and their song subscriptions
 const clients = new Map<WebSocket, ClientInfo>();
@@ -28,6 +29,9 @@ export function registerRoutes(app: Express) {
       cb(true);
     }
   });
+
+  // Mount Neo storage routes
+  app.use('/api/neo-storage', neoStorageRouter);
 
   // WebSocket connection handling
   wss.on('connection', (ws) => {

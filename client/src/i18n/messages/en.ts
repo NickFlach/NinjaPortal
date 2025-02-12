@@ -44,4 +44,12 @@ export default {
   // Map location messages
   'map.location.error.title': 'Location Access',
   'map.location.error.description': 'Unable to access your location. You can still use the map, but your plays won\'t be geotagged.',
+  // Neo Storage messages
+  'storage.title': 'Neo FS Storage',
+  'storage.upload': 'Upload to Neo FS',
+  'storage.uploading': 'Uploading...',
+  'storage.noFiles': 'No files stored in Neo FS yet',
+  'storage.success': 'File uploaded successfully to Neo FS',
+  'storage.error': 'Failed to upload file',
+  'storage.download.error': 'Failed to download file',
 } as const;

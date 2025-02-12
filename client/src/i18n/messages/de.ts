@@ -33,5 +33,13 @@ export default {
   'tour.welcome': 'Willkommen bei Ninja-Portal! Ich bin dein Guide.',
   'tour.connect': 'Verbinde dein Wallet, um Musik zu entdecken.',
   'tour.upload': 'Lade deine Lieblingsmusik hoch und teile sie mit der Welt!',
-  'tour.gotIt': 'Verstanden!'
+  'tour.gotIt': 'Verstanden!',
+  // Neo Storage messages
+  'storage.title': 'Neo FS Speicher',
+  'storage.upload': 'Auf Neo FS hochladen',
+  'storage.uploading': 'Wird hochgeladen...',
+  'storage.noFiles': 'Noch keine Dateien in Neo FS gespeichert',
+  'storage.success': 'Datei erfolgreich auf Neo FS hochgeladen',
+  'storage.error': 'Fehler beim Hochladen der Datei',
+  'storage.download.error': 'Fehler beim Herunterladen der Datei',
 } as const;
