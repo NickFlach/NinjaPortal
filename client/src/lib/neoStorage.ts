@@ -32,8 +32,14 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
   // Don't set Content-Type, let the browser set it with the boundary
   headers.append('X-Wallet-Address', address);
 
+  // Calculate timeout based on file size: minimum 30s, plus 1s per MB
+  const timeoutDuration = Math.max(30000, file.size / (1024 * 1024) * 1000);
+
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+  const timeoutId = setTimeout(() => {
+    console.log(`Upload timed out after ${timeoutDuration/1000}s`);
+    controller.abort();
+  }, timeoutDuration);
 
   const MAX_RETRIES = 3;
   let attempt = 0;
@@ -73,7 +79,7 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
       console.error(`Upload attempt ${attempt + 1} failed:`, error);
 
       if (error.name === 'AbortError') {
-        throw new Error("Upload timed out. Please try again with a smaller file or check your connection.");
+        throw new Error(`Upload timed out after ${timeoutDuration/1000} seconds. Please try again with a smaller file or check your connection.`);
       }
 
       // Network error or other fetch error
@@ -86,7 +92,9 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
       // If we've exhausted our retries or it's a different error, rethrow
       throw error;
     } finally {
-      clearTimeout(timeoutId);
+      if (attempt === MAX_RETRIES - 1 || !error) {
+        clearTimeout(timeoutId);
+      }
     }
   }
 
