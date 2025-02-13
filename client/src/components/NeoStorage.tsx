@@ -37,13 +37,13 @@ export function NeoStorage() {
       setUploadLoading(true);
       console.log('Starting file upload:', {
         name: file.name,
-        size: file.size,
+        size: `${(file.size / (1024 * 1024)).toFixed(2)}MB`,
         type: file.type,
         address: address
       });
 
       const result = await uploadToNeoFS(file, address);
-      console.log('Upload result:', result);
+      console.log('Upload completed successfully:', result);
 
       queryClient.invalidateQueries({ queryKey: [`/api/neo-storage/files/${address}`] });
       toast({
@@ -56,10 +56,23 @@ export function NeoStorage() {
         e.target.value = '';
       }
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('Upload error details:', error);
+
+      // Handle specific error types
+      let errorMessage = error instanceof Error ? error.message : intl.formatMessage({ id: 'storage.error' });
+
+      // Check for timeout or network errors
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Upload timed out. Please try again with a smaller file.';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error occurred. Please check your connection and try again.';
+        }
+      }
+
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : intl.formatMessage({ id: 'storage.error' }),
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -72,6 +85,7 @@ export function NeoStorage() {
     if (!address) return;
 
     try {
+      console.log('Starting file download:', file.name);
       const blob = await downloadNeoFSFile(file.id, address);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -81,7 +95,9 @@ export function NeoStorage() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      console.log('Download completed successfully');
     } catch (error) {
+      console.error('Download error:', error);
       toast({
         title: "Error",
         description: intl.formatMessage({ id: 'storage.download.error' }),

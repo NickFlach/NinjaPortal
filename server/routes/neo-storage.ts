@@ -32,7 +32,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
     console.log('Received file upload request:', {
       filename: req.file.originalname,
-      size: req.file.size,
+      size: `${(req.file.size / (1024 * 1024)).toFixed(2)}MB`,
       mimetype: req.file.mimetype,
       address: address
     });
@@ -42,19 +42,34 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     formData.append('file', new Blob([req.file.buffer], { type: req.file.mimetype }), req.file.originalname);
     formData.append('wallet', address);
 
+    console.log('Sending request to Neo FS...');
+
     // Upload to Neo FS with reduced timeout and retries
     const response = await axios.post(`${NEO_FS_API}/upload`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-      timeout: 10000, // Reduced to 10 second timeout
+      timeout: 10000, // 10 second timeout
       maxContentLength: 10 * 1024 * 1024, // 10MB limit
       maxBodyLength: 10 * 1024 * 1024, // 10MB limit
+      validateStatus: null, // Don't throw on any status
       retry: 3,
       retryDelay: (retryCount) => {
         return retryCount * 1000; // exponential backoff
       }
     });
+
+    console.log('Neo FS response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+      data: response.data
+    });
+
+    if (!response.data || response.status !== 200) {
+      console.error('Neo FS error response:', response.data);
+      throw new Error(response.data?.error || 'Failed to upload to Neo FS');
+    }
 
     const fileData = {
       id: response.data.id,
@@ -69,6 +84,11 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     res.json(fileData);
   } catch (error: any) {
     console.error('Neo FS upload error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      response: error.response?.data
+    });
 
     if (error.code === 'ECONNABORTED') {
       return res.status(504).json({ error: 'Upload timed out. Please try again with a smaller file.' });
@@ -94,16 +114,37 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 router.get('/files/:address', async (req, res) => {
   try {
     const { address } = req.params;
+    console.log('Fetching files for wallet:', address);
+
     const response = await axios.get(`${NEO_FS_API}/files/${address}`, {
       timeout: 10000, // 10 second timeout for listing
+      validateStatus: null, // Don't throw on any status
       retry: 3,
       retryDelay: (retryCount) => {
         return retryCount * 1000;
       }
     });
+
+    console.log('Neo FS list response:', {
+      status: response.status,
+      statusText: response.statusText,
+      dataLength: Array.isArray(response.data) ? response.data.length : 'not an array'
+    });
+
+    if (!response.data || response.status !== 200) {
+      console.error('Neo FS list error:', response.data);
+      throw new Error(response.data?.error || 'Failed to list files from Neo FS');
+    }
+
     res.json(response.data);
   } catch (error: any) {
     console.error('Neo FS list error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      response: error.response?.data
+    });
+
     if (error.code === 'ECONNABORTED') {
       return res.status(504).json({ error: 'Request timed out. Please try again.' });
     }
@@ -118,15 +159,23 @@ router.get('/files/:address', async (req, res) => {
 router.get('/download/:address/:fileId', async (req, res) => {
   try {
     const { address, fileId } = req.params;
+    console.log('Downloading file:', { address, fileId });
+
     const response = await axios.get(`${NEO_FS_API}/download/${fileId}`, {
       responseType: 'stream',
       params: { wallet: address },
       timeout: 15000, // 15 second timeout for downloads
+      validateStatus: null, // Don't throw on any status
       retry: 3,
       retryDelay: (retryCount) => {
         return retryCount * 1000;
       }
     });
+
+    if (!response.data || response.status !== 200) {
+      console.error('Neo FS download error:', response.data);
+      throw new Error(response.data?.error || 'Failed to download from Neo FS');
+    }
 
     res.setHeader('Content-Type', response.headers['content-type']);
     res.setHeader('Content-Disposition', response.headers['content-disposition']);
@@ -134,6 +183,12 @@ router.get('/download/:address/:fileId', async (req, res) => {
     response.data.pipe(res);
   } catch (error: any) {
     console.error('Neo FS download error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      response: error.response?.data
+    });
+
     if (error.code === 'ECONNABORTED') {
       return res.status(504).json({ error: 'Download timed out. Please try again.' });
     }
