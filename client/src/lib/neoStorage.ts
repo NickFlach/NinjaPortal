@@ -30,10 +30,7 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
 
   console.log('Uploading file to Neo FS:', {
     name: file.name,
-    size: {
-      mb: fileSizeMB,
-      bytes: file.size
-    },
+    size: `${fileSizeMB.toFixed(2)}MB`,
     type: file.type,
     address: address
   });

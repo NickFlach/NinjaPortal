@@ -43,10 +43,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const fileSizeMB = req.file.size / (1024 * 1024);
     console.log('Received file upload request:', {
       filename: req.file.originalname,
-      size: {
-        mb: fileSizeMB,
-        bytes: req.file.size
-      },
+      size: `${fileSizeMB.toFixed(2)}MB`,
       mimetype: req.file.mimetype,
       address: address
     });
