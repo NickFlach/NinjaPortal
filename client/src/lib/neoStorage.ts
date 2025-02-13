@@ -11,9 +11,9 @@ export interface NeoFSFile {
 
 export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSFile> {
   // Validate file size before upload
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // Reduced to 5MB limit for better reliability
   if (file.size > MAX_FILE_SIZE) {
-    throw new Error(`File size must be less than 10MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
+    throw new Error(`File size must be less than 5MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
   }
 
   // Create FormData and append file and address
@@ -33,13 +33,14 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
   headers.append('X-Wallet-Address', address);
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
   const MAX_RETRIES = 3;
   let attempt = 0;
 
   while (attempt < MAX_RETRIES) {
     try {
+      console.log(`Upload attempt ${attempt + 1} of ${MAX_RETRIES}`);
       const response = await fetch('/api/neo-storage/upload', {
         method: 'POST',
         body: formData,
@@ -65,7 +66,9 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
         throw new Error(error || "Failed to upload file to Neo FS");
       }
 
-      return response.json();
+      const result = await response.json();
+      console.log('Upload successful:', result);
+      return result;
     } catch (error: any) {
       console.error(`Upload attempt ${attempt + 1} failed:`, error);
 
@@ -82,6 +85,8 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
 
       // If we've exhausted our retries or it's a different error, rethrow
       throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -94,11 +99,14 @@ export async function listNeoFSFiles(address: string): Promise<NeoFSFile[]> {
 
   while (attempt < MAX_RETRIES) {
     try {
+      console.log(`List files attempt ${attempt + 1} of ${MAX_RETRIES}`);
       const response = await apiRequest("GET", `/api/neo-storage/files/${address}`);
       if (!response.ok) {
         throw new Error("Failed to fetch Neo FS files");
       }
-      return response.json();
+      const result = await response.json();
+      console.log('Files retrieved successfully:', result.length);
+      return result;
     } catch (error) {
       console.error(`List files attempt ${attempt + 1} failed:`, error);
       if (attempt < MAX_RETRIES - 1) {
@@ -118,11 +126,14 @@ export async function downloadNeoFSFile(fileId: string, address: string): Promis
 
   while (attempt < MAX_RETRIES) {
     try {
+      console.log(`Download attempt ${attempt + 1} of ${MAX_RETRIES}`);
       const response = await apiRequest("GET", `/api/neo-storage/download/${address}/${fileId}`);
       if (!response.ok) {
         throw new Error("Failed to download file from Neo FS");
       }
-      return response.blob();
+      const blob = await response.blob();
+      console.log('Download successful, blob size:', blob.size);
+      return blob;
     } catch (error) {
       console.error(`Download attempt ${attempt + 1} failed:`, error);
       if (attempt < MAX_RETRIES - 1) {

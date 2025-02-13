@@ -42,15 +42,15 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     formData.append('file', new Blob([req.file.buffer], { type: req.file.mimetype }), req.file.originalname);
     formData.append('wallet', address);
 
-    // Upload to Neo FS with timeout
+    // Upload to Neo FS with reduced timeout and retries
     const response = await axios.post(`${NEO_FS_API}/upload`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-      timeout: 15000, // 15 second timeout - reduced from 30s
+      timeout: 10000, // Reduced to 10 second timeout
       maxContentLength: 10 * 1024 * 1024, // 10MB limit
       maxBodyLength: 10 * 1024 * 1024, // 10MB limit
-      retry: 3, // Enable retries
+      retry: 3,
       retryDelay: (retryCount) => {
         return retryCount * 1000; // exponential backoff
       }
