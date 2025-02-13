@@ -12,6 +12,12 @@ export interface NeoFSFile {
 }
 
 export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSFile> {
+  // Validate file size before upload
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error(`File size must be less than 5MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
+  }
+
   // Create FormData and append file and address
   const formData = new FormData();
   formData.append('file', file, file.name); // Include filename
@@ -50,7 +56,7 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
     }
 
     return response.json();
-  } catch (error) {
+  } catch (error: any) {
     if (error.name === 'AbortError') {
       throw new Error("Upload timed out. Please try again with a smaller file or check your connection.");
     }
