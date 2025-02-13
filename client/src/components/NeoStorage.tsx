@@ -24,7 +24,7 @@ export function NeoStorage() {
   // Handle file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) {
+    if (!file || !address) {
       toast({
         title: "Error",
         description: intl.formatMessage({ id: 'app.errors.upload' }),
@@ -39,9 +39,10 @@ export function NeoStorage() {
         name: file.name,
         size: file.size,
         type: file.type,
+        address: address
       });
 
-      const result = await uploadToNeoFS(file, address!);
+      const result = await uploadToNeoFS(file, address);
       console.log('Upload result:', result);
 
       queryClient.invalidateQueries({ queryKey: [`/api/neo-storage/files/${address}`] });

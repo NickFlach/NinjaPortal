@@ -1,7 +1,5 @@
 import { apiRequest } from "./queryClient";
 
-const NEO_FS_API = "https://fs.neo.org";
-
 export interface NeoFSFile {
   id: string;
   name: string;
@@ -21,7 +19,6 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
   // Create FormData and append file and address
   const formData = new FormData();
   formData.append('file', file, file.name); // Include filename
-  formData.append('wallet', address); // Changed from 'address' to 'wallet' to match Neo FS API
 
   console.log('Uploading file to Neo FS:', {
     name: file.name,

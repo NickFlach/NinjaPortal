@@ -23,9 +23,11 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file provided' });
     }
 
-    const { address } = req.body;
+    // Get wallet address from header
+    const address = req.headers['x-wallet-address'] as string;
     if (!address) {
-      return res.status(400).json({ error: 'No address provided' });
+      console.error('No wallet address in headers:', req.headers);
+      return res.status(400).json({ error: 'No wallet address provided' });
     }
 
     console.log('Received file upload request:', {
