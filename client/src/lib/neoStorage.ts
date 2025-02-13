@@ -18,13 +18,22 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
     throw new Error(`File size must be less than 10MB. Your file is ${fileSizeMB.toFixed(2)}MB`);
   }
 
+  // Validate file type
+  const validMimeTypes = ['audio/mpeg', 'audio/mp3'];
+  if (!validMimeTypes.includes(file.type)) {
+    throw new Error('Please select an MP3 file. Other audio formats are not supported.');
+  }
+
   // Create FormData and append file and address
   const formData = new FormData();
   formData.append('file', file, file.name);
 
   console.log('Uploading file to Neo FS:', {
     name: file.name,
-    size: `${fileSizeMB.toFixed(2)}MB (${file.size} bytes)`,
+    size: {
+      mb: fileSizeMB,
+      bytes: file.size
+    },
     type: file.type,
     address: address
   });

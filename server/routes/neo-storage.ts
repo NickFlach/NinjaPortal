@@ -5,11 +5,21 @@ import { db } from '@db';
 import { eq } from 'drizzle-orm';
 
 const router = Router();
-// Configure multer with proper field name matching the frontend
+
+// Configure multer with proper field name and file type validation
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Check file type
+    const validMimeTypes = ['audio/mpeg', 'audio/mp3'];
+    if (!validMimeTypes.includes(file.mimetype)) {
+      cb(new Error('Please select an MP3 file. Other audio formats are not supported.'));
+      return;
+    }
+    cb(null, true);
   }
 });
 
@@ -33,7 +43,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const fileSizeMB = req.file.size / (1024 * 1024);
     console.log('Received file upload request:', {
       filename: req.file.originalname,
-      size: `${fileSizeMB.toFixed(2)}MB (${req.file.size} bytes)`,
+      size: {
+        mb: fileSizeMB,
+        bytes: req.file.size
+      },
       mimetype: req.file.mimetype,
       address: address
     });
