@@ -11,29 +11,32 @@ export interface NeoFSFile {
 
 export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSFile> {
   // Validate file size before upload
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+  const fileSizeMB = file.size / (1024 * 1024);
+
   if (file.size > MAX_FILE_SIZE) {
-    throw new Error(`File size must be less than 10MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
+    throw new Error(`File size must be less than 10MB. Your file is ${fileSizeMB.toFixed(2)}MB`);
   }
 
   // Create FormData and append file and address
   const formData = new FormData();
-  formData.append('file', file, file.name); // Include filename
+  formData.append('file', file, file.name);
 
   console.log('Uploading file to Neo FS:', {
     name: file.name,
-    size: file.size,
+    size: `${fileSizeMB.toFixed(2)}MB (${file.size} bytes)`,
     type: file.type,
     address: address
   });
 
   // Custom headers for FormData
   const headers = new Headers();
-  // Don't set Content-Type, let the browser set it with the boundary
   headers.append('X-Wallet-Address', address);
 
-  // Calculate timeout based on file size: minimum 30s, plus 1s per MB
-  const timeoutDuration = Math.max(30000, file.size / (1024 * 1024) * 1000);
+  // Calculate timeout based on file size: base timeout plus additional time per MB
+  const BASE_TIMEOUT = 30000; // 30 seconds base timeout
+  const TIMEOUT_PER_MB = 2000; // 2 seconds per MB
+  const timeoutDuration = BASE_TIMEOUT + (fileSizeMB * TIMEOUT_PER_MB);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
@@ -43,6 +46,7 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
 
   const MAX_RETRIES = 3;
   let attempt = 0;
+  let lastError = null;
 
   while (attempt < MAX_RETRIES) {
     try {
@@ -74,11 +78,14 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
 
       const result = await response.json();
       console.log('Upload successful:', result);
+      clearTimeout(timeoutId); // Clear timeout on success
       return result;
     } catch (error: any) {
       console.error(`Upload attempt ${attempt + 1} failed:`, error);
+      lastError = error;
 
       if (error.name === 'AbortError') {
+        clearTimeout(timeoutId);
         throw new Error(`Upload timed out after ${timeoutDuration/1000} seconds. Please try again with a smaller file or check your connection.`);
       }
 
@@ -89,16 +96,14 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
         continue;
       }
 
-      // If we've exhausted our retries or it's a different error, rethrow
+      // If we've exhausted our retries or it's a different error, clean up and rethrow
+      clearTimeout(timeoutId);
       throw error;
-    } finally {
-      if (attempt === MAX_RETRIES - 1 || !error) {
-        clearTimeout(timeoutId);
-      }
     }
   }
 
-  throw new Error("Failed to upload file after multiple attempts. Please try again later.");
+  clearTimeout(timeoutId); // Ensure timeout is cleared
+  throw lastError || new Error("Failed to upload file after multiple attempts. Please try again later.");
 }
 
 export async function listNeoFSFiles(address: string): Promise<NeoFSFile[]> {

@@ -30,9 +30,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No wallet address provided' });
     }
 
+    const fileSizeMB = req.file.size / (1024 * 1024);
     console.log('Received file upload request:', {
       filename: req.file.originalname,
-      size: `${(req.file.size / (1024 * 1024)).toFixed(2)}MB`,
+      size: `${fileSizeMB.toFixed(2)}MB (${req.file.size} bytes)`,
       mimetype: req.file.mimetype,
       address: address
     });
@@ -44,12 +45,17 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
     console.log('Sending request to Neo FS...');
 
-    // Upload to Neo FS with reduced timeout and retries
+    // Calculate timeout based on file size
+    const BASE_TIMEOUT = 30000; // 30 seconds base timeout
+    const TIMEOUT_PER_MB = 2000; // 2 seconds per MB
+    const timeoutDuration = BASE_TIMEOUT + (fileSizeMB * TIMEOUT_PER_MB);
+
+    // Upload to Neo FS with dynamic timeout and retries
     const response = await axios.post(`${NEO_FS_API}/upload`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-      timeout: 10000, // 10 second timeout
+      timeout: timeoutDuration,
       maxContentLength: 10 * 1024 * 1024, // 10MB limit
       maxBodyLength: 10 * 1024 * 1024, // 10MB limit
       validateStatus: null, // Don't throw on any status
