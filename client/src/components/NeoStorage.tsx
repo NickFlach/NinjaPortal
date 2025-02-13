@@ -21,36 +21,46 @@ export function NeoStorage() {
     enabled: !!address,
   });
 
-  // Upload mutation
-  const uploadMutation = useMutation({
-    mutationFn: async (file: File) => {
-      if (!address) throw new Error("Please connect your wallet");
-      return uploadToNeoFS(file, address);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/neo-storage/files/${address}`] });
-      toast({
-        title: "Success",
-        description: "File uploaded successfully to Neo FS",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   // Handle file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      toast({
+        title: "Error",
+        description: intl.formatMessage({ id: 'app.errors.upload' }),
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setUploadLoading(true);
-      await uploadMutation.mutateAsync(file);
+      console.log('Starting file upload:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      });
+
+      const result = await uploadToNeoFS(file, address!);
+      console.log('Upload result:', result);
+
+      queryClient.invalidateQueries({ queryKey: [`/api/neo-storage/files/${address}`] });
+      toast({
+        title: "Success",
+        description: intl.formatMessage({ id: 'storage.success' }),
+      });
+
+      // Clear the input
+      if (e.target) {
+        e.target.value = '';
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : intl.formatMessage({ id: 'storage.error' }),
+        variant: "destructive",
+      });
     } finally {
       setUploadLoading(false);
     }
@@ -73,7 +83,7 @@ export function NeoStorage() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to download file",
+        description: intl.formatMessage({ id: 'storage.download.error' }),
         variant: "destructive",
       });
     }
@@ -84,31 +94,33 @@ export function NeoStorage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold">Neo FS Storage</h2>
-        <Input
-          type="file"
-          onChange={handleFileUpload}
-          className="hidden"
-          id="neo-fs-upload"
-          disabled={uploadLoading}
-        />
-        <label htmlFor="neo-fs-upload">
-          <Button variant="outline" asChild disabled={uploadLoading}>
-            <span>
-              {uploadLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload to Neo FS
-                </>
-              )}
-            </span>
-          </Button>
-        </label>
+        <h2 className="text-2xl font-semibold">{intl.formatMessage({ id: 'storage.title' })}</h2>
+        <div className="flex items-center gap-4">
+          <Input
+            type="file"
+            onChange={handleFileUpload}
+            className="hidden"
+            id="neo-fs-upload"
+            disabled={uploadLoading}
+          />
+          <label htmlFor="neo-fs-upload">
+            <Button variant="outline" asChild disabled={uploadLoading}>
+              <span>
+                {uploadLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {intl.formatMessage({ id: 'storage.uploading' })}
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    {intl.formatMessage({ id: 'storage.upload' })}
+                  </>
+                )}
+              </span>
+            </Button>
+          </label>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -118,7 +130,7 @@ export function NeoStorage() {
           </div>
         ) : files.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
-            No files stored in Neo FS yet
+            {intl.formatMessage({ id: 'storage.noFiles' })}
           </p>
         ) : (
           <div className="grid gap-4">

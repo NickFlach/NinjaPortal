@@ -14,7 +14,7 @@ export interface NeoFSFile {
 export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSFile> {
   // Create FormData and append file and address
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', file, file.name); // Include filename
   formData.append('address', address);
 
   console.log('Uploading file to Neo FS:', {
@@ -24,11 +24,23 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
     address: address
   });
 
-  const response = await apiRequest("POST", "/api/neo-storage/upload", formData);
+  // Custom headers for FormData
+  const headers = new Headers();
+  // Don't set Content-Type, let the browser set it with the boundary
+  headers.append('X-Wallet-Address', address);
+
+  const response = await fetch('/api/neo-storage/upload', {
+    method: 'POST',
+    body: formData,
+    headers,
+  });
+
   if (!response.ok) {
     const error = await response.text();
+    console.error('Upload error:', error);
     throw new Error(error || "Failed to upload file to Neo FS");
   }
+
   return response.json();
 }
 
