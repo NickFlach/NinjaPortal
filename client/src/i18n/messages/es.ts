@@ -26,4 +26,43 @@ export default {
   'app.network.warning': 'Advertencia de Red',
   'app.network.switch': 'Por favor aprueba el cambio de red en Opera Wallet',
   'app.network.connect': 'Por favor asegúrate de estar conectado a la red NEO X',
+  'app.disconnect.success': '¡Billetera desconectada exitosamente!',
+  'app.disconnect.error': 'Error al desconectar la billetera',
+  // Tour messages
+  'tour.welcome': '¡Bienvenido a Ninja-Portal! Seré tu guía.',
+  'tour.connect': 'Conecta tu billetera para empezar a explorar música.',
+  'tour.upload': '¡Sube tus canciones favoritas y compártelas con el mundo!',
+  'tour.gotIt': '¡Entendido!',
+  // Map messages
+  'map.title': 'Mapa Global de Oyentes',
+  'map.noActivity': 'Sin Actividad',
+  'map.noData': '¡Aún no hay datos de oyentes disponibles. ¡Reproduce música para ver actividad en el mapa!',
+  'map.totalListeners': '{count} Oyentes Activos en Todo el Mundo',
+  'map.error': 'Error al cargar datos del mapa: {error}',
+  'map.tooltipDetail': '{country}: {total} {total, plural, one {Oyente} other {Oyentes}} ({percentage}%) - {geotagged} geoetiquetados, {anonymous} anónimos',
+  // Map location messages
+  'map.location.error.title': 'Acceso a Ubicación',
+  'map.location.error.description': 'No se pudo acceder a tu ubicación. Aún puedes usar el mapa, pero tus reproducciones no serán geoetiquetadas.',
+  // Neo Storage messages
+  'storage.title': 'Almacenamiento Neo FS',
+  'storage.upload': 'Subir a Neo FS',
+  'storage.uploading': 'Subiendo...',
+  'storage.noFiles': 'Aún no hay archivos almacenados en Neo FS',
+  'storage.success': 'Archivo subido exitosamente a Neo FS',
+  'storage.error': 'Error al subir el archivo',
+  'storage.download.error': 'Error al descargar el archivo',
+  // Wisdom quotes
+  'wisdom.quote1': 'La música es el lenguaje universal de la humanidad.',
+  'wisdom.quote2': 'La música expresa lo que no se puede decir con palabras.',
+  'wisdom.quote3': 'Sin música, la vida sería un error.',
+  'wisdom.quote4': 'La música le da alas al alma.',
+  'wisdom.quote5': 'Donde terminan las palabras, comienza la música.',
+  // Map visualization options
+  'map.view.heatmap': 'Mapa de Calor',
+  'map.view.markers': 'Marcadores',
+  'map.view.regions': 'Regiones',
+  'map.view.clusters': 'Grupos',
+  'map.legend.active': 'Oyentes Activos',
+  'map.legend.inactive': 'Oyentes Inactivos',
+  'map.legend.anonymous': 'Oyentes Anónimos'
 } as const;

@@ -28,4 +28,41 @@ export default {
   'app.network.connect': 'Убедитесь, что вы подключены к сети NEO X',
   'app.disconnect.success': 'Кошелек успешно отключен!',
   'app.disconnect.error': 'Ошибка при отключении кошелька',
+  // Tour messages
+  'tour.welcome': 'Добро пожаловать в Ninja-Portal! Я буду вашим гидом.',
+  'tour.connect': 'Подключите кошелек, чтобы начать исследовать музыку.',
+  'tour.upload': 'Загрузите свою любимую музыку и поделитесь ей с миром!',
+  'tour.gotIt': 'Понятно!',
+  // Map messages
+  'map.title': 'Глобальная карта слушателей',
+  'map.noActivity': 'Нет активности',
+  'map.noData': 'Данные о слушателях пока недоступны. Включите музыку, чтобы увидеть активность на карте!',
+  'map.totalListeners': '{count} активных слушателей по всему миру',
+  'map.error': 'Ошибка загрузки данных карты: {error}',
+  'map.tooltipDetail': '{country}: {total} {total, plural, one {слушатель} few {слушателя} many {слушателей}} ({percentage}%) - {geotagged} с геометкой, {anonymous} анонимных',
+  // Map location messages
+  'map.location.error.title': 'Доступ к местоположению',
+  'map.location.error.description': 'Не удалось получить доступ к вашему местоположению. Вы можете использовать карту, но ваши прослушивания не будут отмечены на ней.',
+  // Neo Storage messages
+  'storage.title': 'Хранилище Neo FS',
+  'storage.upload': 'Загрузить в Neo FS',
+  'storage.uploading': 'Загрузка...',
+  'storage.noFiles': 'В Neo FS пока нет файлов',
+  'storage.success': 'Файл успешно загружен в Neo FS',
+  'storage.error': 'Ошибка при загрузке файла',
+  'storage.download.error': 'Ошибка при скачивании файла',
+  // Wisdom quotes
+  'wisdom.quote1': 'Музыка — это универсальный язык человечества.',
+  'wisdom.quote2': 'Музыка выражает то, что невозможно сказать словами.',
+  'wisdom.quote3': 'Без музыки жизнь была бы ошибкой.',
+  'wisdom.quote4': 'Музыка дает крылья душе.',
+  'wisdom.quote5': 'Где заканчиваются слова, начинается музыка.',
+  // Map visualization options
+  'map.view.heatmap': 'Тепловая карта',
+  'map.view.markers': 'Маркеры',
+  'map.view.regions': 'Регионы',
+  'map.view.clusters': 'Кластеры',
+  'map.legend.active': 'Активные слушатели',
+  'map.legend.inactive': 'Неактивные слушатели',
+  'map.legend.anonymous': 'Анонимные слушатели'
 } as const;

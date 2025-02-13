@@ -32,5 +32,37 @@ export default {
   'tour.welcome': 'Benvenuto su Ninja-Portal! Sarò la tua guida.',
   'tour.connect': 'Connetti il tuo wallet per esplorare la musica.',
   'tour.upload': 'Carica la tua musica preferita e condividila con il mondo!',
-  'tour.gotIt': 'Ho capito!'
+  'tour.gotIt': 'Ho capito!',
+  // Map messages
+  'map.title': 'Mappa Globale Ascoltatori',
+  'map.noActivity': 'Nessuna Attività',
+  'map.noData': 'Nessun dato sugli ascoltatori disponibile. Riproduci della musica per vedere attività sulla mappa!',
+  'map.totalListeners': '{count} Ascoltatori Attivi nel Mondo',
+  'map.error': 'Errore nel caricamento dei dati della mappa: {error}',
+  'map.tooltipDetail': '{country}: {total} {total, plural, one {Ascoltatore} other {Ascoltatori}} ({percentage}%) - {geotagged} geolocalizzati, {anonymous} anonimi',
+  // Map location messages
+  'map.location.error.title': 'Accesso alla Posizione',
+  'map.location.error.description': 'Impossibile accedere alla tua posizione. Puoi ancora usare la mappa, ma le tue riproduzioni non saranno geolocalizzate.',
+  // Neo Storage messages
+  'storage.title': 'Archiviazione Neo FS',
+  'storage.upload': 'Carica su Neo FS',
+  'storage.uploading': 'Caricamento in corso...',
+  'storage.noFiles': 'Nessun file archiviato su Neo FS',
+  'storage.success': 'File caricato con successo su Neo FS',
+  'storage.error': 'Errore durante il caricamento del file',
+  'storage.download.error': 'Errore durante il download del file',
+  // Wisdom quotes
+  'wisdom.quote1': 'La musica è il linguaggio universale dell\'umanità.',
+  'wisdom.quote2': 'La musica esprime ciò che non può essere detto a parole.',
+  'wisdom.quote3': 'Senza musica la vita sarebbe un errore.',
+  'wisdom.quote4': 'La musica dà le ali all\'anima.',
+  'wisdom.quote5': 'Dove finiscono le parole, inizia la musica.',
+  // Map visualization options
+  'map.view.heatmap': 'Mappa di Calore',
+  'map.view.markers': 'Marcatori',
+  'map.view.regions': 'Regioni',
+  'map.view.clusters': 'Cluster',
+  'map.legend.active': 'Ascoltatori Attivi',
+  'map.legend.inactive': 'Ascoltatori Inattivi',
+  'map.legend.anonymous': 'Ascoltatori Anonimi'
 } as const;
