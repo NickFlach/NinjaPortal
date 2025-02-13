@@ -23,7 +23,8 @@ const upload = multer({
   }
 });
 
-const NEO_FS_API = "https://fs.neo.org";
+// Updated API endpoint to include version and proper path
+const NEO_FS_API = "https://fs.neo.org/api/v1";
 
 // Upload file to Neo FS
 router.post('/upload', upload.single('file'), async (req, res) => {
@@ -50,8 +51,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
     // Create form data for Neo FS
     const formData = new FormData();
-    formData.append('file', new Blob([req.file.buffer], { type: req.file.mimetype }), req.file.originalname);
+    const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+    formData.append('file', blob, req.file.originalname);
     formData.append('wallet', address);
+    formData.append('type', 'audio'); // Specify content type
 
     console.log('Sending request to Neo FS...');
 
@@ -61,9 +64,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const timeoutDuration = BASE_TIMEOUT + (fileSizeMB * TIMEOUT_PER_MB);
 
     // Upload to Neo FS with dynamic timeout and retries
-    const response = await axios.post(`${NEO_FS_API}/upload`, formData, {
+    const response = await axios.post(`${NEO_FS_API}/objects`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+        'Accept': 'application/json'
       },
       timeout: timeoutDuration,
       maxContentLength: 10 * 1024 * 1024, // 10MB limit
@@ -84,7 +88,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
     if (!response.data || response.status !== 200) {
       console.error('Neo FS error response:', response.data);
-      throw new Error(response.data?.error || 'Failed to upload to Neo FS');
+      throw new Error(response.data?.error || response.data?.message || 'Failed to upload to Neo FS');
     }
 
     const fileData = {
@@ -93,7 +97,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       size: req.file.size,
       type: req.file.mimetype,
       uploadedAt: new Date().toISOString(),
-      url: `${NEO_FS_API}/files/${response.data.id}`,
+      url: `${NEO_FS_API}/objects/${response.data.id}`,
     };
 
     console.log('Upload successful:', fileData);
@@ -126,15 +130,19 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// List files for a wallet
+// Update the list files endpoint
 router.get('/files/:address', async (req, res) => {
   try {
     const { address } = req.params;
     console.log('Fetching files for wallet:', address);
 
-    const response = await axios.get(`${NEO_FS_API}/files/${address}`, {
+    const response = await axios.get(`${NEO_FS_API}/objects`, {
+      params: { wallet: address },
       timeout: 10000, // 10 second timeout for listing
       validateStatus: null, // Don't throw on any status
+      headers: {
+        'Accept': 'application/json'
+      },
       retry: 3,
       retryDelay: (retryCount) => {
         return retryCount * 1000;
@@ -149,7 +157,7 @@ router.get('/files/:address', async (req, res) => {
 
     if (!response.data || response.status !== 200) {
       console.error('Neo FS list error:', response.data);
-      throw new Error(response.data?.error || 'Failed to list files from Neo FS');
+      throw new Error(response.data?.error || response.data?.message || 'Failed to list files from Neo FS');
     }
 
     res.json(response.data);
@@ -171,17 +179,20 @@ router.get('/files/:address', async (req, res) => {
   }
 });
 
-// Download file
+// Update the download endpoint
 router.get('/download/:address/:fileId', async (req, res) => {
   try {
     const { address, fileId } = req.params;
     console.log('Downloading file:', { address, fileId });
 
-    const response = await axios.get(`${NEO_FS_API}/download/${fileId}`, {
+    const response = await axios.get(`${NEO_FS_API}/objects/${fileId}`, {
       responseType: 'stream',
       params: { wallet: address },
       timeout: 15000, // 15 second timeout for downloads
       validateStatus: null, // Don't throw on any status
+      headers: {
+        'Accept': '*/*'
+      },
       retry: 3,
       retryDelay: (retryCount) => {
         return retryCount * 1000;
@@ -190,7 +201,7 @@ router.get('/download/:address/:fileId', async (req, res) => {
 
     if (!response.data || response.status !== 200) {
       console.error('Neo FS download error:', response.data);
-      throw new Error(response.data?.error || 'Failed to download from Neo FS');
+      throw new Error(response.data?.error || response.data?.message || 'Failed to download from Neo FS');
     }
 
     res.setHeader('Content-Type', response.headers['content-type']);
