@@ -40,11 +40,12 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     formData.append('file', new Blob([req.file.buffer]), req.file.originalname);
     formData.append('wallet', address);
 
-    // Upload to Neo FS
+    // Upload to Neo FS with timeout
     const response = await axios.post(`${NEO_FS_API}/upload`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 30000, // 30 second timeout
     });
 
     const fileData = {
@@ -60,6 +61,19 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     res.json(fileData);
   } catch (error) {
     console.error('Neo FS upload error:', error);
+
+    if (error.code === 'ECONNABORTED') {
+      return res.status(504).json({ error: 'Upload timed out. Please try again with a smaller file.' });
+    }
+
+    if (error.response?.status === 502) {
+      return res.status(502).json({ error: 'Neo FS service is currently unavailable. Please try again later.' });
+    }
+
+    if (error.response?.status === 413) {
+      return res.status(413).json({ error: 'File is too large. Maximum size is 10MB.' });
+    }
+
     res.status(500).json({ error: 'Failed to upload file to Neo FS' });
   }
 });
@@ -68,10 +82,15 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 router.get('/files/:address', async (req, res) => {
   try {
     const { address } = req.params;
-    const response = await axios.get(`${NEO_FS_API}/files/${address}`);
+    const response = await axios.get(`${NEO_FS_API}/files/${address}`, {
+      timeout: 10000 // 10 second timeout for listing
+    });
     res.json(response.data);
   } catch (error) {
     console.error('Neo FS list error:', error);
+    if (error.code === 'ECONNABORTED') {
+      return res.status(504).json({ error: 'Request timed out. Please try again.' });
+    }
     res.status(500).json({ error: 'Failed to list Neo FS files' });
   }
 });
@@ -82,7 +101,8 @@ router.get('/download/:address/:fileId', async (req, res) => {
     const { address, fileId } = req.params;
     const response = await axios.get(`${NEO_FS_API}/download/${fileId}`, {
       responseType: 'stream',
-      params: { wallet: address }
+      params: { wallet: address },
+      timeout: 30000 // 30 second timeout for downloads
     });
 
     res.setHeader('Content-Type', response.headers['content-type']);
@@ -91,6 +111,9 @@ router.get('/download/:address/:fileId', async (req, res) => {
     response.data.pipe(res);
   } catch (error) {
     console.error('Neo FS download error:', error);
+    if (error.code === 'ECONNABORTED') {
+      return res.status(504).json({ error: 'Download timed out. Please try again.' });
+    }
     res.status(500).json({ error: 'Failed to download file from Neo FS' });
   }
 });
