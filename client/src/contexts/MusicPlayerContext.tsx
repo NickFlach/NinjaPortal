@@ -42,6 +42,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [currentContext, setCurrentContext] = useState<PlaylistContext>('landing');
   const [userCoordinates, setUserCoordinates] = useState<Coordinates>();
   const [activeListeners, setActiveListeners] = useState(0);
+  const [isSynced, setIsSynced] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -51,7 +52,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const isLandingPage = !userAddress;
   const audioContextRef = useRef<AudioContext>();
   const geolocationPermissionAsked = useRef(false);
-  const [isSynced, setIsSynced] = useState(false);
 
   // Initialize audio element
   useEffect(() => {
@@ -349,8 +349,18 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === 'stats_update') {
-            setActiveListeners(data.data.activeListeners);
+          switch (data.type) {
+            case 'stats_update':
+              setActiveListeners(data.data.activeListeners);
+              break;
+            case 'auth_success':
+              console.log('Authentication successful');
+              break;
+            case 'error':
+              console.error('WebSocket error message:', data.message);
+              break;
+            default:
+              console.log('Received websocket message:', data);
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
@@ -361,11 +371,12 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         console.log('WebSocket disconnected');
         setIsSynced(false);
         setActiveListeners(0);
-        setTimeout(connectWebSocket, 5000);
+        setTimeout(connectWebSocket, 5000); // Attempt to reconnect after 5 seconds
       };
 
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        // The onclose handler will be called after this
       };
     };
 
@@ -383,22 +394,27 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   // Update the WebSocket effect to handle playback status
   useEffect(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN && currentSong) {
-      // Send playback status
-      wsRef.current.send(JSON.stringify({
-        type: 'sync',
-        songId: currentSong.id,
-        playing: isPlaying,
-        timestamp: audioRef.current?.currentTime || 0
-      }));
-
-      // Only send location updates if music is playing and we have coordinates
-      if (isPlaying && userCoordinates) {
-        console.log('Sending location update:', userCoordinates);
+      try {
+        // Send playback status
         wsRef.current.send(JSON.stringify({
-          type: 'location_update',
-          coordinates: userCoordinates,
-          countryCode: 'US' // Default to US for demo purposes
+          type: 'sync',
+          songId: currentSong.id,
+          playing: isPlaying,
+          timestamp: audioRef.current?.currentTime || 0
         }));
+
+        // Only send location updates if music is playing and we have coordinates
+        if (isPlaying && userCoordinates) {
+          console.log('Sending location update:', userCoordinates);
+          wsRef.current.send(JSON.stringify({
+            type: 'location_update',
+            coordinates: userCoordinates,
+            countryCode: 'US' // Default to US for demo purposes
+          }));
+        }
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+        // The socket's onclose handler will handle reconnection if needed
       }
     }
   }, [isPlaying, currentSong, userCoordinates]);

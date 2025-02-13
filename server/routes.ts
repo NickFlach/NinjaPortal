@@ -36,6 +36,24 @@ export function registerRoutes(app: Express) {
   // WebSocket connection handling
   wss.on('connection', (ws) => {
     console.log('New client connected');
+
+    // Setup ping-pong to detect stale connections
+    let isAlive = true;
+    const pingInterval = setInterval(() => {
+      if (!isAlive) {
+        console.log('Client not responding to ping, terminating connection');
+        clearInterval(pingInterval);
+        ws.terminate();
+        return;
+      }
+      isAlive = false;
+      ws.ping();
+    }, 30000);
+
+    ws.on('pong', () => {
+      isAlive = true;
+    });
+
     clients.set(ws, {});
 
     ws.on('message', async (data) => {
@@ -52,6 +70,8 @@ export function registerRoutes(app: Express) {
           case 'auth': {
             if (message.address) {
               clientInfo.address = message.address.toLowerCase();
+              // Send confirmation back to client
+              ws.send(JSON.stringify({ type: 'auth_success' }));
             }
             break;
           }
@@ -59,6 +79,11 @@ export function registerRoutes(app: Express) {
           case 'subscribe': {
             if (message.songId) {
               clientInfo.currentSong = message.songId;
+              // Send confirmation back to client
+              ws.send(JSON.stringify({ 
+                type: 'subscribe_success',
+                songId: message.songId 
+              }));
             }
             break;
           }
@@ -108,40 +133,61 @@ export function registerRoutes(app: Express) {
               clientInfo.coordinates = coordinates;
               clientInfo.countryCode = countryCode;
               console.log('Updated client info:', clientInfo);
+              // Send confirmation back to client
+              ws.send(JSON.stringify({ 
+                type: 'location_update_success',
+                coordinates,
+                countryCode 
+              }));
               // Broadcast updated stats with new location info
               broadcastStats();
             } else {
               console.log('Invalid location update - missing coordinates or country code');
+              ws.send(JSON.stringify({ 
+                type: 'error',
+                message: 'Invalid location data'
+              }));
             }
             break;
           }
         }
       } catch (error) {
         console.error('WebSocket message error:', error);
+        // Send error back to client
+        ws.send(JSON.stringify({ 
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Unknown error'
+        }));
       }
     });
 
     ws.on('error', (error) => {
       console.error('WebSocket error:', error);
+      clearInterval(pingInterval);
       clients.delete(ws);
       broadcastStats();
     });
 
     ws.on('close', () => {
       console.log('Client disconnected');
+      clearInterval(pingInterval);
       clients.delete(ws);
       broadcastStats();
     });
   });
 
-  // Regular cleanup of stale connections
+  // Regular cleanup of stale connections and broadcast updates
   setInterval(() => {
+    let hadStaleConnections = false;
     Array.from(clients.keys()).forEach((client) => {
       if (client.readyState !== WebSocket.OPEN) {
         clients.delete(client);
+        hadStaleConnections = true;
       }
     });
-    broadcastStats();
+    if (hadStaleConnections) {
+      broadcastStats();
+    }
   }, 30000);
 
   // Map routes
