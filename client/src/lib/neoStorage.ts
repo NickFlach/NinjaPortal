@@ -12,13 +12,22 @@ export interface NeoFSFile {
 }
 
 export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSFile> {
+  // Create FormData and append file and address
   const formData = new FormData();
   formData.append('file', file);
   formData.append('address', address);
 
+  console.log('Uploading file to Neo FS:', {
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    address: address
+  });
+
   const response = await apiRequest("POST", "/api/neo-storage/upload", formData);
   if (!response.ok) {
-    throw new Error("Failed to upload file to Neo FS");
+    const error = await response.text();
+    throw new Error(error || "Failed to upload file to Neo FS");
   }
   return response.json();
 }

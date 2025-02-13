@@ -5,7 +5,13 @@ import { db } from '@db';
 import { eq } from 'drizzle-orm';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+// Configure multer with proper field name matching the frontend
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  }
+});
 
 const NEO_FS_API = "https://fs.neo.org";
 
@@ -13,6 +19,7 @@ const NEO_FS_API = "https://fs.neo.org";
 router.post('/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
+      console.error('No file in request:', req.files, req.file);
       return res.status(400).json({ error: 'No file provided' });
     }
 
@@ -20,6 +27,13 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     if (!address) {
       return res.status(400).json({ error: 'No address provided' });
     }
+
+    console.log('Received file upload request:', {
+      filename: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      address: address
+    });
 
     // Create form data for Neo FS
     const formData = new FormData();
@@ -42,6 +56,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       url: `${NEO_FS_API}/files/${response.data.id}`,
     };
 
+    console.log('Upload successful:', fileData);
     res.json(fileData);
   } catch (error) {
     console.error('Neo FS upload error:', error);
@@ -72,7 +87,7 @@ router.get('/download/:address/:fileId', async (req, res) => {
 
     res.setHeader('Content-Type', response.headers['content-type']);
     res.setHeader('Content-Disposition', response.headers['content-disposition']);
-    
+
     response.data.pipe(res);
   } catch (error) {
     console.error('Neo FS download error:', error);
