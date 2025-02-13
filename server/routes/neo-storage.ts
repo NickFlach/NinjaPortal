@@ -48,6 +48,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       timeout: 15000, // 15 second timeout - reduced from 30s
       maxContentLength: 10 * 1024 * 1024, // 10MB limit
       maxBodyLength: 10 * 1024 * 1024, // 10MB limit
+      retry: 3, // Enable retries
+      retryDelay: (retryCount) => {
+        return retryCount * 1000; // exponential backoff
+      }
     });
 
     const fileData = {
@@ -68,6 +72,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       return res.status(504).json({ error: 'Upload timed out. Please try again with a smaller file.' });
     }
 
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      return res.status(503).json({ error: 'Unable to connect to Neo FS. Please try again later.' });
+    }
+
     if (error.response?.status === 502) {
       return res.status(502).json({ error: 'Neo FS service is currently unavailable. Please try again later.' });
     }
@@ -76,7 +84,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       return res.status(413).json({ error: 'File is too large. Maximum size is 10MB.' });
     }
 
-    res.status(500).json({ error: 'Failed to upload file to Neo FS' });
+    res.status(500).json({ error: 'Failed to upload file to Neo FS', details: error.message });
   }
 });
 
@@ -85,7 +93,11 @@ router.get('/files/:address', async (req, res) => {
   try {
     const { address } = req.params;
     const response = await axios.get(`${NEO_FS_API}/files/${address}`, {
-      timeout: 10000 // 10 second timeout for listing
+      timeout: 10000, // 10 second timeout for listing
+      retry: 3,
+      retryDelay: (retryCount) => {
+        return retryCount * 1000;
+      }
     });
     res.json(response.data);
   } catch (error: any) {
@@ -93,7 +105,10 @@ router.get('/files/:address', async (req, res) => {
     if (error.code === 'ECONNABORTED') {
       return res.status(504).json({ error: 'Request timed out. Please try again.' });
     }
-    res.status(500).json({ error: 'Failed to list Neo FS files' });
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      return res.status(503).json({ error: 'Unable to connect to Neo FS. Please try again later.' });
+    }
+    res.status(500).json({ error: 'Failed to list Neo FS files', details: error.message });
   }
 });
 
@@ -104,7 +119,11 @@ router.get('/download/:address/:fileId', async (req, res) => {
     const response = await axios.get(`${NEO_FS_API}/download/${fileId}`, {
       responseType: 'stream',
       params: { wallet: address },
-      timeout: 15000 // 15 second timeout for downloads
+      timeout: 15000, // 15 second timeout for downloads
+      retry: 3,
+      retryDelay: (retryCount) => {
+        return retryCount * 1000;
+      }
     });
 
     res.setHeader('Content-Type', response.headers['content-type']);
@@ -116,7 +135,10 @@ router.get('/download/:address/:fileId', async (req, res) => {
     if (error.code === 'ECONNABORTED') {
       return res.status(504).json({ error: 'Download timed out. Please try again.' });
     }
-    res.status(500).json({ error: 'Failed to download file from Neo FS' });
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      return res.status(503).json({ error: 'Unable to connect to Neo FS. Please try again later.' });
+    }
+    res.status(500).json({ error: 'Failed to download file from Neo FS', details: error.message });
   }
 });
 
