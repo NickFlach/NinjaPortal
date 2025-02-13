@@ -13,9 +13,9 @@ export interface NeoFSFile {
 
 export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSFile> {
   // Validate file size before upload
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
   if (file.size > MAX_FILE_SIZE) {
-    throw new Error(`File size must be less than 5MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
+    throw new Error(`File size must be less than 10MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
   }
 
   // Create FormData and append file and address

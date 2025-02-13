@@ -9,7 +9,7 @@ const router = Router();
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit to match client
+    fileSize: 10 * 1024 * 1024, // 10MB limit
   }
 });
 
@@ -46,8 +46,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         'Content-Type': 'multipart/form-data',
       },
       timeout: 15000, // 15 second timeout - reduced from 30s
-      maxContentLength: 5 * 1024 * 1024, // 5MB limit
-      maxBodyLength: 5 * 1024 * 1024, // 5MB limit
+      maxContentLength: 10 * 1024 * 1024, // 10MB limit
+      maxBodyLength: 10 * 1024 * 1024, // 10MB limit
     });
 
     const fileData = {
@@ -73,7 +73,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     }
 
     if (error.response?.status === 413 || error instanceof multer.MulterError) {
-      return res.status(413).json({ error: 'File is too large. Maximum size is 5MB.' });
+      return res.status(413).json({ error: 'File is too large. Maximum size is 10MB.' });
     }
 
     res.status(500).json({ error: 'Failed to upload file to Neo FS' });
