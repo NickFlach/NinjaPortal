@@ -52,4 +52,18 @@ export default {
   'storage.success': 'Dosiero alŝutita sukcese al Neo FS',
   'storage.error': 'Malsukcesis alŝuti dosieron',
   'storage.download.error': 'Malsukcesis elŝuti dosieron',
+  // Wisdom quotes
+  'wisdom.quote1': 'Muziko estas la universala lingvo de la homaro.',
+  'wisdom.quote2': 'Muziko esprimas tion, kion oni ne povas diri.',
+  'wisdom.quote3': 'Sen muziko la vivo estus eraro.',
+  'wisdom.quote4': 'Muziko donas flugilojn al la animo.',
+  'wisdom.quote5': 'Kie vortoj finiĝas, muziko komenciĝas.',
+  // Map visualization options
+  'map.view.heatmap': 'Varmeca Mapo',
+  'map.view.markers': 'Markiloj',
+  'map.view.regions': 'Regionoj',
+  'map.view.clusters': 'Grupoj',
+  'map.legend.active': 'Aktivaj Aŭskultantoj',
+  'map.legend.inactive': 'Neaktivaj Aŭskultantoj',
+  'map.legend.anonymous': 'Anonimaj Aŭskultantoj'
 } as const;

@@ -34,6 +34,16 @@ export default {
   'tour.connect': 'Verbinde dein Wallet, um Musik zu entdecken.',
   'tour.upload': 'Lade deine Lieblingsmusik hoch und teile sie mit der Welt!',
   'tour.gotIt': 'Verstanden!',
+  // Map messages
+  'map.title': 'Globale Zuhörer-Karte',
+  'map.noActivity': 'Keine Aktivität',
+  'map.noData': 'Noch keine Zuhörerdaten verfügbar. Spiele Musik ab, um Aktivität auf der Karte zu sehen!',
+  'map.totalListeners': '{count} Aktive Zuhörer Weltweit',
+  'map.error': 'Fehler beim Laden der Kartendaten: {error}',
+  'map.tooltipDetail': '{country}: {total} {total, plural, one {Zuhörer} other {Zuhörer}} ({percentage}%) - {geotagged} georeferenziert, {anonymous} anonym',
+  // Map location messages
+  'map.location.error.title': 'Standortzugriff',
+  'map.location.error.description': 'Standortzugriff nicht möglich. Du kannst die Karte weiterhin nutzen, aber deine Wiedergaben werden nicht georeferenziert.',
   // Neo Storage messages
   'storage.title': 'Neo FS Speicher',
   'storage.upload': 'Auf Neo FS hochladen',
@@ -42,4 +52,18 @@ export default {
   'storage.success': 'Datei erfolgreich auf Neo FS hochgeladen',
   'storage.error': 'Fehler beim Hochladen der Datei',
   'storage.download.error': 'Fehler beim Herunterladen der Datei',
+  // Wisdom quotes
+  'wisdom.quote1': 'Musik ist die universelle Sprache der Menschheit.',
+  'wisdom.quote2': 'Die Musik drückt das aus, was nicht gesagt werden kann.',
+  'wisdom.quote3': 'Ohne Musik wäre das Leben ein Irrtum.',
+  'wisdom.quote4': 'Musik gibt der Seele Flügel.',
+  'wisdom.quote5': 'Wo Worte enden, beginnt die Musik.',
+  // Map visualization options
+  'map.view.heatmap': 'Wärmekarte',
+  'map.view.markers': 'Markierungen',
+  'map.view.regions': 'Regionen',
+  'map.view.clusters': 'Cluster',
+  'map.legend.active': 'Aktive Zuhörer',
+  'map.legend.inactive': 'Inaktive Zuhörer',
+  'map.legend.anonymous': 'Anonyme Zuhörer'
 } as const;
