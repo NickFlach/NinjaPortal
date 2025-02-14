@@ -7,9 +7,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Upload, Download, Loader2, File } from "lucide-react";
 import { uploadToNeoFS, listNeoFSFiles, downloadNeoFSFile, type NeoFSFile } from "@/lib/neoStorage";
 import { useIntl } from 'react-intl';
+import { EditSongDialog } from "./EditSongDialog";
 
 export function NeoStorage() {
   const [uploadLoading, setUploadLoading] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { address } = useAccount();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -21,8 +24,8 @@ export function NeoStorage() {
     enabled: !!address,
   });
 
-  // Handle file upload
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle initial file selection
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !address) {
       toast({
@@ -33,16 +36,24 @@ export function NeoStorage() {
       return;
     }
 
+    setSelectedFile(file);
+    setDialogOpen(true);
+  };
+
+  // Handle the actual file upload after metadata input and GAS confirmation
+  const handleFileUpload = async (metadata: { title: string; artist: string }) => {
+    if (!selectedFile || !address) return;
+
     try {
       setUploadLoading(true);
       console.log('Starting file upload:', {
-        name: file.name,
-        size: `${(file.size / (1024 * 1024)).toFixed(2)}MB`,
-        type: file.type,
+        name: selectedFile.name,
+        size: `${(selectedFile.size / (1024 * 1024)).toFixed(2)}MB`,
+        type: selectedFile.type,
         address: address
       });
 
-      const result = await uploadToNeoFS(file, address);
+      const result = await uploadToNeoFS(selectedFile, address);
       console.log('Upload completed successfully:', result);
 
       queryClient.invalidateQueries({ queryKey: [`/api/neo-storage/files/${address}`] });
@@ -51,10 +62,9 @@ export function NeoStorage() {
         description: intl.formatMessage({ id: 'storage.success' }),
       });
 
-      // Clear the input
-      if (e.target) {
-        e.target.value = '';
-      }
+      // Reset state
+      setSelectedFile(null);
+      setDialogOpen(false);
     } catch (error) {
       console.error('Upload error details:', error);
 
@@ -115,7 +125,7 @@ export function NeoStorage() {
         <div className="flex items-center gap-4">
           <Input
             type="file"
-            onChange={handleFileUpload}
+            onChange={handleFileSelect}
             className="hidden"
             id="neo-fs-upload"
             disabled={uploadLoading}
@@ -139,6 +149,19 @@ export function NeoStorage() {
           </label>
         </div>
       </div>
+
+      {/* Metadata Input Dialog */}
+      <EditSongDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        mode="create"
+        onSubmit={handleFileUpload}
+        fileSize={selectedFile?.size}
+        onGasConfirm={() => {
+          // Handle any additional GAS payment logic here if needed
+          console.log('GAS payment confirmed');
+        }}
+      />
 
       <div className="space-y-4">
         {isLoading ? (

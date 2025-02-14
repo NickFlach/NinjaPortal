@@ -26,6 +26,8 @@ interface EditSongDialogProps {
   onOpenChange: (open: boolean) => void;
   mode: 'edit' | 'create';
   onSubmit?: (data: { title: string; artist: string }) => void;
+  fileSize?: number; // Add file size for GAS calculation
+  onGasConfirm?: () => void; // Callback when GAS payment is confirmed
 }
 
 export function EditSongDialog({ 
@@ -33,10 +35,13 @@ export function EditSongDialog({
   open, 
   onOpenChange,
   mode,
-  onSubmit 
+  onSubmit,
+  fileSize,
+  onGasConfirm 
 }: EditSongDialogProps) {
   const [title, setTitle] = React.useState(song?.title || '');
   const [artist, setArtist] = React.useState(song?.artist || '');
+  const [gasAmount, setGasAmount] = React.useState<string>('0');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -45,7 +50,29 @@ export function EditSongDialog({
       setTitle(song.title);
       setArtist(song.artist);
     }
-  }, [song]);
+
+    // Calculate required GAS if file size is provided
+    if (fileSize && mode === 'create') {
+      // Call NEO FS service to calculate GAS
+      fetch('/api/neo-storage/calculate-gas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileSize, duration: 24 }) // 24 hours storage
+      })
+        .then(res => res.json())
+        .then(data => {
+          setGasAmount(data.requiredGas);
+        })
+        .catch(error => {
+          console.error('Error calculating GAS:', error);
+          toast({
+            title: "Error",
+            description: "Failed to calculate required GAS",
+            variant: "destructive",
+          });
+        });
+    }
+  }, [song, fileSize, mode]);
 
   const editSongMutation = useMutation({
     mutationFn: async (data: { title: string; artist: string }) => {
@@ -74,7 +101,7 @@ export function EditSongDialog({
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !artist) {
       toast({
@@ -83,6 +110,20 @@ export function EditSongDialog({
         variant: "destructive",
       });
       return;
+    }
+
+    if (mode === 'create' && fileSize) {
+      // Confirm GAS payment before proceeding
+      const confirmed = window.confirm(
+        `This upload requires ${gasAmount} GAS. Do you want to proceed?`
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      // Notify parent about GAS confirmation
+      onGasConfirm?.();
     }
 
     if (mode === 'edit') {
@@ -102,7 +143,11 @@ export function EditSongDialog({
               {mode === 'edit' ? 'Edit Song Details' : 'New Song Details'}
             </DialogTitle>
             <DialogDescription>
-              {mode === 'edit' ? 'Update the title and artist for this song.' : 'Enter the title and artist for your new song.'}
+              {mode === 'edit' 
+                ? 'Update the title and artist for this song.' 
+                : `Enter the title and artist for your new song.${
+                    fileSize ? ` Required GAS: ${gasAmount}` : ''
+                  }`}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">

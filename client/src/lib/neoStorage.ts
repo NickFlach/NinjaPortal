@@ -9,6 +9,15 @@ export interface NeoFSFile {
   url: string;
 }
 
+export interface SongMetadata {
+  title: string;
+  artist: string;
+  uploadedBy: string;
+  ipfsHash: string;
+  neoContainerId?: string;
+  createdAt: Date;
+}
+
 export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSFile> {
   // Validate file size before upload
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
