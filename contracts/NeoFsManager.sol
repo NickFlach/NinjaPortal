@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 interface INeoFsOracle {
     function getStorageRate() external view returns (uint256);
@@ -24,14 +24,10 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
         bytes32 storageProof; // Proof of storage from NEO FS
     }
 
-    // Mapping of file hash to file data
     mapping(bytes32 => FileData) public files;
-    // User balances for storage payments in GAS
     mapping(address => uint256) public balances;
-    // Mapping to track storage proofs
     mapping(bytes32 => bool) public processedStorageProofs;
 
-    // Events
     event FileRegistered(
         address indexed owner,
         bytes32 indexed fileHash,
@@ -55,22 +51,19 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
     /**
      * @dev Pay for storage upfront using GAS
      */
-    receive() external payable {
+    external payable {
         balances[msg.sender] += msg.value;
         emit StoragePaid(msg.sender, msg.value);
     }
 
     /**
      * @dev Register a file upload with storage proof
-     * @param fileHash Hash of the file in NEO FS
-     * @param size Size of the file in bytes
-     * @param storageProof Proof of storage from NEO FS
      */
-    function registerFileUpload(
+    external function registerFileUpload(
         bytes32 fileHash,
         uint256 size,
         bytes32 storageProof
-    ) external nonReentrant {
+    ) nonReentrant {
         require(size > 0, "File size must be greater than 0");
         require(!processedStorageProofs[storageProof], "Storage proof already used");
         require(files[fileHash].owner == address(0), "File already registered");
@@ -106,18 +99,18 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Update treasury address (owner only)
+     * @dev Update treasury address
      */
-    function setTreasuryAddress(address newTreasury) external onlyOwner {
+    external function setTreasuryAddress(address newTreasury) onlyOwner {
         require(newTreasury != address(0), "Invalid treasury address");
         treasuryAddress = newTreasury;
         emit TreasuryUpdated(newTreasury);
     }
 
     /**
-     * @dev Update oracle address (owner only)
+     * @dev Update oracle address
      */
-    function setOracle(address newOracle) external onlyOwner {
+    external function setOracle(address newOracle) onlyOwner {
         require(newOracle != address(0), "Invalid oracle address");
         oracle = INeoFsOracle(newOracle);
         emit OracleUpdated(newOracle);
@@ -126,7 +119,7 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
     /**
      * @dev Get file storage details
      */
-    function getFileDetails(bytes32 fileHash) external view returns (
+    external view function getFileDetails(bytes32 fileHash) returns (
         address owner,
         uint256 size,
         uint256 storagePaid,
@@ -140,21 +133,21 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
     /**
      * @dev Get current storage rate from oracle
      */
-    function getCurrentStorageRate() external view returns (uint256) {
+    external view function getCurrentStorageRate() returns (uint256) {
         return oracle.getStorageRate();
     }
 
     /**
-     * @dev Get user's storage balance in GAS
+     * @dev Get user's storage balance
      */
-    function getBalance() external view returns (uint256) {
+    external view function getBalance() returns (uint256) {
         return balances[msg.sender];
     }
 
     /**
      * @dev Withdraw storage balance
      */
-    function withdrawBalance(uint256 amount) external nonReentrant {
+    external function withdrawBalance(uint256 amount) nonReentrant {
         require(balances[msg.sender] >= amount, "Insufficient balance");
         balances[msg.sender] -= amount;
         (bool success, ) = payable(msg.sender).call{value: amount}("");
@@ -165,7 +158,7 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
     /**
      * @dev Withdraw contract balance (owner only)
      */
-    function withdrawStorage(uint256 amount) external onlyOwner nonReentrant {
+    external function withdrawStorage(uint256 amount) onlyOwner nonReentrant {
         require(address(this).balance >= amount, "Insufficient contract balance");
         (bool success, ) = payable(owner()).call{value: amount}("");
         require(success, "Transfer failed");

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title NeoFsOracle
@@ -32,7 +32,7 @@ contract NeoFsOracle is Ownable {
      * @param newRate New storage rate per MB per day in GAS wei
      * @param updateId Unique identifier for this update to prevent duplicates
      */
-    function updateStorageRate(uint256 newRate, bytes32 updateId) external onlyOperator {
+    external function updateStorageRate(uint256 newRate, bytes32 updateId) onlyOperator {
         require(!processedUpdates[updateId], "Update already processed");
         require(newRate > 0, "Invalid rate");
 
@@ -56,7 +56,7 @@ contract NeoFsOracle is Ownable {
      * @param operator Address of the operator
      * @param isActive Whether to add or remove the operator
      */
-    function setOperator(address operator, bool isActive) external onlyOwner {
+    external function setOperator(address operator, bool isActive) onlyOwner {
         require(operator != address(0), "Invalid operator address");
         operators[operator] = isActive;
         emit OracleOperatorUpdate(operator);
@@ -65,7 +65,7 @@ contract NeoFsOracle is Ownable {
     /**
      * @dev Get the latest storage rate
      */
-    function getStorageRate() external view returns (uint256) {
+    external view function getStorageRate() returns (uint256) {
         require(currentStorageRate > 0, "Rate not initialized");
         return currentStorageRate;
     }

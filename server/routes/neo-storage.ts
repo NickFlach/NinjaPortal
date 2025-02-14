@@ -1,8 +1,14 @@
-import { Router } from 'express';
+import { Router, Request } from 'express';
 import multer from 'multer';
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import { db } from '@db';
 import { eq } from 'drizzle-orm';
+
+// Define custom request type with multer file
+interface MulterRequest extends Request {
+  file?: Express.Multer.File;
+  files?: { [fieldname: string]: Express.Multer.File[] };
+}
 
 const router = Router();
 
@@ -12,7 +18,7 @@ const upload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     // Check file type
     const validMimeTypes = ['audio/mpeg', 'audio/mp3'];
     if (!validMimeTypes.includes(file.mimetype)) {
@@ -48,14 +54,9 @@ router.post('/calculate-gas', async (req, res) => {
     }
 
     // Calculate required GAS based on file size and duration
-    // Base cost for storage (GAS per MB per hour)
-    const baseCost = 0.001;
+    const baseCost = 0.001; // GAS per MB per hour
     const sizeCost = (fileSize / (1024 * 1024)) * baseCost * duration;
-
-    // Add overhead for container operations
     const overhead = 0.1;
-
-    // Total cost with 20% buffer and current GAS price
     const gasPriceMultiplier = parseInt(response.data.result.fast) / 1000;
     const totalCost = (sizeCost + overhead) * 1.2 * gasPriceMultiplier;
 
@@ -70,9 +71,10 @@ router.post('/calculate-gas', async (req, res) => {
     });
   } catch (error) {
     console.error('Error calculating GAS:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     res.status(500).json({ 
       error: 'Failed to calculate GAS requirement',
-      details: error.message
+      details: errorMessage
     });
   }
 });
@@ -80,8 +82,14 @@ router.post('/calculate-gas', async (req, res) => {
 // Updated API endpoint to include version and proper path
 const NEO_FS_API = "https://fs.neo.org/api/v1";
 
+// Custom axios config type with retry
+interface CustomAxiosConfig extends AxiosRequestConfig {
+  retry?: number;
+  retryDelay?: (retryCount: number) => number;
+}
+
 // Upload file to Neo FS
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', upload.single('file'), async (req: MulterRequest, res) => {
   try {
     if (!req.file) {
       console.error('No file in request:', req.files, req.file);
@@ -129,30 +137,28 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
     formData.append('file', blob, req.file.originalname);
     formData.append('wallet', address);
-    formData.append('type', 'audio'); // Specify content type
-
-    console.log('Sending request to Neo FS...');
+    formData.append('type', 'audio');
 
     // Calculate timeout based on file size
-    const BASE_TIMEOUT = 30000; // 30 seconds base timeout
-    const TIMEOUT_PER_MB = 2000; // 2 seconds per MB
+    const BASE_TIMEOUT = 30000;
+    const TIMEOUT_PER_MB = 2000;
     const timeoutDuration = BASE_TIMEOUT + (fileSizeMB * TIMEOUT_PER_MB);
 
     // Upload to Neo FS with dynamic timeout and retries
-    const response = await axios.post(`${NEO_FS_API}/objects`, formData, {
+    const config: CustomAxiosConfig = {
       headers: {
         'Content-Type': 'multipart/form-data',
         'Accept': 'application/json'
       },
       timeout: timeoutDuration,
-      maxContentLength: 10 * 1024 * 1024, // 10MB limit
-      maxBodyLength: 10 * 1024 * 1024, // 10MB limit
-      validateStatus: null, // Don't throw on any status
+      maxContentLength: 10 * 1024 * 1024,
+      maxBodyLength: 10 * 1024 * 1024,
+      validateStatus: null,
       retry: 3,
-      retryDelay: (retryCount) => {
-        return retryCount * 1000; // exponential backoff
-      }
-    });
+      retryDelay: (retryCount: number) => retryCount * 1000
+    };
+
+    const response = await axios.post(`${NEO_FS_API}/objects`, formData, config);
 
     console.log('Neo FS response:', {
       status: response.status,
@@ -205,24 +211,24 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// Update the list files endpoint
+// Update the list files endpoint with proper types
 router.get('/files/:address', async (req, res) => {
   try {
     const { address } = req.params;
     console.log('Fetching files for wallet:', address);
 
-    const response = await axios.get(`${NEO_FS_API}/objects`, {
+    const config: CustomAxiosConfig = {
       params: { wallet: address },
-      timeout: 10000, // 10 second timeout for listing
-      validateStatus: null, // Don't throw on any status
+      timeout: 10000,
+      validateStatus: null,
       headers: {
         'Accept': 'application/json'
       },
       retry: 3,
-      retryDelay: (retryCount) => {
-        return retryCount * 1000;
-      }
-    });
+      retryDelay: (retryCount: number) => retryCount * 1000
+    };
+
+    const response = await axios.get(`${NEO_FS_API}/objects`, config);
 
     console.log('Neo FS list response:', {
       status: response.status,
@@ -254,25 +260,25 @@ router.get('/files/:address', async (req, res) => {
   }
 });
 
-// Update the download endpoint
+// Update the download endpoint with proper types
 router.get('/download/:address/:fileId', async (req, res) => {
   try {
     const { address, fileId } = req.params;
     console.log('Downloading file:', { address, fileId });
 
-    const response = await axios.get(`${NEO_FS_API}/objects/${fileId}`, {
+    const config: CustomAxiosConfig = {
       responseType: 'stream',
       params: { wallet: address },
-      timeout: 15000, // 15 second timeout for downloads
-      validateStatus: null, // Don't throw on any status
+      timeout: 15000,
+      validateStatus: null,
       headers: {
         'Accept': '*/*'
       },
       retry: 3,
-      retryDelay: (retryCount) => {
-        return retryCount * 1000;
-      }
-    });
+      retryDelay: (retryCount: number) => retryCount * 1000
+    };
+
+    const response = await axios.get(`${NEO_FS_API}/objects/${fileId}`, config);
 
     if (!response.data || response.status !== 200) {
       console.error('Neo FS download error:', response.data);
