@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAccount } from 'wagmi';
 import { useMusicPlayer } from './MusicPlayerContext';
+import { PIDController } from '@/lib/PIDController';
 
 interface MusicSyncContextType {
   syncEnabled: boolean;
   toggleSync: () => void;
+  updateMetadata: (songId: number, metadata: { title: string; artist: string }) => Promise<void>;
 }
 
 const MusicSyncContext = createContext<MusicSyncContextType | undefined>(undefined);
@@ -18,6 +20,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
   const maxReconnectAttempts = 5;
   const reconnectAttemptRef = useRef(0);
   const lastSyncRef = useRef<{ timestamp: number; playing: boolean } | null>(null);
+  const pidController = useRef<PIDController>(new PIDController());
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -33,7 +36,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
       try {
         // Get the current hostname and port
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsHost = window.location.host; // This includes hostname and port
+        const wsHost = window.location.host;
         const wsPath = '/ws/music-sync';
         const wsUrl = `${wsProtocol}//${wsHost}${wsPath}`;
 
@@ -57,20 +60,10 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
             const message = JSON.parse(event.data);
             if (message.type === 'sync' && audioRef.current && message.songId === currentSong?.id) {
               const currentTime = audioRef.current.currentTime;
-              const timeDiff = Math.abs(currentTime - message.timestamp);
 
-              // Prevent sync feedback loops
-              const now = Date.now();
-              if (lastSyncRef.current && 
-                  now - lastSyncRef.current.timestamp < 1000 && 
-                  lastSyncRef.current.playing === message.playing) {
-                return;
-              }
-
-              // Only sync if time difference is significant
-              if (timeDiff > 1) {
-                audioRef.current.currentTime = message.timestamp;
-              }
+              // Use PID controller to adjust playback rate
+              const newRate = pidController.current.compute(message.timestamp, currentTime);
+              audioRef.current.playbackRate = newRate;
 
               // Handle play/pause state
               if (message.playing !== isPlaying) {
@@ -79,9 +72,12 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
               // Update last sync state
               lastSyncRef.current = {
-                timestamp: now,
+                timestamp: Date.now(),
                 playing: message.playing
               };
+            } else if (message.type === 'storage_status') {
+              console.log('Storage status update:', message.data);
+              // Handle NEO FS storage status updates
             }
           } catch (error) {
             console.error('Error processing sync message:', error);
@@ -132,52 +128,28 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
     };
   }, [syncEnabled, address, togglePlay, currentSong?.id, isPlaying]);
 
-  // Send sync messages when playback state changes
-  useEffect(() => {
-    if (!syncEnabled || !wsRef.current || !currentSong || wsRef.current.readyState !== WebSocket.OPEN) {
-      return;
+  // Update metadata function
+  const updateMetadata = async (songId: number, metadata: { title: string; artist: string }) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      throw new Error('Not connected to sync server');
     }
 
-    try {
-      // Only send sync message if it's different from last sync
-      const now = Date.now();
-      if (lastSyncRef.current && 
-          now - lastSyncRef.current.timestamp < 1000 && 
-          lastSyncRef.current.playing === isPlaying) {
-        return;
-      }
-
-      // Subscribe to current song
-      wsRef.current.send(JSON.stringify({
-        type: 'subscribe',
-        songId: currentSong.id
-      }));
-
-      // Send current playback state
-      wsRef.current.send(JSON.stringify({
-        type: 'sync',
-        songId: currentSong.id,
-        timestamp: audioRef.current?.currentTime || 0,
-        playing: isPlaying
-      }));
-
-      // Update last sync state
-      lastSyncRef.current = {
-        timestamp: now,
-        playing: isPlaying
-      };
-    } catch (error) {
-      console.error('Error sending sync message:', error);
-      setSyncEnabled(false);
-    }
-  }, [syncEnabled, currentSong?.id, isPlaying, audioRef.current?.currentTime]);
+    wsRef.current.send(JSON.stringify({
+      type: 'update_metadata',
+      songId,
+      metadata
+    }));
+  };
 
   const toggleSync = () => {
     setSyncEnabled(!syncEnabled);
+    if (!syncEnabled) {
+      pidController.current.reset();
+    }
   };
 
   return (
-    <MusicSyncContext.Provider value={{ syncEnabled, toggleSync }}>
+    <MusicSyncContext.Provider value={{ syncEnabled, toggleSync, updateMetadata }}>
       {children}
     </MusicSyncContext.Provider>
   );
