@@ -23,6 +23,60 @@ const upload = multer({
   }
 });
 
+// Add GAS calculation endpoint
+router.post('/calculate-gas', async (req, res) => {
+  try {
+    const { fileSize, duration } = req.body;
+
+    if (!fileSize || !duration) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters. Please provide fileSize and duration.' 
+      });
+    }
+
+    // Call NEO node RPC to get current GAS price
+    const neoNodeUrl = process.env.NEO_NODE_URL || 'https://mainnet1.neo.coz.io:443';
+    const response = await axios.post(neoNodeUrl, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'getgasprice',
+      params: []
+    });
+
+    if (!response.data?.result?.fast) {
+      throw new Error('Failed to fetch GAS price from NEO node');
+    }
+
+    // Calculate required GAS based on file size and duration
+    // Base cost for storage (GAS per MB per hour)
+    const baseCost = 0.001;
+    const sizeCost = (fileSize / (1024 * 1024)) * baseCost * duration;
+
+    // Add overhead for container operations
+    const overhead = 0.1;
+
+    // Total cost with 20% buffer and current GAS price
+    const gasPriceMultiplier = parseInt(response.data.result.fast) / 1000;
+    const totalCost = (sizeCost + overhead) * 1.2 * gasPriceMultiplier;
+
+    res.json({ 
+      requiredGas: totalCost.toFixed(8),
+      gasPriceMultiplier,
+      breakdown: {
+        sizeCost: sizeCost.toFixed(8),
+        overhead: overhead.toFixed(8),
+        buffer: (totalCost - sizeCost - overhead).toFixed(8)
+      }
+    });
+  } catch (error) {
+    console.error('Error calculating GAS:', error);
+    res.status(500).json({ 
+      error: 'Failed to calculate GAS requirement',
+      details: error.message
+    });
+  }
+});
+
 // Updated API endpoint to include version and proper path
 const NEO_FS_API = "https://fs.neo.org/api/v1";
 
@@ -34,11 +88,31 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file provided' });
     }
 
-    // Get wallet address from header
+    // Get wallet address and transaction hash from headers
     const address = req.headers['x-wallet-address'] as string;
-    if (!address) {
-      console.error('No wallet address in headers:', req.headers);
-      return res.status(400).json({ error: 'No wallet address provided' });
+    const gasTransactionHash = req.headers['x-gas-transaction'] as string;
+
+    if (!address || !gasTransactionHash) {
+      console.error('Missing required headers:', {
+        address: !!address,
+        gasTransaction: !!gasTransactionHash
+      });
+      return res.status(400).json({ 
+        error: 'Missing required headers. Please provide wallet address and GAS transaction hash.' 
+      });
+    }
+
+    // Verify GAS payment transaction
+    const neoNodeUrl = process.env.NEO_NODE_URL || 'https://mainnet1.neo.coz.io:443';
+    const txResponse = await axios.post(neoNodeUrl, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'gettransaction',
+      params: [gasTransactionHash]
+    });
+
+    if (!txResponse.data?.result?.blocktime) {
+      throw new Error('Invalid or pending GAS transaction');
     }
 
     const fileSizeMB = req.file.size / (1024 * 1024);
@@ -46,7 +120,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       filename: req.file.originalname,
       size: `${fileSizeMB.toFixed(2)}MB`,
       mimetype: req.file.mimetype,
-      address: address
+      address: address,
+      gasTransaction: gasTransactionHash
     });
 
     // Create form data for Neo FS

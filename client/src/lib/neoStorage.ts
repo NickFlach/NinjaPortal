@@ -18,6 +18,84 @@ export interface SongMetadata {
   createdAt: Date;
 }
 
+// Add GAS calculation function
+export async function calculateNeoGas(fileSize: number): Promise<{ requiredGas: string }> {
+  const response = await fetch('/api/neo-storage/calculate-gas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileSize, duration: 24 }) // 24 hours storage
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || 'Failed to calculate GAS requirement');
+  }
+
+  return response.json();
+}
+
+// Add NEO wallet payment function
+export async function handleGasPayment(amount: string): Promise<string> {
+  // Check if NEO wallet is available
+  if (typeof window.neo3Dapi === 'undefined') {
+    throw new Error('NEO wallet not found. Please install a compatible wallet.');
+  }
+
+  try {
+    // Connect to wallet
+    const connected = await window.neo3Dapi.getProvider();
+    if (!connected) {
+      throw new Error('Failed to connect to NEO wallet');
+    }
+
+    // Request GAS payment
+    const result = await window.neo3Dapi.invoke({
+      scriptHash: process.env.VITE_NEO_CONTRACT_ADDRESS,
+      operation: 'transfer',
+      args: [
+        {
+          type: 'Hash160',
+          value: process.env.VITE_GAS_RECIPIENT_ADDRESS
+        },
+        {
+          type: 'Integer',
+          value: amount
+        },
+        {
+          type: 'String',
+          value: 'NEO FS Storage Payment'
+        }
+      ]
+    });
+
+    if (!result.txid) {
+      throw new Error('Transaction failed');
+    }
+
+    // Wait for transaction confirmation
+    let confirmed = false;
+    let attempts = 0;
+    while (!confirmed && attempts < 30) {
+      const tx = await window.neo3Dapi.getTransaction({ txid: result.txid });
+      if (tx && tx.blocktime) {
+        confirmed = true;
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        attempts++;
+      }
+    }
+
+    if (!confirmed) {
+      throw new Error('Transaction confirmation timeout');
+    }
+
+    return result.txid;
+  } catch (error) {
+    console.error('GAS payment error:', error);
+    throw new Error(error.message || 'Failed to process GAS payment');
+  }
+}
+
 export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSFile> {
   // Validate file size before upload
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -33,20 +111,28 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
     throw new Error('Please select an MP3 file. Other audio formats are not supported.');
   }
 
-  // Create FormData and append file and address
+  // Calculate required GAS
+  const { requiredGas } = await calculateNeoGas(file.size);
+
+  // Process GAS payment
+  const gasTransactionHash = await handleGasPayment(requiredGas);
+
+  // Create FormData and append file
   const formData = new FormData();
   formData.append('file', file, file.name);
 
   console.log('Uploading file to Neo FS:', {
     name: file.name,
-    size: `${fileSizeMB.toFixed(2)}MB`,
+    size: `${(file.size / (1024 * 1024)).toFixed(2)}MB`,
     type: file.type,
-    address: address
+    address: address,
+    gasTransaction: gasTransactionHash
   });
 
-  // Custom headers for FormData
+  // Add GAS transaction hash to headers
   const headers = new Headers();
   headers.append('X-Wallet-Address', address);
+  headers.append('X-Gas-Transaction', gasTransactionHash);
 
   // Calculate timeout based on file size: base timeout plus additional time per MB
   const BASE_TIMEOUT = 30000; // 30 seconds base timeout

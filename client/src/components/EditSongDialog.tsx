@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { calculateNeoGas } from "@/lib/neoStorage";
 
 interface Song {
   id: number;
@@ -26,22 +27,23 @@ interface EditSongDialogProps {
   onOpenChange: (open: boolean) => void;
   mode: 'edit' | 'create';
   onSubmit?: (data: { title: string; artist: string }) => void;
-  fileSize?: number; // Add file size for GAS calculation
-  onGasConfirm?: () => void; // Callback when GAS payment is confirmed
+  fileSize?: number;
+  onGasConfirm?: () => void;
 }
 
-export function EditSongDialog({ 
-  song, 
-  open, 
+export function EditSongDialog({
+  song,
+  open,
   onOpenChange,
   mode,
   onSubmit,
   fileSize,
-  onGasConfirm 
+  onGasConfirm
 }: EditSongDialogProps) {
   const [title, setTitle] = React.useState(song?.title || '');
   const [artist, setArtist] = React.useState(song?.artist || '');
   const [gasAmount, setGasAmount] = React.useState<string>('0');
+  const [gasLoading, setGasLoading] = React.useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -53,23 +55,21 @@ export function EditSongDialog({
 
     // Calculate required GAS if file size is provided
     if (fileSize && mode === 'create') {
-      // Call NEO FS service to calculate GAS
-      fetch('/api/neo-storage/calculate-gas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileSize, duration: 24 }) // 24 hours storage
-      })
-        .then(res => res.json())
-        .then(data => {
-          setGasAmount(data.requiredGas);
+      setGasLoading(true);
+      calculateNeoGas(fileSize)
+        .then(({ requiredGas }) => {
+          setGasAmount(requiredGas);
         })
         .catch(error => {
           console.error('Error calculating GAS:', error);
           toast({
             title: "Error",
-            description: "Failed to calculate required GAS",
+            description: "Failed to calculate required GAS. Please try again.",
             variant: "destructive",
           });
+        })
+        .finally(() => {
+          setGasLoading(false);
         });
     }
   }, [song, fileSize, mode]);
@@ -115,7 +115,7 @@ export function EditSongDialog({
     if (mode === 'create' && fileSize) {
       // Confirm GAS payment before proceeding
       const confirmed = window.confirm(
-        `This upload requires ${gasAmount} GAS. Do you want to proceed?`
+        `This upload requires ${gasAmount} GAS. Do you want to proceed with the payment?`
       );
 
       if (!confirmed) {
@@ -143,10 +143,14 @@ export function EditSongDialog({
               {mode === 'edit' ? 'Edit Song Details' : 'New Song Details'}
             </DialogTitle>
             <DialogDescription>
-              {mode === 'edit' 
-                ? 'Update the title and artist for this song.' 
+              {mode === 'edit'
+                ? 'Update the title and artist for this song.'
                 : `Enter the title and artist for your new song.${
-                    fileSize ? ` Required GAS: ${gasAmount}` : ''
+                    fileSize
+                      ? gasLoading
+                        ? ' Calculating GAS...'
+                        : ` Required GAS: ${gasAmount}`
+                      : ''
                   }`}
             </DialogDescription>
           </DialogHeader>
@@ -175,11 +179,11 @@ export function EditSongDialog({
             </div>
           </div>
           <DialogFooter>
-            <Button 
-              type="submit" 
-              disabled={!title || !artist || editSongMutation.isPending}
+            <Button
+              type="submit"
+              disabled={!title || !artist || editSongMutation.isPending || gasLoading}
             >
-              {mode === 'edit' ? 'Save Changes' : 'Create Song'}
+              {mode === 'edit' ? 'Save Changes' : fileSize ? 'Proceed to Payment' : 'Create Song'}
             </Button>
           </DialogFooter>
         </form>
