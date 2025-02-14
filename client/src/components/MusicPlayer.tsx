@@ -6,6 +6,7 @@ import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useMusicSync } from "@/contexts/MusicSyncContext";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useIntl } from "react-intl";
+import { motion } from "framer-motion";
 
 export function MusicPlayer() {
   const {
@@ -45,10 +46,33 @@ export function MusicPlayer() {
                   onClick={toggleBluetoothSync}
                   className={isBluetoothEnabled ? "text-primary" : "text-muted-foreground"}
                 >
-                  <div className="relative">
+                  <motion.div 
+                    className="relative"
+                    animate={isBluetoothEnabled ? {
+                      scale: [1, 1.2, 1],
+                      rotate: [0, 15, -15, 0]
+                    } : {}}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      repeatType: "reverse"
+                    }}
+                  >
                     <Bluetooth className="h-4 w-4" />
-                    <Skull className="h-3 w-3 absolute -bottom-1 -right-1 text-primary" />
-                  </div>
+                    <motion.div
+                      animate={isBluetoothEnabled ? {
+                        opacity: [0.5, 1],
+                        scale: [0.8, 1.2]
+                      } : {}}
+                      transition={{
+                        duration: 1,
+                        repeat: Infinity,
+                        repeatType: "reverse"
+                      }}
+                    >
+                      <Skull className="h-3 w-3 absolute -bottom-1 -right-1 text-primary" />
+                    </motion.div>
+                  </motion.div>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
