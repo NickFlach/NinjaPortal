@@ -9,6 +9,8 @@ export interface ClientInfo {
   isPlaying?: boolean;
   coordinates?: Coordinates;
   countryCode?: string;
+  connectedAt: number; // Add timestamp for connection order
+  isLeader?: boolean; // Identify the first connected client
 }
 
 export type WebSocketMessage = 
@@ -19,7 +21,8 @@ export type WebSocketMessage =
 
 export type ServerMessage =
   | { type: 'stats_update'; data: LiveStats }
-  | { type: 'sync'; songId: number; timestamp: number; playing: boolean };
+  | { type: 'sync'; songId: number; timestamp: number; playing: boolean }
+  | { type: 'leader_update'; isLeader: boolean };
 
 export interface LiveStats {
   activeListeners: number;

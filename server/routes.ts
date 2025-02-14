@@ -13,15 +13,49 @@ import neoStorageRouter from './routes/neo-storage';
 const clients = new Map<WebSocket, ClientInfo>();
 setClients(clients);
 
+// Function to find the leader client
+function findLeaderClient(): [WebSocket, ClientInfo] | undefined {
+  let earliestConnection: [WebSocket, ClientInfo] | undefined;
+
+  for (const [ws, info] of clients.entries()) {
+    if (ws.readyState === WebSocket.OPEN && 
+        (!earliestConnection || info.connectedAt < earliestConnection[1].connectedAt)) {
+      earliestConnection = [ws, info];
+    }
+  }
+
+  return earliestConnection;
+}
+
+// Function to update leader status after connection changes
+function updateLeaderStatus() {
+  const leader = findLeaderClient();
+
+  for (const [ws, info] of clients.entries()) {
+    if (ws.readyState === WebSocket.OPEN) {
+      const isLeader = leader && ws === leader[0];
+      info.isLeader = isLeader;
+
+      try {
+        ws.send(JSON.stringify({
+          type: 'leader_update',
+          isLeader
+        }));
+      } catch (error) {
+        console.error('Error sending leader update:', error);
+      }
+    }
+  }
+}
+
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
 
-  // Initialize WebSocket server with specific path to avoid conflicts with Vite HMR
+  // Initialize WebSocket server with specific path
   const wss = new WebSocketServer({ 
     server: httpServer,
     path: '/ws/music-sync',
     verifyClient: (info, cb) => {
-      // Skip Vite HMR websocket connections
       if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
         cb(false);
         return;
@@ -54,7 +88,13 @@ export function registerRoutes(app: Express) {
       isAlive = true;
     });
 
-    clients.set(ws, {});
+    // Initialize client info with connection timestamp
+    clients.set(ws, {
+      connectedAt: Date.now(),
+      isLeader: clients.size === 0 // First client becomes leader
+    });
+
+    updateLeaderStatus();
 
     ws.on('message', async (data) => {
       try {
@@ -70,7 +110,6 @@ export function registerRoutes(app: Express) {
           case 'auth': {
             if (message.address) {
               clientInfo.address = message.address.toLowerCase();
-              // Send confirmation back to client
               ws.send(JSON.stringify({ type: 'auth_success' }));
             }
             break;
@@ -79,7 +118,6 @@ export function registerRoutes(app: Express) {
           case 'subscribe': {
             if (message.songId) {
               clientInfo.currentSong = message.songId;
-              // Send confirmation back to client
               ws.send(JSON.stringify({ 
                 type: 'subscribe_success',
                 songId: message.songId 
@@ -92,36 +130,37 @@ export function registerRoutes(app: Express) {
             const { timestamp, playing, songId } = message;
             clientInfo.isPlaying = playing;
 
-            // Clear location data if playback stops
-            if (!playing) {
-              clientInfo.coordinates = undefined;
-              clientInfo.countryCode = undefined;
-            }
+            // Only broadcast sync if this is the leader or no leader exists
+            if (clientInfo.isLeader) {
+              // Clear location data if playback stops
+              if (!playing) {
+                clientInfo.coordinates = undefined;
+                clientInfo.countryCode = undefined;
+              }
 
-            if (typeof songId === 'number') {
-              // Broadcast sync message to other listeners
-              const syncMessage = JSON.stringify({
-                type: 'sync',
-                timestamp,
-                playing,
-                songId
-              });
+              if (typeof songId === 'number') {
+                // Broadcast sync message to other listeners
+                const syncMessage = JSON.stringify({
+                  type: 'sync',
+                  timestamp,
+                  playing,
+                  songId
+                });
 
-              Array.from(clients.entries()).forEach(([client, info]) => {
-                if (client !== ws && 
-                    info.currentSong === songId && 
-                    client.readyState === WebSocket.OPEN) {
-                  try {
-                    client.send(syncMessage);
-                  } catch (error) {
-                    console.error('Error sending sync message:', error);
-                    clients.delete(client);
+                Array.from(clients.entries()).forEach(([client, info]) => {
+                  if (client !== ws && 
+                      info.currentSong === songId && 
+                      client.readyState === WebSocket.OPEN) {
+                    try {
+                      client.send(syncMessage);
+                    } catch (error) {
+                      console.error('Error sending sync message:', error);
+                      clients.delete(client);
+                    }
                   }
-                }
-              });
+                });
+              }
             }
-            // Broadcast updated stats
-            broadcastStats();
             break;
           }
 
@@ -133,13 +172,11 @@ export function registerRoutes(app: Express) {
               clientInfo.coordinates = coordinates;
               clientInfo.countryCode = countryCode;
               console.log('Updated client info:', clientInfo);
-              // Send confirmation back to client
               ws.send(JSON.stringify({ 
                 type: 'location_update_success',
                 coordinates,
                 countryCode 
               }));
-              // Broadcast updated stats with new location info
               broadcastStats();
             } else {
               console.log('Invalid location update - missing coordinates or country code');
@@ -153,7 +190,6 @@ export function registerRoutes(app: Express) {
         }
       } catch (error) {
         console.error('WebSocket message error:', error);
-        // Send error back to client
         ws.send(JSON.stringify({ 
           type: 'error',
           message: error instanceof Error ? error.message : 'Unknown error'
@@ -165,6 +201,7 @@ export function registerRoutes(app: Express) {
       console.error('WebSocket error:', error);
       clearInterval(pingInterval);
       clients.delete(ws);
+      updateLeaderStatus();
       broadcastStats();
     });
 
@@ -172,6 +209,7 @@ export function registerRoutes(app: Express) {
       console.log('Client disconnected');
       clearInterval(pingInterval);
       clients.delete(ws);
+      updateLeaderStatus();
       broadcastStats();
     });
   });

@@ -34,6 +34,7 @@ interface MusicPlayerContextType {
   isSynced: boolean;
   toggleBluetoothSync: () => Promise<void>;
   isBluetoothEnabled: boolean;
+  isLeader: boolean; // Add leader status
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -56,6 +57,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const isLandingPage = !userAddress;
   const audioContextRef = useRef<AudioContext>();
   const geolocationPermissionAsked = useRef(false);
+  const [isLeader, setIsLeader] = useState(false);
+  const lastSyncRef = useRef<{ timestamp: number; playing: boolean } | null>(null);
 
   // Initialize audio element
   useEffect(() => {
@@ -331,7 +334,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
-  // Initialize WebSocket connection
+  // WebSocket connection setup
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/music-sync`;
@@ -360,6 +363,40 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
             case 'auth_success':
               console.log('Authentication successful');
               break;
+            case 'leader_update':
+              console.log('Leader status updated:', data.isLeader);
+              setIsLeader(data.isLeader);
+              break;
+            case 'sync':
+              // Only follow sync messages if we're not the leader
+              if (!isLeader && audioRef.current && data.songId === currentSong?.id) {
+                const timeDiff = Math.abs(audioRef.current.currentTime - data.timestamp);
+
+                // Prevent sync feedback loops
+                const now = Date.now();
+                if (lastSyncRef.current && 
+                    now - lastSyncRef.current.timestamp < 1000 && 
+                    lastSyncRef.current.playing === data.playing) {
+                  return;
+                }
+
+                // Only sync if time difference is significant
+                if (timeDiff > 1) {
+                  audioRef.current.currentTime = data.timestamp;
+                }
+
+                // Handle play/pause state
+                if (data.playing !== isPlaying) {
+                  togglePlay();
+                }
+
+                // Update last sync state
+                lastSyncRef.current = {
+                  timestamp: now,
+                  playing: data.playing
+                };
+              }
+              break;
             case 'error':
               console.error('WebSocket error message:', data.message);
               break;
@@ -375,12 +412,12 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         console.log('WebSocket disconnected');
         setIsSynced(false);
         setActiveListeners(0);
-        setTimeout(connectWebSocket, 5000); // Attempt to reconnect after 5 seconds
+        setIsLeader(false);
+        setTimeout(connectWebSocket, 5000);
       };
 
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
-        // The onclose handler will be called after this
       };
     };
 
@@ -391,15 +428,15 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         wsRef.current.close();
         wsRef.current = null;
         setIsSynced(false);
+        setIsLeader(false);
       }
     };
-  }, [userAddress]);
+  }, [userAddress, isPlaying, currentSong?.id]);
 
-  // Update the WebSocket effect to handle playback status
+  // Update sync state when we're the leader
   useEffect(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN && currentSong) {
+    if (wsRef.current?.readyState === WebSocket.OPEN && currentSong && isLeader) {
       try {
-        // Send playback status
         wsRef.current.send(JSON.stringify({
           type: 'sync',
           songId: currentSong.id,
@@ -407,7 +444,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           timestamp: audioRef.current?.currentTime || 0
         }));
 
-        // Only send location updates if music is playing and we have coordinates
         if (isPlaying && userCoordinates) {
           console.log('Sending location update:', userCoordinates);
           wsRef.current.send(JSON.stringify({
@@ -418,10 +454,9 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         }
       } catch (error) {
         console.error('Error sending WebSocket message:', error);
-        // The socket's onclose handler will handle reconnection if needed
       }
     }
-  }, [isPlaying, currentSong, userCoordinates]);
+  }, [isPlaying, currentSong, userCoordinates, isLeader]);
 
 
   const toggleBluetoothSync = useCallback(async () => {
@@ -505,7 +540,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         activeListeners,
         isSynced,
         toggleBluetoothSync,
-        isBluetoothEnabled
+        isBluetoothEnabled,
+        isLeader
       }}
     >
       {children}
