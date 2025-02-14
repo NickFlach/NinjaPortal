@@ -13,8 +13,6 @@ interface INeoFsOracle {
  * @dev Manages GAS payments and file registrations for NEO FS integration
  */
 contract NeoFsManager is Ownable, ReentrancyGuard {
-    // Storage fee state variables
-    uint256 public baseStorageRate; // GAS per MB per day (from oracle)
     uint256 public constant OVERHEAD_FEE = 100000000000000000; // 0.1 GAS fixed overhead
     address public treasuryAddress;
     INeoFsOracle public oracle;
@@ -22,21 +20,24 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
     struct FileData {
         address owner;
         uint256 size;
-        uint256 timestamp;
         uint256 storagePaid;
+        bytes32 storageProof; // Proof of storage from NEO FS
     }
 
     // Mapping of file hash to file data
     mapping(bytes32 => FileData) public files;
     // User balances for storage payments in GAS
     mapping(address => uint256) public balances;
+    // Mapping to track storage proofs
+    mapping(bytes32 => bool) public processedStorageProofs;
 
     // Events
     event FileRegistered(
         address indexed owner,
         bytes32 indexed fileHash,
         uint256 size,
-        uint256 storagePaid
+        uint256 storagePaid,
+        bytes32 storageProof
     );
     event StoragePaid(address indexed user, uint256 amount);
     event StorageWithdrawn(address indexed recipient, uint256 amount);
@@ -49,8 +50,6 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
         require(_oracle != address(0), "Invalid oracle address");
         treasuryAddress = _treasuryAddress;
         oracle = INeoFsOracle(_oracle);
-        // Initialize rate from oracle
-        baseStorageRate = oracle.getStorageRate();
     }
 
     /**
@@ -62,26 +61,26 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Register a file upload and deduct storage payment
+     * @dev Register a file upload with storage proof
      * @param fileHash Hash of the file in NEO FS
      * @param size Size of the file in bytes
-     * @param duration Storage duration in days
+     * @param storageProof Proof of storage from NEO FS
      */
     function registerFileUpload(
         bytes32 fileHash,
         uint256 size,
-        uint256 duration
+        bytes32 storageProof
     ) external nonReentrant {
         require(size > 0, "File size must be greater than 0");
-        require(duration > 0, "Duration must be greater than 0");
+        require(!processedStorageProofs[storageProof], "Storage proof already used");
         require(files[fileHash].owner == address(0), "File already registered");
 
-        // Get current rate from oracle
         uint256 currentRate = oracle.getStorageRate();
+        require(currentRate > 0, "Storage rate not available");
 
-        // Calculate storage cost (MB per day + overhead)
+        // Calculate storage cost (MB + overhead)
         uint256 mbSize = (size + 1024 * 1024 - 1) / (1024 * 1024); // Round up to nearest MB
-        uint256 storageCost = (mbSize * currentRate * duration) + OVERHEAD_FEE;
+        uint256 storageCost = (mbSize * currentRate) + OVERHEAD_FEE;
 
         require(balances[msg.sender] >= storageCost, "Insufficient GAS balance");
 
@@ -92,20 +91,22 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
         (bool success, ) = payable(treasuryAddress).call{value: OVERHEAD_FEE}("");
         require(success, "Treasury transfer failed");
 
+        // Mark storage proof as used
+        processedStorageProofs[storageProof] = true;
+
         // Register file
         files[fileHash] = FileData({
             owner: msg.sender,
             size: size,
-            timestamp: block.timestamp,
-            storagePaid: storageCost
+            storagePaid: storageCost,
+            storageProof: storageProof
         });
 
-        emit FileRegistered(msg.sender, fileHash, size, storageCost);
+        emit FileRegistered(msg.sender, fileHash, size, storageCost, storageProof);
     }
 
     /**
      * @dev Update treasury address (owner only)
-     * @param newTreasury New treasury address
      */
     function setTreasuryAddress(address newTreasury) external onlyOwner {
         require(newTreasury != address(0), "Invalid treasury address");
@@ -115,7 +116,6 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
 
     /**
      * @dev Update oracle address (owner only)
-     * @param newOracle New oracle address
      */
     function setOracle(address newOracle) external onlyOwner {
         require(newOracle != address(0), "Invalid oracle address");
@@ -125,17 +125,16 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
 
     /**
      * @dev Get file storage details
-     * @param fileHash Hash of the file
      */
     function getFileDetails(bytes32 fileHash) external view returns (
         address owner,
         uint256 size,
-        uint256 timestamp,
-        uint256 storagePaid
+        uint256 storagePaid,
+        bytes32 storageProof
     ) {
         FileData memory file = files[fileHash];
         require(file.owner != address(0), "File not found");
-        return (file.owner, file.size, file.timestamp, file.storagePaid);
+        return (file.owner, file.size, file.storagePaid, file.storageProof);
     }
 
     /**
@@ -154,7 +153,6 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
 
     /**
      * @dev Withdraw storage balance
-     * @param amount Amount of GAS to withdraw
      */
     function withdrawBalance(uint256 amount) external nonReentrant {
         require(balances[msg.sender] >= amount, "Insufficient balance");
@@ -166,7 +164,6 @@ contract NeoFsManager is Ownable, ReentrancyGuard {
 
     /**
      * @dev Withdraw contract balance (owner only)
-     * @param amount Amount of GAS to withdraw
      */
     function withdrawStorage(uint256 amount) external onlyOwner nonReentrant {
         require(address(this).balance >= amount, "Insufficient contract balance");

@@ -5,18 +5,17 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title NeoFsOracle
- * @dev Oracle contract for fetching NEO FS storage rates
+ * @dev Oracle contract for NEO FS storage rates without time dependencies
  */
 contract NeoFsOracle is Ownable {
-    uint256 public lastUpdateTimestamp;
     uint256 public currentStorageRate;
-    uint256 public constant UPDATE_INTERVAL = 1 hours;
     uint256 public constant MAX_RATE_CHANGE_PERCENTAGE = 20; // 20% max change
 
-    event StorageRateUpdate(uint256 newRate, uint256 timestamp);
+    event StorageRateUpdate(uint256 newRate, bytes32 indexed updateId);
     event OracleOperatorUpdate(address indexed operator);
 
     mapping(address => bool) public operators;
+    mapping(bytes32 => bool) public processedUpdates;
 
     modifier onlyOperator() {
         require(operators[msg.sender], "Not authorized as operator");
@@ -31,12 +30,10 @@ contract NeoFsOracle is Ownable {
     /**
      * @dev Update the storage rate with latest data from NEO FS
      * @param newRate New storage rate per MB per day in GAS wei
+     * @param updateId Unique identifier for this update to prevent duplicates
      */
-    function updateStorageRate(uint256 newRate) external onlyOperator {
-        require(
-            block.timestamp >= lastUpdateTimestamp + UPDATE_INTERVAL,
-            "Update too frequent"
-        );
+    function updateStorageRate(uint256 newRate, bytes32 updateId) external onlyOperator {
+        require(!processedUpdates[updateId], "Update already processed");
         require(newRate > 0, "Invalid rate");
 
         // Check for maximum rate change
@@ -49,10 +46,9 @@ contract NeoFsOracle is Ownable {
             );
         }
 
+        processedUpdates[updateId] = true;
         currentStorageRate = newRate;
-        lastUpdateTimestamp = block.timestamp;
-
-        emit StorageRateUpdate(newRate, block.timestamp);
+        emit StorageRateUpdate(newRate, updateId);
     }
 
     /**

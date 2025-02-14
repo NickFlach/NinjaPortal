@@ -4,13 +4,13 @@ import { Address } from 'viem';
 export interface FileData {
   owner: Address;
   size: bigint;
-  timestamp: bigint;
   storagePaid: bigint;
+  storageProof: string;
 }
 
 export interface NeoFsManagerContract {
   // File management
-  registerFileUpload: (fileHash: string, size: bigint, duration: bigint) => Promise<ethers.ContractTransaction>;
+  registerFileUpload: (fileHash: string, size: bigint, storageProof: string) => Promise<ethers.ContractTransaction>;
   getFileDetails: (fileHash: string) => Promise<FileData>;
 
   // Oracle integration
@@ -23,7 +23,7 @@ export interface NeoFsManagerContract {
   withdrawBalance: (amount: bigint) => Promise<ethers.ContractTransaction>;
 
   // Events
-  onFileRegistered: (callback: (owner: Address, fileHash: string, size: bigint, storagePaid: bigint) => void) => void;
+  onFileRegistered: (callback: (owner: Address, fileHash: string, size: bigint, storagePaid: bigint, storageProof: string) => void) => void;
   onStoragePaid: (callback: (user: Address, amount: bigint) => void) => void;
   onStorageWithdrawn: (callback: (recipient: Address, amount: bigint) => void) => void;
   onBalanceWithdrawn: (callback: (user: Address, amount: bigint) => void) => void;
@@ -32,7 +32,7 @@ export interface NeoFsManagerContract {
 
 export interface NeoFsOracleContract {
   getStorageRate: () => Promise<bigint>;
-  updateStorageRate: (newRate: bigint) => Promise<ethers.ContractTransaction>;
+  updateStorageRate: (newRate: bigint, updateId: string) => Promise<ethers.ContractTransaction>;
   setOperator: (operator: Address, isActive: boolean) => Promise<ethers.ContractTransaction>;
   operators: (address: Address) => Promise<boolean>;
 }
@@ -46,8 +46,7 @@ export const OVERHEAD_FEE = BigInt(100000000000000000); // 0.1 GAS fixed overhea
 
 export const calculateRequiredStorage = async (
   contract: NeoFsManagerContract,
-  sizeInBytes: number,
-  durationInDays: number
+  sizeInBytes: number
 ): Promise<bigint> => {
   // Get current rate from oracle via manager contract
   const currentRate = await contract.getCurrentStorageRate();
@@ -55,8 +54,8 @@ export const calculateRequiredStorage = async (
   // Convert size to MB (rounding up)
   const sizeInMB = BigInt(Math.ceil(sizeInBytes / (1024 * 1024)));
 
-  // Calculate storage cost: (size_mb * current_rate * days) + overhead
-  return (sizeInMB * currentRate * BigInt(durationInDays)) + OVERHEAD_FEE;
+  // Calculate storage cost: (size_mb * current_rate) + overhead
+  return (sizeInMB * currentRate) + OVERHEAD_FEE;
 };
 
 // Wei conversion helpers for GAS
