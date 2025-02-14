@@ -36,62 +36,63 @@ export async function calculateNeoGas(fileSize: number): Promise<{ requiredGas: 
 
 // Add NEO wallet payment function
 export async function handleGasPayment(amount: string): Promise<string> {
-  // Check if NEO wallet is available
-  if (typeof window.neo3Dapi === 'undefined') {
-    throw new Error('NEO wallet not found. Please install a compatible wallet.');
+  // NEO wallet interaction code
+  const neoDapi = (window as any).NEOLineN3;
+
+  if (!neoDapi) {
+    throw new Error('NEO wallet not found. Please install NeoLine or other compatible NEO wallet.');
   }
 
   try {
-    // Connect to wallet
-    const connected = await window.neo3Dapi.getProvider();
-    if (!connected) {
-      throw new Error('Failed to connect to NEO wallet');
-    }
+    // Request wallet connection
+    await neoDapi.getAccount();
 
-    // Request GAS payment
-    const result = await window.neo3Dapi.invoke({
-      scriptHash: process.env.VITE_NEO_CONTRACT_ADDRESS,
-      operation: 'transfer',
-      args: [
-        {
-          type: 'Hash160',
-          value: process.env.VITE_GAS_RECIPIENT_ADDRESS
-        },
-        {
-          type: 'Integer',
-          value: amount
-        },
-        {
-          type: 'String',
-          value: 'NEO FS Storage Payment'
-        }
-      ]
-    });
+    // Convert GAS amount to proper format (multiply by 10^8 as NEO uses 8 decimal places)
+    const gasAmount = BigInt(Math.floor(parseFloat(amount) * 100000000));
 
-    if (!result.txid) {
-      throw new Error('Transaction failed');
+    // Construct the transaction
+    const txParams = {
+      fromAddress: await neoDapi.getAccount(),
+      toAddress: process.env.VITE_GAS_RECIPIENT_ADDRESS,
+      asset: 'GAS',
+      amount: gasAmount.toString(),
+      remark: 'NEO FS Storage Payment',
+      fee: '0'
+    };
+
+    // Request payment
+    const { txid } = await neoDapi.send(txParams);
+    if (!txid) {
+      throw new Error('Transaction failed - no transaction ID returned');
     }
 
     // Wait for transaction confirmation
     let confirmed = false;
     let attempts = 0;
     while (!confirmed && attempts < 30) {
-      const tx = await window.neo3Dapi.getTransaction({ txid: result.txid });
-      if (tx && tx.blocktime) {
-        confirmed = true;
-      } else {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        attempts++;
+      try {
+        const tx = await neoDapi.getTransaction(txid);
+        if (tx && tx.blocktime) {
+          confirmed = true;
+          break;
+        }
+      } catch (error) {
+        console.warn('Waiting for transaction confirmation...', error);
       }
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      attempts++;
     }
 
     if (!confirmed) {
-      throw new Error('Transaction confirmation timeout');
+      throw new Error('Transaction confirmation timeout. Please check your wallet for the status.');
     }
 
-    return result.txid;
-  } catch (error) {
+    return txid;
+  } catch (error: any) {
     console.error('GAS payment error:', error);
+    if (error.type === 'CANCELED') {
+      throw new Error('Payment was cancelled by user');
+    }
     throw new Error(error.message || 'Failed to process GAS payment');
   }
 }
@@ -134,7 +135,7 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
   headers.append('X-Wallet-Address', address);
   headers.append('X-Gas-Transaction', gasTransactionHash);
 
-  // Calculate timeout based on file size: base timeout plus additional time per MB
+  // Calculate timeout based on file size
   const BASE_TIMEOUT = 30000; // 30 seconds base timeout
   const TIMEOUT_PER_MB = 2000; // 2 seconds per MB
   const timeoutDuration = BASE_TIMEOUT + (fileSizeMB * TIMEOUT_PER_MB);
@@ -179,7 +180,7 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
 
       const result = await response.json();
       console.log('Upload successful:', result);
-      clearTimeout(timeoutId); // Clear timeout on success
+      clearTimeout(timeoutId);
       return result;
     } catch (error: any) {
       console.error(`Upload attempt ${attempt + 1} failed:`, error);
@@ -193,18 +194,17 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
       // Network error or other fetch error
       if (error instanceof TypeError && attempt < MAX_RETRIES - 1) {
         attempt++;
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         continue;
       }
 
-      // If we've exhausted our retries or it's a different error, clean up and rethrow
       clearTimeout(timeoutId);
       throw error;
     }
   }
 
-  clearTimeout(timeoutId); // Ensure timeout is cleared
-  throw lastError || new Error("Failed to upload file after multiple attempts. Please try again later.");
+  clearTimeout(timeoutId);
+  throw lastError || new Error("Failed to upload file after multiple attempts");
 }
 
 export async function listNeoFSFiles(address: string): Promise<NeoFSFile[]> {
@@ -231,7 +231,7 @@ export async function listNeoFSFiles(address: string): Promise<NeoFSFile[]> {
       throw error;
     }
   }
-  throw new Error("Failed to list files after multiple attempts. Please try again later.");
+  throw new Error("Failed to list files after multiple attempts");
 }
 
 export async function downloadNeoFSFile(fileId: string, address: string): Promise<Blob> {
@@ -258,5 +258,5 @@ export async function downloadNeoFSFile(fileId: string, address: string): Promis
       throw error;
     }
   }
-  throw new Error("Failed to download file after multiple attempts. Please try again later.");
+  throw new Error("Failed to download file after multiple attempts");
 }
