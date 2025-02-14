@@ -90,34 +90,6 @@ export function NeoStorage() {
     }
   };
 
-  // Handle file download
-  const handleDownload = async (file: NeoFSFile) => {
-    if (!address) return;
-
-    try {
-      console.log('Starting file download:', file.name);
-      const blob = await downloadNeoFSFile(file.id, address);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.name;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      console.log('Download completed successfully');
-    } catch (error) {
-      console.error('Download error:', error);
-      toast({
-        title: "Error",
-        description: intl.formatMessage({ id: 'storage.download.error' }),
-        variant: "destructive",
-      });
-    }
-  };
-
-  if (!address) return null;
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -126,7 +98,7 @@ export function NeoStorage() {
           <Input
             type="file"
             onChange={handleFileSelect}
-            className="hidden"
+            accept="audio/mpeg,audio/mp3"
             id="neo-fs-upload"
             disabled={uploadLoading}
           />
@@ -158,7 +130,6 @@ export function NeoStorage() {
         onSubmit={handleFileUpload}
         fileSize={selectedFile?.size}
         onGasConfirm={() => {
-          // Handle any additional GAS payment logic here if needed
           console.log('GAS payment confirmed');
         }}
       />
