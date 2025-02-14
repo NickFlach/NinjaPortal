@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from "@tanstack/react-query";
 import { getFromIPFS } from "@/lib/ipfs";
 import { useAccount } from 'wagmi';
@@ -31,7 +31,9 @@ interface MusicPlayerContextType {
   audioRef: React.RefObject<HTMLAudioElement>;
   userCoordinates?: Coordinates;
   activeListeners: number;
-  isSynced: boolean; // Add this new property
+  isSynced: boolean;
+  toggleBluetoothSync: () => Promise<void>;
+  isBluetoothEnabled: boolean;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -43,9 +45,11 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [userCoordinates, setUserCoordinates] = useState<Coordinates>();
   const [activeListeners, setActiveListeners] = useState(0);
   const [isSynced, setIsSynced] = useState(false);
+  const [isBluetoothEnabled, setIsBluetoothEnabled] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const bluetoothDeviceRef = useRef<BluetoothDevice | null>(null);
   const { address: userAddress } = useAccount();
   const defaultWallet = "REDACTED_WALLET_ADDRESS";
   const landingAddress = userAddress || defaultWallet;
@@ -324,6 +328,9 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       if (wsRef.current) {
         wsRef.current.close();
       }
+      if (bluetoothDeviceRef.current?.gatt?.connected) {
+        bluetoothDeviceRef.current.gatt.disconnect();
+      }
     };
   }, []);
 
@@ -420,6 +427,60 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   }, [isPlaying, currentSong, userCoordinates]);
 
 
+  const toggleBluetoothSync = useCallback(async () => {
+    if (isBluetoothEnabled) {
+      // Disconnect if already connected
+      if (bluetoothDeviceRef.current?.gatt?.connected) {
+        await bluetoothDeviceRef.current.gatt.disconnect();
+      }
+      setIsBluetoothEnabled(false);
+      return;
+    }
+
+    try {
+      // Request Bluetooth device with specific service
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [
+          {
+            services: ['music_sync_service'] // Custom service UUID for our app
+          }
+        ]
+      });
+
+      bluetoothDeviceRef.current = device;
+
+      // Connect to the device
+      const server = await device.gatt?.connect();
+      if (!server) throw new Error('Failed to connect to device');
+
+      // Successfully connected
+      setIsBluetoothEnabled(true);
+
+      // Handle disconnection
+      device.addEventListener('gattserverdisconnected', () => {
+        setIsBluetoothEnabled(false);
+        bluetoothDeviceRef.current = null;
+      });
+
+      // Start listening for nearby devices
+      // This would be implemented in a real app to handle music sync
+      console.log('Connected to Bluetooth device:', device.name);
+
+    } catch (error) {
+      console.error('Bluetooth connection error:', error);
+      setIsBluetoothEnabled(false);
+    }
+  }, [isBluetoothEnabled]);
+
+  // Clean up Bluetooth connection on unmount
+  useEffect(() => {
+    return () => {
+      if (bluetoothDeviceRef.current?.gatt?.connected) {
+        bluetoothDeviceRef.current.gatt.disconnect();
+      }
+    };
+  }, []);
+
   return (
     <MusicPlayerContext.Provider
       value={{
@@ -433,7 +494,9 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         audioRef,
         userCoordinates,
         activeListeners,
-        isSynced // Add this to the context value
+        isSynced,
+        toggleBluetoothSync,
+        isBluetoothEnabled
       }}
     >
       {children}

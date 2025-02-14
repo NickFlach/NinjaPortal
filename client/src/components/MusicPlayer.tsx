@@ -1,20 +1,24 @@
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Volume2, VolumeX, Wifi, WifiOff } from "lucide-react";
+import { Volume2, VolumeX, Wifi, WifiOff, Bluetooth, Skull } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useMusicSync } from "@/contexts/MusicSyncContext";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { useIntl } from "react-intl";
 
 export function MusicPlayer() {
   const {
     currentSong,
     isPlaying,
     togglePlay,
-    isLandingPage
+    isLandingPage,
+    toggleBluetoothSync,
+    isBluetoothEnabled
   } = useMusicPlayer();
 
   const { syncEnabled, toggleSync } = useMusicSync();
+  const intl = useIntl();
 
   // Only show mini player when not on landing page and we have a song
   if (!isLandingPage && !currentSong) return null;
@@ -31,6 +35,29 @@ export function MusicPlayer() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Bluetooth Sync Button */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={toggleBluetoothSync}
+                  className={isBluetoothEnabled ? "text-primary" : "text-muted-foreground"}
+                >
+                  <div className="relative">
+                    <Bluetooth className="h-4 w-4" />
+                    <Skull className="h-3 w-3 absolute -bottom-1 -right-1 text-primary" />
+                  </div>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isBluetoothEnabled ? "Disable nearby sync" : "Enable nearby sync"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* WebSocket Sync Button */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -52,6 +79,8 @@ export function MusicPlayer() {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+
+          {/* Play/Pause Button */}
           <Button variant="ghost" size="icon" onClick={togglePlay}>
             {isPlaying ? (
               <VolumeX className="h-4 w-4" />
