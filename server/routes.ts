@@ -48,6 +48,19 @@ function updateLeaderStatus() {
   }
 }
 
+// Function to find current leader's playback state
+function getLeaderState(): { songId?: number; timestamp: number; playing: boolean } | undefined {
+  const leader = findLeaderClient();
+  if (!leader) return undefined;
+
+  const [_, info] = leader;
+  return {
+    songId: info.currentSong,
+    timestamp: info.currentTime || 0,
+    playing: info.isPlaying || false
+  };
+}
+
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
 
@@ -126,13 +139,25 @@ export function registerRoutes(app: Express) {
             break;
           }
 
+          case 'request_sync': {
+            // New case to handle sync requests from followers
+            const leaderState = getLeaderState();
+            if (leaderState && leaderState.songId === message.songId) {
+              ws.send(JSON.stringify({
+                type: 'sync',
+                ...leaderState
+              }));
+            }
+            break;
+          }
+
           case 'sync': {
             const { timestamp, playing, songId } = message;
             clientInfo.isPlaying = playing;
+            clientInfo.currentTime = timestamp;
 
-            // Only broadcast sync if this is the leader or no leader exists
+            // Only broadcast sync if this is the leader
             if (clientInfo.isLeader) {
-              // Clear location data if playback stops
               if (!playing) {
                 clientInfo.coordinates = undefined;
                 clientInfo.countryCode = undefined;

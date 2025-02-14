@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { useQuery } from "@tanstack/react-query";
 import { getFromIPFS } from "@/lib/ipfs";
 import { useAccount } from 'wagmi';
+import { PIDController } from '@/lib/PIDController';
 
 interface Song {
   id: number;
@@ -59,6 +60,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const geolocationPermissionAsked = useRef(false);
   const [isLeader, setIsLeader] = useState(false);
   const lastSyncRef = useRef<{ timestamp: number; playing: boolean } | null>(null);
+  const pidControllerRef = useRef<PIDController>(new PIDController());
+  const syncIntervalRef = useRef<NodeJS.Timeout>();
 
   // Initialize audio element
   useEffect(() => {
@@ -331,6 +334,12 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       if (wsRef.current) {
         wsRef.current.close();
       }
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+      }
+      if (audioRef.current) {
+        audioRef.current.playbackRate = 1;
+      }
     };
   }, []);
 
@@ -353,7 +362,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         }
       };
 
-      ws.onmessage = (event) => {
+      ws.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
           switch (data.type) {
@@ -370,31 +379,22 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
             case 'sync':
               // Only follow sync messages if we're not the leader
               if (!isLeader && audioRef.current && data.songId === currentSong?.id) {
-                const timeDiff = Math.abs(audioRef.current.currentTime - data.timestamp);
-
-                // Prevent sync feedback loops
-                const now = Date.now();
-                if (lastSyncRef.current && 
-                    now - lastSyncRef.current.timestamp < 1000 && 
-                    lastSyncRef.current.playing === data.playing) {
-                  return;
-                }
-
-                // Only sync if time difference is significant
-                if (timeDiff > 1) {
-                  audioRef.current.currentTime = data.timestamp;
-                }
-
-                // Handle play/pause state
-                if (data.playing !== isPlaying) {
-                  togglePlay();
-                }
-
-                // Update last sync state
+                // Update last sync reference for PID controller
                 lastSyncRef.current = {
-                  timestamp: now,
+                  timestamp: data.timestamp,
                   playing: data.playing
                 };
+
+                // If we're too far behind (> 5 seconds), do a hard seek
+                const timeDiff = Math.abs(audioRef.current.currentTime - data.timestamp);
+                if (timeDiff > 5) {
+                  audioRef.current.currentTime = data.timestamp;
+                  pidControllerRef.current.reset();
+                }
+                // Handle play/pause state
+                if (data.playing !== isPlaying) {
+                  await togglePlay();
+                }
               }
               break;
             case 'error':
@@ -459,6 +459,49 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   }, [isPlaying, currentSong, userCoordinates, isLeader]);
 
 
+  const adjustPlaybackSync = useCallback(() => {
+    if (!audioRef.current || !currentSong || isLeader) return;
+
+    // Get the target time from the leader's last sync message
+    const targetTime = lastSyncRef.current?.timestamp || 0;
+    const currentTime = audioRef.current.currentTime;
+
+    // Compute new playback rate using PID controller
+    const newRate = pidControllerRef.current.compute(targetTime, currentTime);
+
+    // Apply the new playback rate
+    audioRef.current.playbackRate = newRate;
+
+    console.log('Sync adjustment:', {
+      targetTime,
+      currentTime,
+      newRate,
+      diff: targetTime - currentTime
+    });
+  }, [currentSong, isLeader]);
+
+  // Initialize sync interval when becoming a follower
+  useEffect(() => {
+    if (!isLeader && isBluetoothEnabled) {
+      // Reset PID controller when starting sync
+      pidControllerRef.current.reset();
+
+      // Start sync adjustment interval
+      syncIntervalRef.current = setInterval(adjustPlaybackSync, 100); // 10Hz update rate
+
+      return () => {
+        if (syncIntervalRef.current) {
+          clearInterval(syncIntervalRef.current);
+        }
+        // Reset playback rate when stopping sync
+        if (audioRef.current) {
+          audioRef.current.playbackRate = 1;
+        }
+      };
+    }
+  }, [isLeader, isBluetoothEnabled, adjustPlaybackSync]);
+
+
   const toggleBluetoothSync = useCallback(async () => {
     if (isBluetoothEnabled) {
       setIsBluetoothEnabled(false);
@@ -466,7 +509,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
 
     try {
-      // Request geolocation instead of Bluetooth
       if ('geolocation' in navigator) {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -481,41 +523,19 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           lng: position.coords.longitude
         });
 
-        // Simulate successful "pirate beacon" connection
+        // If we're not the leader, try to capture current stream
+        if (!isLeader && currentSong) {
+          // Reset PID controller
+          pidControllerRef.current.reset();
+
+          // Request current playback state from leader
+          wsRef.current?.send(JSON.stringify({
+            type: 'request_sync',
+            songId: currentSong.id
+          }));
+        }
+
         setIsBluetoothEnabled(true);
-
-        // Start checking for nearby listeners every 5 seconds
-        const checkNearbyInterval = setInterval(() => {
-          if (!isBluetoothEnabled) {
-            clearInterval(checkNearbyInterval);
-            return;
-          }
-
-          // Get all active listeners from the WebSocket context
-          //  NOTE:  This assumes wsRef.current.listeners is an array of objects with a coordinates property.  
-          //  This needs to be defined and populated elsewhere in the application.
-          Array.from(wsRef.current?.listeners || []).forEach(listener => {
-            if (listener.coordinates && userCoordinates) {
-              // Calculate distance between users (simplified)
-              const distance = Math.sqrt(
-                Math.pow(listener.coordinates.lat - userCoordinates.lat, 2) +
-                Math.pow(listener.coordinates.lng - userCoordinates.lng, 2)
-              );
-
-              // If users are close (within ~100 meters), sync their playback
-              if (distance < 0.001 && audioRef.current && currentSong) {
-                wsRef.current?.send(JSON.stringify({
-                  type: 'sync',
-                  songId: currentSong.id,
-                  timestamp: audioRef.current.currentTime,
-                  playing: isPlaying
-                }));
-              }
-            }
-          });
-        }, 5000);
-
-        return () => clearInterval(checkNearbyInterval);
       }
     } catch (error) {
       console.error('Location sync error:', error);
@@ -523,7 +543,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       // This is our "innovative" approach - always staying in sync!
       setIsBluetoothEnabled(true);
     }
-  }, [isBluetoothEnabled, userCoordinates, currentSong, isPlaying]);
+  }, [isBluetoothEnabled, currentSong, isLeader]);
 
   return (
     <MusicPlayerContext.Provider

@@ -9,14 +9,16 @@ export interface ClientInfo {
   isPlaying?: boolean;
   coordinates?: Coordinates;
   countryCode?: string;
-  connectedAt: number; // Add timestamp for connection order
-  isLeader?: boolean; // Identify the first connected client
+  connectedAt: number;
+  isLeader?: boolean;
+  currentTime?: number; // Add current playback time
 }
 
 export type WebSocketMessage = 
   | { type: 'auth'; address: string }
   | { type: 'subscribe'; songId: number }
   | { type: 'sync'; songId: number; timestamp: number; playing: boolean }
+  | { type: 'request_sync'; songId: number }
   | { type: 'location_update'; coordinates: Coordinates; countryCode: string };
 
 export type ServerMessage =
