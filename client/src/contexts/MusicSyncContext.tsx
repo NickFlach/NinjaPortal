@@ -94,7 +94,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
         };
 
         ws.onclose = (event) => {
-          console.log('WebSocket connection closed:', event.code, event.reason);
+          console.log('WebSocket disconnected:', event.code, event.reason);
 
           if (syncEnabled && !reconnectTimeoutRef.current && reconnectAttemptRef.current < maxReconnectAttempts) {
             const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
