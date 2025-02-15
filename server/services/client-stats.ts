@@ -1,4 +1,4 @@
-import type { WebSocket } from 'ws';
+import { WebSocket } from 'ws';
 import type { ClientInfo } from '../types/websocket';
 
 // In-memory store for client stats
@@ -68,7 +68,7 @@ export function broadcastStats() {
     data: stats,
   });
 
-  for (const [ws] of clients.entries()) {
+  clients.forEach((_, ws) => {
     if (ws.readyState === WebSocket.OPEN) {
       try {
         ws.send(message);
@@ -76,5 +76,5 @@ export function broadcastStats() {
         console.error('Error broadcasting stats:', error);
       }
     }
-  }
+  });
 }
