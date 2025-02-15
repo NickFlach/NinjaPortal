@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import path from "path";
 import { fileURLToPath } from 'url';
+import { createServer } from 'http';
 
 // ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -43,7 +44,11 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
+const startServer = async (retryCount = 0) => {
+  const maxRetries = 3;
+  const basePort = 5000;
+  const port = basePort + retryCount;
+
   try {
     const server = registerRoutes(app);
 
@@ -84,12 +89,32 @@ app.use((req, res, next) => {
     process.on('SIGTERM', cleanup);
     process.on('SIGINT', cleanup);
 
-    const PORT = 5000;
-    server.listen(PORT, "0.0.0.0", () => {
-      log(`serving on port ${PORT}`);
+    await new Promise<void>((resolve, reject) => {
+      server.listen(port, "0.0.0.0")
+        .once('listening', () => {
+          log(`serving on port ${port}`);
+          resolve();
+        })
+        .once('error', (err: NodeJS.ErrnoException) => {
+          if (err.code === 'EADDRINUSE' && retryCount < maxRetries) {
+            server.close();
+            startServer(retryCount + 1);
+          } else {
+            reject(err);
+          }
+        });
     });
+
   } catch (error) {
     console.error('Failed to start server:', error);
-    process.exit(1);
+    if (retryCount < maxRetries) {
+      console.log(`Retrying on port ${port + 1}...`);
+      await startServer(retryCount + 1);
+    } else {
+      console.error('Max retries reached. Unable to start server.');
+      process.exit(1);
+    }
   }
-})();
+};
+
+startServer();
