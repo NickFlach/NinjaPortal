@@ -126,7 +126,10 @@ export const NetworkSyncVisualization: FC = () => {
                   domain={['auto', 'auto']}
                   tickFormatter={(value) => new Date(value).toLocaleTimeString()}
                 />
-                <YAxis />
+                <YAxis 
+                  domain={[0, 'auto']}
+                  tickFormatter={(value) => value.toFixed(2)}
+                />
                 <Tooltip
                   labelFormatter={(value) => new Date(value).toLocaleTimeString()}
                   formatter={(value: number) => value.toFixed(3)}
@@ -137,6 +140,8 @@ export const NetworkSyncVisualization: FC = () => {
                   stroke="#10b981"
                   dot={false}
                   name="Entropy"
+                  strokeWidth={2}
+                  isAnimationActive={false}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -153,7 +158,10 @@ export const NetworkSyncVisualization: FC = () => {
                   domain={['auto', 'auto']}
                   tickFormatter={(value) => new Date(value).toLocaleTimeString()}
                 />
-                <YAxis />
+                <YAxis 
+                  domain={[-2, 2]}
+                  tickFormatter={(value) => value.toFixed(2)}
+                />
                 <Tooltip
                   labelFormatter={(value) => new Date(value).toLocaleTimeString()}
                   formatter={(value: number) => value.toFixed(3)}
@@ -164,6 +172,8 @@ export const NetworkSyncVisualization: FC = () => {
                   stroke="#8b5cf6"
                   dot={false}
                   name="Free Energy"
+                  strokeWidth={2}
+                  isAnimationActive={false}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -172,35 +182,70 @@ export const NetworkSyncVisualization: FC = () => {
       </div>
 
       {/* PID Control Metrics */}
-      <div className="h-64 mb-4">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={metrics}>
-            <XAxis 
-              dataKey="timestamp"
-              domain={['auto', 'auto']}
-              tickFormatter={(value) => new Date(value).toLocaleTimeString()}
-            />
-            <YAxis />
-            <Tooltip
-              labelFormatter={(value) => new Date(value).toLocaleTimeString()}
-              formatter={(value: number) => value.toFixed(3)}
-            />
-            <Line 
-              type="monotone"
-              dataKey="error"
-              stroke="#ef4444"
-              dot={false}
-              name="Sync Error"
-            />
-            <Line 
-              type="monotone"
-              dataKey="output"
-              stroke="#3b82f6"
-              dot={false}
-              name="PID Output"
-            />
-          </LineChart>
-        </ResponsiveContainer>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <Card className="p-4">
+          <Label>Sync Error</Label>
+          <div className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={metrics}>
+                <XAxis 
+                  dataKey="timestamp"
+                  domain={['auto', 'auto']}
+                  tickFormatter={(value) => new Date(value).toLocaleTimeString()}
+                />
+                <YAxis 
+                  domain={[-1, 1]}
+                  tickFormatter={(value) => value.toFixed(2)}
+                />
+                <Tooltip
+                  labelFormatter={(value) => new Date(value).toLocaleTimeString()}
+                  formatter={(value: number) => value.toFixed(3)}
+                />
+                <Line 
+                  type="monotone"
+                  dataKey="error"
+                  stroke="#ef4444"
+                  dot={false}
+                  name="Sync Error"
+                  strokeWidth={2}
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <Label>PID Output (Playback Rate Adjustment)</Label>
+          <div className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={metrics}>
+                <XAxis 
+                  dataKey="timestamp"
+                  domain={['auto', 'auto']}
+                  tickFormatter={(value) => new Date(value).toLocaleTimeString()}
+                />
+                <YAxis 
+                  domain={[-0.5, 0.5]}
+                  tickFormatter={(value) => value.toFixed(2)}
+                />
+                <Tooltip
+                  labelFormatter={(value) => new Date(value).toLocaleTimeString()}
+                  formatter={(value: number) => value.toFixed(3)}
+                />
+                <Line 
+                  type="monotone"
+                  dataKey="output"
+                  stroke="#3b82f6"
+                  dot={false}
+                  name="PID Output"
+                  strokeWidth={2}
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
       </div>
 
       {/* Network Status */}
