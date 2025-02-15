@@ -2,17 +2,9 @@ import { FC, useEffect, useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { motion } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useMusicSync } from "@/contexts/MusicSyncContext";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
-
-interface NetworkNode {
-  id: string;
-  latency: number;
-  syncError: number;
-  playbackRate: number;
-}
 
 interface NetworkMetrics {
   timestamp: number;
@@ -26,10 +18,9 @@ interface NetworkMetrics {
 }
 
 export const NetworkSyncVisualization: FC = () => {
-  const { syncEnabled, pidMetrics, updatePIDParameters } = useMusicSync();
+  const { syncEnabled, pidMetrics, updatePIDParameters, connectedNodes } = useMusicSync();
   const { isPlaying } = useMusicPlayer();
   const [metrics, setMetrics] = useState<NetworkMetrics[]>([]);
-  const [nodes, setNodes] = useState<NetworkNode[]>([]);
 
   // Update metrics every 100ms when playing and sync is enabled
   useEffect(() => {
@@ -37,8 +28,8 @@ export const NetworkSyncVisualization: FC = () => {
 
     const interval = setInterval(() => {
       // Calculate entropy and free energy based on current network state
-      const entropy = calculateNetworkEntropy(nodes);
-      const freeEnergy = calculateFreeEnergy(nodes);
+      const entropy = calculateNetworkEntropy(connectedNodes);
+      const freeEnergy = calculateFreeEnergy(connectedNodes);
 
       const newMetric: NetworkMetrics = {
         timestamp: Date.now(),
@@ -53,9 +44,9 @@ export const NetworkSyncVisualization: FC = () => {
     }, 100);
 
     return () => clearInterval(interval);
-  }, [syncEnabled, isPlaying, pidMetrics, nodes]);
+  }, [syncEnabled, isPlaying, pidMetrics, connectedNodes]);
 
-  const calculateNetworkEntropy = (nodes: NetworkNode[]) => {
+  const calculateNetworkEntropy = (nodes: typeof connectedNodes) => {
     if (nodes.length === 0) return 0;
     // Implement entropy calculation based on sync errors distribution
     const totalError = nodes.reduce((sum, node) => sum + Math.abs(node.syncError), 0);
@@ -64,7 +55,7 @@ export const NetworkSyncVisualization: FC = () => {
       entropy + (p > 0 ? p * Math.log(p) : 0), 0);
   };
 
-  const calculateFreeEnergy = (nodes: NetworkNode[]) => {
+  const calculateFreeEnergy = (nodes: typeof connectedNodes) => {
     if (nodes.length === 0) return 0;
     // Implementation based on the article's free energy formula
     const avgPlaybackRate = nodes.reduce((sum, node) => sum + node.playbackRate, 0) / nodes.length;
@@ -228,9 +219,9 @@ export const NetworkSyncVisualization: FC = () => {
         <div>
           <Label>Network Statistics</Label>
           <div className="mt-2 space-y-1 text-sm">
-            <div>Connected Nodes: {nodes.length}</div>
-            <div>Avg. Latency: {nodes.length ? 
-              (nodes.reduce((sum, n) => sum + n.latency, 0) / nodes.length).toFixed(0) 
+            <div>Connected Nodes: {connectedNodes.length}</div>
+            <div>Avg. Latency: {connectedNodes.length ? 
+              (connectedNodes.reduce((sum, n) => sum + n.latency, 0) / connectedNodes.length).toFixed(0) 
               : 'N/A'} ms</div>
           </div>
         </div>

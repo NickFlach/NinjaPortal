@@ -3,6 +3,13 @@ import { useAccount } from 'wagmi';
 import { useMusicPlayer } from './MusicPlayerContext';
 import { PIDController } from '@/lib/PIDController';
 
+interface NetworkNode {
+  id: string;
+  latency: number;
+  syncError: number;
+  playbackRate: number;
+}
+
 interface MusicSyncContextType {
   syncEnabled: boolean;
   toggleSync: () => void;
@@ -16,6 +23,7 @@ interface MusicSyncContextType {
       kd: number;
     };
   };
+  connectedNodes: NetworkNode[];
   updatePIDParameters: (params: { kp: number; ki: number; kd: number }) => void;
 }
 
@@ -23,6 +31,7 @@ const MusicSyncContext = createContext<MusicSyncContextType | undefined>(undefin
 
 export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
   const [syncEnabled, setSyncEnabled] = useState(false);
+  const [connectedNodes, setConnectedNodes] = useState<NetworkNode[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const { address } = useAccount();
   const { currentSong, isPlaying, audioRef, togglePlay } = useMusicPlayer();
@@ -98,6 +107,16 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
                 output: newRate - 1 // Normalize around 1.0
               }));
 
+              // Update connected nodes information
+              if (message.nodes) {
+                setConnectedNodes(message.nodes.map((node: any) => ({
+                  id: node.address,
+                  latency: node.latency || 0,
+                  syncError: node.syncError || 0,
+                  playbackRate: node.playbackRate || 1.0
+                })));
+              }
+
               // Handle play/pause state
               if (message.playing !== isPlaying) {
                 await togglePlay();
@@ -107,9 +126,6 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
                 timestamp: Date.now(),
                 playing: message.playing
               };
-            } else if (message.type === 'storage_status') {
-              console.log('Storage status update:', message.data);
-              // Handle NEO FS storage status updates
             }
           } catch (error) {
             console.error('Error processing sync message:', error);
@@ -123,6 +139,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
         ws.onclose = (event) => {
           console.log('WebSocket disconnected:', event.code, event.reason);
+          setConnectedNodes([]); // Clear connected nodes on disconnect
 
           if (syncEnabled && !reconnectTimeoutRef.current && reconnectAttemptRef.current < maxReconnectAttempts) {
             const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
@@ -191,6 +208,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
         toggleSync, 
         updateMetadata, 
         pidMetrics,
+        connectedNodes,
         updatePIDParameters
       }}
     >
