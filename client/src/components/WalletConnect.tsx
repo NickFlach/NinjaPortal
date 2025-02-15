@@ -4,7 +4,7 @@ import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from 'wouter';
-import { isOperaWallet, isMobileDevice, autoConfigureNeoXNetwork } from "@/lib/web3";
+import { isOperaWallet, isMobileDevice, autoConfigureNeoXNetwork, isMetaMaskAvailable } from "@/lib/web3";
 import { useIntl } from 'react-intl';
 import { useDevice } from "@/hooks/use-mobile";
 
@@ -43,12 +43,19 @@ export function WalletConnect() {
     try {
       // Check if we're on mobile and guide users accordingly
       if (isMobile && !window.ethereum) {
-        // Provide mobile-specific wallet guidance
+        // If MetaMask is the target wallet, redirect to MetaMask mobile app
+        if (isMetaMaskAvailable()) {
+          const mmDeepLink = `https://metamask.app.link/dapp/${window.location.host}`;
+          window.location.href = mmDeepLink;
+          return;
+        }
+
+        // For other wallets, show installation guidance
         toast({
           title: intl.formatMessage({ id: 'app.network.setup' }),
           description: isOperaWallet()
-            ? intl.formatMessage({ id: 'app.network.opera.install' })
-            : intl.formatMessage({ id: 'app.network.mobile.install' }),
+            ? intl.formatMessage({ id: 'app.network.opera' })
+            : intl.formatMessage({ id: 'app.network.install' }),
           variant: "destructive",
         });
         return;

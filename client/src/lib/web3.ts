@@ -26,6 +26,19 @@ const isMobileDevice = () => {
   }
 };
 
+// Helper to check if MetaMask is available
+const isMetaMaskAvailable = () => {
+  try {
+    return typeof window !== 'undefined' && (
+      window.ethereum?.isMetaMask ||
+      // Check if we're on mobile and MetaMask is not installed
+      (isMobileDevice() && !window.ethereum)
+    );
+  } catch {
+    return false;
+  }
+};
+
 // Define NEO X network
 export const neoXChain = defineChain({
   id: 47763, // NEO X Chain ID
@@ -78,15 +91,15 @@ export const config = createConfig({
     injected({
       target: () => {
         if (isOperaWallet()) return 'opera';
-        if (isMobileDevice()) return 'injected';
-        return 'metaMask';
+        if (isMetaMaskAvailable()) return 'metaMask';
+        return 'injected';
       }
     })
   ],
 });
 
 // Export utility functions
-export { isOperaWallet, isMobileDevice };
+export { isOperaWallet, isMobileDevice, isMetaMaskAvailable };
 
 // Helper functions
 export const isConnected = () => {
