@@ -15,6 +15,17 @@ const isOperaWallet = () => {
   }
 };
 
+// Helper function to detect mobile browser
+const isMobileDevice = () => {
+  try {
+    return typeof window !== 'undefined' && (
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    );
+  } catch {
+    return false;
+  }
+};
+
 // Define NEO X network
 export const neoXChain = defineChain({
   id: 47763, // NEO X Chain ID
@@ -26,8 +37,18 @@ export const neoXChain = defineChain({
     decimals: 18,
   },
   rpcUrls: {
-    default: { http: ['https://mainnet-1.rpc.banelabs.org'] },
-    public: { http: ['https://mainnet-1.rpc.banelabs.org'] },
+    default: { 
+      http: [
+        'https://mainnet-1.rpc.banelabs.org',
+        'https://mainnet-2.rpc.banelabs.org' // Fallback RPC
+      ]
+    },
+    public: { 
+      http: [
+        'https://mainnet-1.rpc.banelabs.org',
+        'https://mainnet-2.rpc.banelabs.org'
+      ]
+    },
   },
   blockExplorers: {
     default: {
@@ -42,6 +63,9 @@ export const neoXChain = defineChain({
 const publicClient = createPublicClient({
   chain: neoXChain,
   transport: http(),
+  batch: {
+    multicall: true,
+  },
 });
 
 // Create wagmi config with NEO X chain
@@ -52,13 +76,17 @@ export const config = createConfig({
   },
   connectors: [
     injected({
-      target: isOperaWallet() ? 'opera' : 'metaMask'
+      target: () => {
+        if (isOperaWallet()) return 'opera';
+        if (isMobileDevice()) return 'injected';
+        return 'metaMask';
+      }
     })
   ],
 });
 
-// Export the Opera detection function
-export { isOperaWallet };
+// Export utility functions
+export { isOperaWallet, isMobileDevice };
 
 // Helper functions
 export const isConnected = () => {
@@ -97,8 +125,10 @@ export const addNeoXNetwork = async () => {
     return true;
   } catch (error: any) {
     console.error('Error adding NEO X network:', error);
-    if (isOperaWallet() && error.code === 4001) {
-      throw new Error('Please approve the network addition in Opera Wallet');
+    if (error.code === 4001) {
+      throw new Error(isOperaWallet() 
+        ? 'Please approve the network addition in Opera Wallet'
+        : 'Please approve the network addition in your wallet');
     }
     throw error;
   }
@@ -119,8 +149,10 @@ export const switchToNeoXNetwork = async () => {
     if (error.code === 4902) {
       return addNeoXNetwork();
     }
-    if (isOperaWallet() && error.code === 4001) {
-      throw new Error('Please approve the network switch in Opera Wallet');
+    if (error.code === 4001) {
+      throw new Error(isOperaWallet()
+        ? 'Please approve the network switch in Opera Wallet'
+        : 'Please approve the network switch in your wallet');
     }
     throw error;
   }

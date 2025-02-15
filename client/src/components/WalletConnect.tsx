@@ -4,8 +4,9 @@ import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from 'wouter';
-import { isOperaWallet, autoConfigureNeoXNetwork } from "@/lib/web3";
+import { isOperaWallet, isMobileDevice, autoConfigureNeoXNetwork } from "@/lib/web3";
 import { useIntl } from 'react-intl';
+import { useDevice } from "@/hooks/use-mobile";
 
 export function WalletConnect() {
   const { address } = useAccount();
@@ -14,6 +15,7 @@ export function WalletConnect() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const intl = useIntl();
+  const { isMobile } = useDevice();
 
   const registerUser = async (userAddress: string) => {
     try {
@@ -30,8 +32,6 @@ export function WalletConnect() {
       }
 
       console.log('User registered:', data.user);
-      console.log('Recent songs:', data.recentSongs);
-
       return data;
     } catch (error) {
       console.error('Registration error:', error);
@@ -41,6 +41,19 @@ export function WalletConnect() {
 
   const handleConnect = async () => {
     try {
+      // Check if we're on mobile and guide users accordingly
+      if (isMobile && !window.ethereum) {
+        // Provide mobile-specific wallet guidance
+        toast({
+          title: intl.formatMessage({ id: 'app.network.setup' }),
+          description: isOperaWallet()
+            ? intl.formatMessage({ id: 'app.network.opera.install' })
+            : intl.formatMessage({ id: 'app.network.mobile.install' }),
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Always try to connect using injected provider first
       if (typeof window.ethereum !== 'undefined') {
         await connect({ connector: injected() });
@@ -92,9 +105,8 @@ export function WalletConnect() {
             : intl.formatMessage({ id: 'app.network.connect' }),
           variant: "destructive",
         });
+        return; // Stop here if network configuration fails
       }
-
-      console.log('Making request with wallet address:', connectedAddress);
 
       // Registration with retries
       let registrationSuccess = false;
