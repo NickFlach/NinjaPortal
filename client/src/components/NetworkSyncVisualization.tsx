@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useMusicSync } from "@/contexts/MusicSyncContext";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
+import { NetworkNodeMap3D } from './NetworkNodeMap3D';
 
 interface NetworkMetrics {
   timestamp: number;
@@ -312,6 +313,14 @@ export const NetworkSyncVisualization: FC = () => {
           </div>
         </div>
       </div>
+
+      {/* 3D Network Visualization */}
+      <Card className="p-4 mt-6">
+        <Label>Network Node Map</Label>
+        <div className="mt-2">
+          <NetworkNodeMap3D nodes={connectedNodes} />
+        </div>
+      </Card>
     </Card>
   );
 };

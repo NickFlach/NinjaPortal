@@ -3,7 +3,7 @@ import { useAccount } from 'wagmi';
 import { useMusicPlayer } from './MusicPlayerContext';
 import { CascadeController, type CascadeMetrics } from '@/lib/CascadeController';
 
-interface NetworkNode {
+export interface NetworkNode {
   id: string;
   latency: number;
   syncError: number;
@@ -60,7 +60,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
     // Calculate entropy (flow diversity)
     const totalError = nodes.reduce((sum, node) => sum + Math.abs(node.syncError), 0);
     const normalizedErrors = nodes.map(node => Math.abs(node.syncError) / totalError);
-    const entropy = -normalizedErrors.reduce((sum, p) => 
+    const entropy = -normalizedErrors.reduce((sum, p) =>
       sum + (p > 0 ? p * Math.log(p) : 0), 0);
 
     // Calculate free energy (signal speed)
@@ -96,9 +96,9 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
           reconnectAttemptRef.current = 0;
 
           if (address) {
-            ws.send(JSON.stringify({ 
-              type: 'auth', 
-              address 
+            ws.send(JSON.stringify({
+              type: 'auth',
+              address
             }));
           }
         };
@@ -227,9 +227,9 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <MusicSyncContext.Provider 
-      value={{ 
-        syncEnabled, 
+    <MusicSyncContext.Provider
+      value={{
+        syncEnabled,
         toggleSync,
         updateMetadata,
         cascadeMetrics,
