@@ -1,7 +1,10 @@
 import { Layout } from "@/components/Layout";
 import { useEffect } from 'react';
+import { useIntl } from 'react-intl';
 
 export default function Whitepaper() {
+  const intl = useIntl();
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -9,13 +12,20 @@ export default function Whitepaper() {
   return (
     <Layout>
       <div className="prose prose-invert max-w-4xl mx-auto">
-        <h1>Decentralized Music Streaming Platform White Paper</h1>
+        <h1>{intl.formatMessage({ id: 'whitepaper.title' })}</h1>
+        <p className="lead">{intl.formatMessage({ id: 'whitepaper.summary' })}</p>
 
-        <h2>Executive Summary</h2>
-        <p>The platform represents a paradigm shift in music streaming by leveraging blockchain technology, decentralized storage, and advanced network synchronization. Our innovative approach combines NEO blockchain infrastructure with statistical physics principles to create a truly decentralized, synchronized music experience.</p>
+        {/* Lumira AI Assistant Section */}
+        <div className="bg-accent/20 p-6 rounded-lg mb-8">
+          <h2 className="flex items-center gap-2">
+            <span className="text-2xl">🤖</span>
+            {intl.formatMessage({ id: 'whitepaper.ai.lumira' })}
+          </h2>
+          <p>{intl.formatMessage({ id: 'whitepaper.ai.lumira.description' })}</p>
+        </div>
 
-        <h2>Technical Architecture</h2>
-
+        <h2>{intl.formatMessage({ id: 'whitepaper.arch.title' })}</h2>
+        {/*<p>{intl.formatMessage({ id: 'whitepaper.arch.description' })}</p>*/}
         <h3>Core Components</h3>
         <h4>Smart Contracts</h4>
         <ul>
@@ -78,8 +88,17 @@ export default function Whitepaper() {
           </li>
         </ul>
 
-        <h2>Network Architecture</h2>
+        <h4>Lumira AI Integration</h4>
+        <p>Lumira AI is a core component of our system, providing:</p>
+        <ul>
+          <li>Real-time music synchronization optimization</li>
+          <li>Network topology optimization</li>
+          <li>Predictive caching strategies</li>
+          <li>Adaptive quality control</li>
+        </ul>
 
+        <h2>{intl.formatMessage({ id: 'whitepaper.network.title' })}</h2>
+        {/*<p>{intl.formatMessage({ id: 'whitepaper.network.description' })}</p>*/}
         <h3>WebSocket Protocol</h3>
         <h4>Connection Management</h4>
         <ul>
@@ -118,8 +137,27 @@ export default function Whitepaper() {
           </li>
         </ul>
 
-        <h2>Technical Challenges and Solutions</h2>
+        <h2>{intl.formatMessage({ id: 'whitepaper.storage.title' })}</h2>
+        {/*<p>{intl.formatMessage({ id: 'whitepaper.storage.description' })}</p>*/}
+        <h3>Content Distribution</h3>
+        <ul>
+          <li><strong>NEO FS Integration</strong>
+            <ul>
+              <li>Content-addressed storage</li>
+              <li>Redundancy factor: 3x</li>
+              <li>Geographic distribution</li>
+            </ul>
+          </li>
+          <li><strong>IPFS Fallback</strong>
+            <ul>
+              <li>Hybrid storage approach</li>
+              <li>Gateway redundancy</li>
+              <li>Cache management</li>
+            </ul>
+          </li>
+        </ul>
 
+        <h2>{intl.formatMessage({ id: 'whitepaper.challenges.title' })}</h2>
         <h3>Playback Synchronization</h3>
         <ul>
           <li><strong>Rate Limiting and Adaptation</strong>
@@ -145,28 +183,7 @@ export default function Whitepaper() {
           </li>
         </ul>
 
-        <h2>Storage Architecture</h2>
-
-        <h3>Content Distribution</h3>
-        <ul>
-          <li><strong>NEO FS Integration</strong>
-            <ul>
-              <li>Content-addressed storage</li>
-              <li>Redundancy factor: 3x</li>
-              <li>Geographic distribution</li>
-            </ul>
-          </li>
-          <li><strong>IPFS Fallback</strong>
-            <ul>
-              <li>Hybrid storage approach</li>
-              <li>Gateway redundancy</li>
-              <li>Cache management</li>
-            </ul>
-          </li>
-        </ul>
-
-        <h2>Roadmap</h2>
-
+        <h2>{intl.formatMessage({ id: 'whitepaper.roadmap.title' })}</h2>
         <h3>Network Resilience (Q2 2025)</h3>
         <ul>
           <li><strong>Performance Targets</strong>
@@ -190,14 +207,12 @@ export default function Whitepaper() {
         </ul>
 
         <h3>Future Development</h3>
+        <h4>Lumira AI Roadmap</h4>
         <ul>
-          <li><strong>Advanced Features</strong>
-            <ul>
-              <li>AI-powered synchronization prediction</li>
-              <li>Cross-chain bridge integration</li>
-              <li>Decentralized governance implementation</li>
-            </ul>
-          </li>
+          <li>Enhanced synchronization with neural network models</li>
+          <li>Collaborative filtering for music recommendations</li>
+          <li>Automated content moderation</li>
+          <li>Cross-chain optimization strategies</li>
         </ul>
       </div>
     </Layout>
