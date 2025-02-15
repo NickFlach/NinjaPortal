@@ -16,6 +16,7 @@ import { MusicPlayerProvider } from "@/contexts/MusicPlayerContext";
 import { MusicSyncProvider } from "@/contexts/MusicSyncContext";
 import { useEffect } from "react";
 import { LocaleProvider } from "./contexts/LocaleContext";
+import Whitepaper from "./pages/Whitepaper"; // Added import for Whitepaper
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<
@@ -107,6 +108,9 @@ function Router() {
       <Route path="/map">
         <ProtectedRoute component={Map} />
       </Route>
+      <Route path="/whitepaper"> {/* Added route for whitepaper */}
+        <ProtectedRoute component={Whitepaper} /> {/* Added route for whitepaper */}
+      </Route> {/* Added route for whitepaper */}
       <Route>
         <NotFound />
       </Route>
