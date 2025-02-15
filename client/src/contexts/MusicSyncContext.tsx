@@ -17,6 +17,8 @@ interface MusicSyncContextType {
   pidMetrics: {
     error: number;
     output: number;
+    integral: number;
+    derivative: number;
     parameters: {
       kp: number;
       ki: number;
@@ -43,6 +45,8 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
   const [pidMetrics, setPidMetrics] = useState({
     error: 0,
     output: 0,
+    integral: 0,
+    derivative: 0,
     parameters: {
       kp: 0.5,
       ki: 0.2,
@@ -118,13 +122,17 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
               // Use PID controller to adjust playback rate and capture metrics
               const newRate = pidController.current.compute(targetTime, currentTime);
+              const { integral, derivative } = pidController.current.getTerms();
+
               audioRef.current.playbackRate = Math.max(0.5, Math.min(2.0, newRate)); // Clamp playback rate
 
-              // Update PID metrics
+              // Update PID metrics with all terms
               setPidMetrics(prev => ({
                 ...prev,
                 error: targetTime - currentTime,
-                output: newRate - 1 // Normalize around 1.0
+                output: newRate - 1, // Normalize around 1.0
+                integral,
+                derivative
               }));
 
               // Update connected nodes information
@@ -207,7 +215,9 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
       setPidMetrics(prev => ({
         ...prev,
         error: 0,
-        output: 0
+        output: 0,
+        integral: 0,
+        derivative: 0
       }));
     }
   };

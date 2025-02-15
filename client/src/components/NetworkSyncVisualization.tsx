@@ -10,6 +10,8 @@ interface NetworkMetrics {
   timestamp: number;
   error: number;
   output: number;
+  integral: number;
+  derivative: number;
   entropy: number;
   freeEnergy: number;
   targetTime: number;
@@ -37,6 +39,8 @@ export const NetworkSyncVisualization: FC = () => {
         timestamp: Date.now(),
         error: pidMetrics.error,
         output: pidMetrics.output,
+        integral: pidMetrics.integral,
+        derivative: pidMetrics.derivative,
         entropy,
         freeEnergy,
         targetTime: audioRef.current?.currentTime || 0,
@@ -134,9 +138,37 @@ export const NetworkSyncVisualization: FC = () => {
         </div>
       </div>
 
+      {/* PID Terms Display */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div>
+          <Label>Error</Label>
+          <div className="text-lg font-mono">
+            {pidMetrics.error.toFixed(3)}ms
+          </div>
+        </div>
+        <div>
+          <Label>Output</Label>
+          <div className="text-lg font-mono">
+            {pidMetrics.output.toFixed(3)}
+          </div>
+        </div>
+        <div>
+          <Label>Integral Term</Label>
+          <div className="text-lg font-mono">
+            {pidMetrics.integral.toFixed(3)}
+          </div>
+        </div>
+        <div>
+          <Label>Derivative Term</Label>
+          <div className="text-lg font-mono">
+            {pidMetrics.derivative.toFixed(3)}
+          </div>
+        </div>
+      </div>
+
       {/* Sync Error and PID Output Combined */}
       <Card className="p-4 mb-6">
-        <Label>Synchronization Metrics</Label>
+        <Label>PID Controller Response</Label>
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={metrics}>
@@ -168,6 +200,24 @@ export const NetworkSyncVisualization: FC = () => {
                 stroke="#3b82f6"
                 dot={false}
                 name="PID Output"
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+              <Line 
+                type="monotone"
+                dataKey="integral"
+                stroke="#10b981"
+                dot={false}
+                name="Integral Term"
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+              <Line 
+                type="monotone"
+                dataKey="derivative"
+                stroke="#8b5cf6"
+                dot={false}
+                name="Derivative Term"
                 strokeWidth={2}
                 isAnimationActive={false}
               />
