@@ -40,7 +40,6 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
   const reconnectAttemptRef = useRef(0);
   const lastSyncRef = useRef<{ timestamp: number; playing: boolean } | null>(null);
   const pidController = useRef<PIDController>(new PIDController());
-  const baselineTimeRef = useRef<number | null>(null);
   const [pidMetrics, setPidMetrics] = useState({
     error: 0,
     output: 0,
@@ -66,7 +65,6 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
         wsRef.current.close();
         wsRef.current = null;
       }
-      baselineTimeRef.current = null;
       return;
     }
 
@@ -83,14 +81,12 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
         ws.onopen = () => {
           console.log('Connected to music sync server');
           reconnectAttemptRef.current = 0;
-          // Reset baseline time on new connection
-          baselineTimeRef.current = audioRef.current?.currentTime || 0;
 
           if (address) {
             ws.send(JSON.stringify({ 
               type: 'auth', 
               address,
-              currentTime: baselineTimeRef.current 
+              currentTime: 0 // Always start from 0
             }));
           }
           if (reconnectTimeoutRef.current) {
@@ -103,27 +99,18 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
           try {
             const message = JSON.parse(event.data);
             if (message.type === 'sync' && audioRef.current && message.songId === currentSong?.id) {
-              const currentTime = audioRef.current.currentTime;
-              let targetTime = message.timestamp;
+              const currentTime = audioRef.current.currentTime * 1000; // Convert to milliseconds
+              let targetTime = 0; // Default target time is 0
 
-              // If we're the only node, use a different synchronization strategy
-              if (message.nodes?.length <= 1) {
-                targetTime = currentTime;
-              } else {
-                // If we haven't set a baseline time yet, set it now
-                if (baselineTimeRef.current === null) {
-                  baselineTimeRef.current = currentTime;
-                }
-
-                // Calculate target time relative to baseline
+              // Only calculate target time if we have multiple nodes
+              if (message.nodes?.length > 1) {
                 const elapsedTime = Date.now() - message.serverTime;
-                targetTime = baselineTimeRef.current + (elapsedTime / 1000);
+                targetTime = elapsedTime % 1000; // Keep within 0-999ms range
               }
 
               console.log('Sync adjustment:', {
                 targetTime,
                 currentTime,
-                baselineTime: baselineTimeRef.current,
                 newRate: pidController.current.compute(targetTime, currentTime),
                 diff: targetTime - currentTime,
                 nodesCount: message.nodes?.length
@@ -131,7 +118,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
               // Use PID controller to adjust playback rate and capture metrics
               const newRate = pidController.current.compute(targetTime, currentTime);
-              audioRef.current.playbackRate = newRate;
+              audioRef.current.playbackRate = Math.max(0.5, Math.min(2.0, newRate)); // Clamp playback rate
 
               // Update PID metrics
               setPidMetrics(prev => ({
@@ -167,12 +154,12 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
         ws.onerror = (error) => {
           console.error('WebSocket error:', error);
+          // Don't disable sync on error, let the reconnection logic handle it
         };
 
         ws.onclose = (event) => {
           console.log('WebSocket disconnected:', event.code, event.reason);
           setConnectedNodes([]); // Clear connected nodes on disconnect
-          baselineTimeRef.current = null; // Reset baseline time on disconnect
 
           // Only attempt reconnect if sync is still enabled and we haven't exceeded max attempts
           if (syncEnabled && !reconnectTimeoutRef.current && reconnectAttemptRef.current < maxReconnectAttempts) {
@@ -210,7 +197,6 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = undefined;
       }
-      baselineTimeRef.current = null;
     };
   }, [syncEnabled, address, togglePlay, currentSong?.id, isPlaying]);
 
@@ -218,7 +204,6 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
     setSyncEnabled(!syncEnabled);
     if (!syncEnabled) {
       pidController.current.reset();
-      baselineTimeRef.current = null;
       setPidMetrics(prev => ({
         ...prev,
         error: 0,

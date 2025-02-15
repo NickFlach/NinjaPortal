@@ -123,13 +123,13 @@ export const NetworkSyncVisualization: FC = () => {
         <div>
           <Label>Target Time</Label>
           <div className="text-lg font-mono">
-            {metrics.length > 0 ? metrics[metrics.length - 1].targetTime.toFixed(2) : '0.00'}s
+            {metrics.length > 0 ? `${metrics[metrics.length - 1].targetTime.toFixed(1)}ms` : '0.0ms'}
           </div>
         </div>
         <div>
           <Label>Current Time</Label>
           <div className="text-lg font-mono">
-            {metrics.length > 0 ? metrics[metrics.length - 1].currentTime.toFixed(2) : '0.00'}s
+            {metrics.length > 0 ? `${metrics[metrics.length - 1].currentTime.toFixed(1)}ms` : '0.0ms'}
           </div>
         </div>
       </div>
