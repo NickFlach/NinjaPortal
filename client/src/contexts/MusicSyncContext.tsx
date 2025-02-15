@@ -95,15 +95,23 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
             const message = JSON.parse(event.data);
             if (message.type === 'sync' && audioRef.current && message.songId === currentSong?.id) {
               const currentTime = audioRef.current.currentTime;
+              const targetTime = message.timestamp;
+
+              console.log('Sync adjustment:', {
+                targetTime,
+                currentTime,
+                newRate: pidController.current.compute(targetTime, currentTime),
+                diff: targetTime - currentTime
+              });
 
               // Use PID controller to adjust playback rate and capture metrics
-              const newRate = pidController.current.compute(message.timestamp, currentTime);
+              const newRate = pidController.current.compute(targetTime, currentTime);
               audioRef.current.playbackRate = newRate;
 
               // Update PID metrics
               setPidMetrics(prev => ({
                 ...prev,
-                error: message.timestamp - currentTime,
+                error: targetTime - currentTime,
                 output: newRate - 1 // Normalize around 1.0
               }));
 
@@ -134,15 +142,17 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
         ws.onerror = (error) => {
           console.error('WebSocket error:', error);
-          setSyncEnabled(false);
         };
 
         ws.onclose = (event) => {
           console.log('WebSocket disconnected:', event.code, event.reason);
           setConnectedNodes([]); // Clear connected nodes on disconnect
 
+          // Only attempt reconnect if sync is still enabled and we haven't exceeded max attempts
           if (syncEnabled && !reconnectTimeoutRef.current && reconnectAttemptRef.current < maxReconnectAttempts) {
             const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
+            console.log(`Attempting reconnect in ${delay}ms (attempt ${reconnectAttemptRef.current + 1}/${maxReconnectAttempts})`);
+
             reconnectTimeoutRef.current = setTimeout(() => {
               reconnectTimeoutRef.current = undefined;
               reconnectAttemptRef.current++;

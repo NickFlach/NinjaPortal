@@ -12,6 +12,8 @@ interface NetworkMetrics {
   output: number;
   entropy: number;
   freeEnergy: number;
+  targetTime: number;
+  currentTime: number;
   kp: number;
   ki: number;
   kd: number;
@@ -19,7 +21,7 @@ interface NetworkMetrics {
 
 export const NetworkSyncVisualization: FC = () => {
   const { syncEnabled, pidMetrics, updatePIDParameters, connectedNodes } = useMusicSync();
-  const { isPlaying } = useMusicPlayer();
+  const { isPlaying, audioRef } = useMusicPlayer();
   const [metrics, setMetrics] = useState<NetworkMetrics[]>([]);
 
   // Update metrics every 100ms when playing and sync is enabled
@@ -37,6 +39,8 @@ export const NetworkSyncVisualization: FC = () => {
         output: pidMetrics.output,
         entropy,
         freeEnergy,
+        targetTime: audioRef.current?.currentTime || 0,
+        currentTime: audioRef.current?.currentTime || 0,
         ...pidMetrics.parameters
       };
 
@@ -44,7 +48,7 @@ export const NetworkSyncVisualization: FC = () => {
     }, 100);
 
     return () => clearInterval(interval);
-  }, [syncEnabled, isPlaying, pidMetrics, connectedNodes]);
+  }, [syncEnabled, isPlaying, pidMetrics, connectedNodes, audioRef]);
 
   const calculateNetworkEntropy = (nodes: typeof connectedNodes) => {
     if (nodes.length === 0) return 0;
@@ -114,6 +118,64 @@ export const NetworkSyncVisualization: FC = () => {
         </div>
       </div>
 
+      {/* Timing Information */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div>
+          <Label>Target Time</Label>
+          <div className="text-lg font-mono">
+            {metrics.length > 0 ? metrics[metrics.length - 1].targetTime.toFixed(2) : '0.00'}s
+          </div>
+        </div>
+        <div>
+          <Label>Current Time</Label>
+          <div className="text-lg font-mono">
+            {metrics.length > 0 ? metrics[metrics.length - 1].currentTime.toFixed(2) : '0.00'}s
+          </div>
+        </div>
+      </div>
+
+      {/* Sync Error and PID Output Combined */}
+      <Card className="p-4 mb-6">
+        <Label>Synchronization Metrics</Label>
+        <div className="h-48">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={metrics}>
+              <XAxis 
+                dataKey="timestamp"
+                domain={['auto', 'auto']}
+                tickFormatter={(value) => new Date(value).toLocaleTimeString()}
+              />
+              <YAxis 
+                domain={[-1, 1]}
+                tickFormatter={(value) => value.toFixed(2)}
+              />
+              <Tooltip
+                labelFormatter={(value) => new Date(value).toLocaleTimeString()}
+                formatter={(value: number) => value.toFixed(3)}
+              />
+              <Line 
+                type="monotone"
+                dataKey="error"
+                stroke="#ef4444"
+                dot={false}
+                name="Sync Error"
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+              <Line 
+                type="monotone"
+                dataKey="output"
+                stroke="#3b82f6"
+                dot={false}
+                name="PID Output"
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+
       {/* Network Flow Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <Card className="p-4">
@@ -172,73 +234,6 @@ export const NetworkSyncVisualization: FC = () => {
                   stroke="#8b5cf6"
                   dot={false}
                   name="Free Energy"
-                  strokeWidth={2}
-                  isAnimationActive={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      </div>
-
-      {/* PID Control Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <Card className="p-4">
-          <Label>Sync Error</Label>
-          <div className="h-40">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={metrics}>
-                <XAxis 
-                  dataKey="timestamp"
-                  domain={['auto', 'auto']}
-                  tickFormatter={(value) => new Date(value).toLocaleTimeString()}
-                />
-                <YAxis 
-                  domain={[-1, 1]}
-                  tickFormatter={(value) => value.toFixed(2)}
-                />
-                <Tooltip
-                  labelFormatter={(value) => new Date(value).toLocaleTimeString()}
-                  formatter={(value: number) => value.toFixed(3)}
-                />
-                <Line 
-                  type="monotone"
-                  dataKey="error"
-                  stroke="#ef4444"
-                  dot={false}
-                  name="Sync Error"
-                  strokeWidth={2}
-                  isAnimationActive={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <Label>PID Output (Playback Rate Adjustment)</Label>
-          <div className="h-40">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={metrics}>
-                <XAxis 
-                  dataKey="timestamp"
-                  domain={['auto', 'auto']}
-                  tickFormatter={(value) => new Date(value).toLocaleTimeString()}
-                />
-                <YAxis 
-                  domain={[-0.5, 0.5]}
-                  tickFormatter={(value) => value.toFixed(2)}
-                />
-                <Tooltip
-                  labelFormatter={(value) => new Date(value).toLocaleTimeString()}
-                  formatter={(value: number) => value.toFixed(3)}
-                />
-                <Line 
-                  type="monotone"
-                  dataKey="output"
-                  stroke="#3b82f6"
-                  dot={false}
-                  name="PID Output"
                   strokeWidth={2}
                   isAnimationActive={false}
                 />
