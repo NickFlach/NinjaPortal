@@ -2,12 +2,15 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { useAccount } from 'wagmi';
 import { useMusicPlayer } from './MusicPlayerContext';
 import { CascadeController, type CascadeMetrics } from '@/lib/CascadeController';
+import { ConnectionManager, type ConnectionType } from '@/lib/ConnectionManager';
+import { AudioBufferController, type AudioQualityMetrics } from '@/lib/AudioBufferController';
 
 export interface NetworkNode {
   id: string;
   latency: number;
   syncError: number;
   playbackRate: number;
+  connectionType: ConnectionType;
 }
 
 interface MusicSyncContextType {
@@ -15,11 +18,14 @@ interface MusicSyncContextType {
   toggleSync: () => void;
   updateMetadata: (songId: number, metadata: { title: string; artist: string }) => Promise<void>;
   cascadeMetrics: CascadeMetrics;
+  audioMetrics: AudioQualityMetrics;
   connectedNodes: NetworkNode[];
   updateControlParameters: (params: {
     innerLoop: { kp: number; ki: number; kd: number };
     outerLoop: { kp: number; ki: number; kd: number };
   }) => void;
+  connectionType: ConnectionType;
+  switchToBluetoothSync: () => Promise<boolean>;
 }
 
 const MusicSyncContext = createContext<MusicSyncContextType | undefined>(undefined);
@@ -27,6 +33,13 @@ const MusicSyncContext = createContext<MusicSyncContextType | undefined>(undefin
 export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [connectedNodes, setConnectedNodes] = useState<NetworkNode[]>([]);
+  const [audioMetrics, setAudioMetrics] = useState<AudioQualityMetrics>({
+    bufferHealth: 1,
+    playbackStability: 1,
+    dropoutCount: 0,
+    jitterMs: 0
+  });
+
   const wsRef = useRef<WebSocket | null>(null);
   const { address } = useAccount();
   const { currentSong, isPlaying, audioRef, togglePlay } = useMusicPlayer();
@@ -35,6 +48,9 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
   const reconnectAttemptRef = useRef(0);
   const lastSyncRef = useRef<{ timestamp: number; playing: boolean } | null>(null);
   const cascadeController = useRef(new CascadeController());
+  const connectionManager = useRef(new ConnectionManager());
+  const audioBufferController = useRef<AudioBufferController | null>(null);
+
   const [cascadeMetrics, setCascadeMetrics] = useState<CascadeMetrics>({
     entropyError: 0,
     freeEnergyError: 0,
@@ -46,11 +62,45 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
     freeEnergyDerivative: 0
   });
 
+  // Initialize audio buffer controller
+  useEffect(() => {
+    if (audioRef.current && !audioBufferController.current) {
+      const audioContext = new AudioContext();
+      audioBufferController.current = new AudioBufferController(audioContext);
+    }
+  }, [audioRef]);
+
+  // Monitor audio quality metrics
+  useEffect(() => {
+    if (!syncEnabled || !audioBufferController.current) return;
+
+    const interval = setInterval(() => {
+      if (audioBufferController.current) {
+        setAudioMetrics(audioBufferController.current.getMetrics());
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [syncEnabled]);
+
   const updateControlParameters = (params: {
     innerLoop: { kp: number; ki: number; kd: number };
     outerLoop: { kp: number; ki: number; kd: number };
   }) => {
     cascadeController.current = new CascadeController(params.innerLoop, params.outerLoop);
+  };
+
+  const switchToBluetoothSync = async () => {
+    const success = await connectionManager.current.connectBluetooth();
+    if (success) {
+      // Reinitialize sync with Bluetooth configuration
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      initializeSync();
+    }
+    return success;
   };
 
   // Calculate network metrics
@@ -71,6 +121,120 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
     return { entropy, freeEnergy };
   };
 
+  const initializeSync = () => {
+    if (!connectionManager.current.isValidConnection()) {
+      console.error('Invalid connection type for sync');
+      setSyncEnabled(false);
+      return;
+    }
+
+    try {
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = window.location.host;
+      const wsPath = '/ws/music-sync';
+      const wsUrl = `${wsProtocol}//${wsHost}${wsPath}`;
+
+      console.log('Connecting to WebSocket:', wsUrl);
+      const ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log('Connected to music sync server');
+        reconnectAttemptRef.current = 0;
+
+        if (address) {
+          ws.send(JSON.stringify({
+            type: 'auth',
+            address,
+            connectionType: connectionManager.current.getConnectionType()
+          }));
+        }
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'sync' && audioRef.current && message.songId === currentSong?.id) {
+            // Calculate current network metrics
+            const { entropy, freeEnergy } = calculateNetworkMetrics(message.nodes || []);
+
+            // Target values (these could be adjusted based on network conditions)
+            const targetFreeEnergy = 1.0; // Optimal signal speed
+
+            // Use cascade controller to compute new playback rate
+            const { playbackRate, metrics } = cascadeController.current.compute(
+              targetFreeEnergy,
+              freeEnergy,
+              entropy
+            );
+
+            // Apply the computed playback rate through the buffer controller
+            if (audioBufferController.current) {
+              audioBufferController.current.adjustPlaybackRate(playbackRate);
+            } else {
+              audioRef.current.playbackRate = playbackRate;
+            }
+
+            // Update metrics for visualization
+            setCascadeMetrics(metrics);
+
+            // Update connected nodes information
+            if (message.nodes) {
+              setConnectedNodes(message.nodes.map((node: any) => ({
+                id: node.address,
+                latency: node.latency || 0,
+                syncError: node.syncError || 0,
+                playbackRate: node.playbackRate || 1.0,
+                connectionType: node.connectionType || 'unknown'
+              })));
+            }
+
+            // Handle play/pause state
+            if (message.playing !== isPlaying) {
+              await togglePlay();
+            }
+
+            lastSyncRef.current = {
+              timestamp: Date.now(),
+              playing: message.playing
+            };
+          }
+        } catch (error) {
+          console.error('Error processing sync message:', error);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      ws.onclose = (event) => {
+        console.log('WebSocket disconnected:', event.code, event.reason);
+        setConnectedNodes([]);
+
+        if (syncEnabled && !reconnectTimeoutRef.current && reconnectAttemptRef.current < maxReconnectAttempts) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
+          console.log(`Attempting reconnect in ${delay}ms (attempt ${reconnectAttemptRef.current + 1}/${maxReconnectAttempts})`);
+
+          reconnectTimeoutRef.current = setTimeout(() => {
+            reconnectTimeoutRef.current = undefined;
+            reconnectAttemptRef.current++;
+            if (syncEnabled) {
+              initializeSync();
+            }
+          }, delay);
+        } else if (reconnectAttemptRef.current >= maxReconnectAttempts) {
+          console.log('Max reconnection attempts reached');
+          setSyncEnabled(false);
+        }
+      };
+
+      wsRef.current = ws;
+    } catch (error) {
+      console.error('Error creating WebSocket connection:', error);
+      setSyncEnabled(false);
+    }
+  };
+
   // Initialize WebSocket connection
   useEffect(() => {
     if (!syncEnabled) {
@@ -81,109 +245,7 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    function connect() {
-      try {
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsHost = window.location.host;
-        const wsPath = '/ws/music-sync';
-        const wsUrl = `${wsProtocol}//${wsHost}${wsPath}`;
-
-        console.log('Connecting to WebSocket:', wsUrl);
-        const ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-          console.log('Connected to music sync server');
-          reconnectAttemptRef.current = 0;
-
-          if (address) {
-            ws.send(JSON.stringify({
-              type: 'auth',
-              address
-            }));
-          }
-        };
-
-        ws.onmessage = async (event) => {
-          try {
-            const message = JSON.parse(event.data);
-            if (message.type === 'sync' && audioRef.current && message.songId === currentSong?.id) {
-              // Calculate current network metrics
-              const { entropy, freeEnergy } = calculateNetworkMetrics(message.nodes || []);
-
-              // Target values (these could be adjusted based on network conditions)
-              const targetFreeEnergy = 1.0; // Optimal signal speed
-
-              // Use cascade controller to compute new playback rate
-              const { playbackRate, metrics } = cascadeController.current.compute(
-                targetFreeEnergy,
-                freeEnergy,
-                entropy
-              );
-
-              // Apply the computed playback rate
-              audioRef.current.playbackRate = playbackRate;
-
-              // Update metrics for visualization
-              setCascadeMetrics(metrics);
-
-              // Update connected nodes information
-              if (message.nodes) {
-                setConnectedNodes(message.nodes.map((node: any) => ({
-                  id: node.address,
-                  latency: node.latency || 0,
-                  syncError: node.syncError || 0,
-                  playbackRate: node.playbackRate || 1.0
-                })));
-              }
-
-              // Handle play/pause state
-              if (message.playing !== isPlaying) {
-                await togglePlay();
-              }
-
-              lastSyncRef.current = {
-                timestamp: Date.now(),
-                playing: message.playing
-              };
-            }
-          } catch (error) {
-            console.error('Error processing sync message:', error);
-          }
-        };
-
-        ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-        };
-
-        ws.onclose = (event) => {
-          console.log('WebSocket disconnected:', event.code, event.reason);
-          setConnectedNodes([]);
-
-          if (syncEnabled && !reconnectTimeoutRef.current && reconnectAttemptRef.current < maxReconnectAttempts) {
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
-            console.log(`Attempting reconnect in ${delay}ms (attempt ${reconnectAttemptRef.current + 1}/${maxReconnectAttempts})`);
-
-            reconnectTimeoutRef.current = setTimeout(() => {
-              reconnectTimeoutRef.current = undefined;
-              reconnectAttemptRef.current++;
-              if (syncEnabled) {
-                connect();
-              }
-            }, delay);
-          } else if (reconnectAttemptRef.current >= maxReconnectAttempts) {
-            console.log('Max reconnection attempts reached');
-            setSyncEnabled(false);
-          }
-        };
-
-        wsRef.current = ws;
-      } catch (error) {
-        console.error('Error creating WebSocket connection:', error);
-        setSyncEnabled(false);
-      }
-    }
-
-    connect();
+    initializeSync();
 
     return () => {
       if (wsRef.current) {
@@ -201,6 +263,9 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
     setSyncEnabled(!syncEnabled);
     if (!syncEnabled) {
       cascadeController.current.reset();
+      if (audioBufferController.current) {
+        audioBufferController.current.reset();
+      }
       setCascadeMetrics({
         entropyError: 0,
         freeEnergyError: 0,
@@ -233,8 +298,11 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
         toggleSync,
         updateMetadata,
         cascadeMetrics,
+        audioMetrics,
         connectedNodes,
-        updateControlParameters
+        updateControlParameters,
+        connectionType: connectionManager.current.getConnectionType(),
+        switchToBluetoothSync
       }}
     >
       {children}
