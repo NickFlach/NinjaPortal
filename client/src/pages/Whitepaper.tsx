@@ -25,194 +25,203 @@ export default function Whitepaper() {
         </div>
 
         <h2>{intl.formatMessage({ id: 'whitepaper.arch.title' })}</h2>
-        {/*<p>{intl.formatMessage({ id: 'whitepaper.arch.description' })}</p>*/}
-        <h3>Core Components</h3>
-        <h4>Smart Contracts</h4>
+        <p>{intl.formatMessage({ id: 'whitepaper.arch.description' })}</p>
+
+        <h3>{intl.formatMessage({ id: 'whitepaper.components.title' })}</h3>
+        <h4>{intl.formatMessage({ id: 'whitepaper.contracts.title' })}</h4>
         <ul>
           <li>
-            <strong>MusicTreasury.sol</strong>: Manages token rewards and treasury functions
+            <strong>MusicTreasury.sol</strong>: {intl.formatMessage({ id: 'whitepaper.contracts.treasury' })}
             <ul>
-              <li>Upload Reward: 1 PFORK - Incentivizes content contribution</li>
-              <li>Playlist Reward: 2 PFORK - Encourages curation and discovery</li>
-              <li>NFT Reward: 3 PFORK - Promotes community ownership</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.contracts.upload' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.contracts.playlist' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.contracts.nft' })}</li>
             </ul>
           </li>
           <li>
-            <strong>NeoFsManager.sol</strong>: Handles decentralized storage
+            <strong>NeoFsManager.sol</strong>: {intl.formatMessage({ id: 'whitepaper.contracts.neofs' })}
             <ul>
-              <li>Implements content-addressed storage using NEO FS</li>
-              <li>Manages file integrity verification</li>
-              <li>Handles storage node incentivization</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.contracts.neofs.storage' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.contracts.neofs.integrity' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.contracts.neofs.incentive' })}</li>
             </ul>
           </li>
         </ul>
 
-        <h4>Cascade Control System</h4>
-        <p>The platform implements an advanced cascade controller system for synchronized playback, based on principles from statistical physics and control theory.</p>
-
-        <h5>Controller Architecture</h5>
+        <h4>{intl.formatMessage({ id: 'whitepaper.cascade.title' })}</h4>
+        <p>{intl.formatMessage({ id: 'whitepaper.cascade.description' })}</p>
+        <h5>{intl.formatMessage({ id: 'whitepaper.cascade.arch.title' })}</h5>
         <ul>
-          <li><strong>Inner Loop (Entropy Control)</strong>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.cascade.inner.title' })}</strong>
             <ul>
-              <li>Manages local playback synchronization</li>
-              <li>Implements anti-windup mechanisms</li>
-              <li>Uses adaptive gain scheduling</li>
-              <li>Features low-pass filtered derivative action</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.cascade.inner.sync' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.cascade.inner.antiwindup' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.cascade.inner.gain' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.cascade.inner.derivative' })}</li>
             </ul>
           </li>
-          <li><strong>Outer Loop (Free Energy Control)</strong>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.cascade.outer.title' })}</strong>
             <ul>
-              <li>Coordinates global network synchronization</li>
-              <li>Implements conservative gain adaptation</li>
-              <li>Features oscillation detection and damping</li>
-              <li>Uses steady-state error compensation</li>
-            </ul>
-          </li>
-        </ul>
-
-        <h4>NEO Blockchain Integration</h4>
-        <ul>
-          <li><strong>Network Configuration</strong>
-            <ul>
-              <li>Chain ID: 47763</li>
-              <li>Native Currency: GAS</li>
-              <li>RPC Endpoint: https://mainnet-1.rpc.banelabs.org</li>
-            </ul>
-          </li>
-          <li><strong>Wallet Integration</strong>
-            <ul>
-              <li>Multi-wallet support (MetaMask, Opera)</li>
-              <li>Automatic network configuration</li>
-              <li>Fallback connection handling</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.cascade.outer.sync' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.cascade.outer.gain' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.cascade.outer.oscillation' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.cascade.outer.error' })}</li>
             </ul>
           </li>
         </ul>
 
-        <h4>Lumira AI Integration</h4>
-        <p>Lumira AI is a core component of our system, providing:</p>
+        <h4>{intl.formatMessage({ id: 'whitepaper.neo.title' })}</h4>
         <ul>
-          <li>Real-time music synchronization optimization</li>
-          <li>Network topology optimization</li>
-          <li>Predictive caching strategies</li>
-          <li>Adaptive quality control</li>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.neo.config.title' })}</strong>
+            <ul>
+              <li>{intl.formatMessage({ id: 'whitepaper.neo.config.chainid' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.neo.config.currency' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.neo.config.rpc' })}</li>
+            </ul>
+          </li>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.neo.wallet.title' })}</strong>
+            <ul>
+              <li>{intl.formatMessage({ id: 'whitepaper.neo.wallet.support' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.neo.wallet.autoconfig' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.neo.wallet.fallback' })}</li>
+            </ul>
+          </li>
         </ul>
+
+        <h4>{intl.formatMessage({ id: 'whitepaper.lumira.title' })}</h4>
+        <p>{intl.formatMessage({ id: 'whitepaper.lumira.features' })}</p>
+        <ul>
+          <li>{intl.formatMessage({ id: 'whitepaper.lumira.sync' })}</li>
+          <li>{intl.formatMessage({ id: 'whitepaper.lumira.topology' })}</li>
+          <li>{intl.formatMessage({ id: 'whitepaper.lumira.caching' })}</li>
+          <li>{intl.formatMessage({ id: 'whitepaper.lumira.quality' })}</li>
+        </ul>
+
+        <h3>{intl.formatMessage({ id: 'whitepaper.lumira.future' })}</h3>
+        <ul>
+          <li>{intl.formatMessage({ id: 'whitepaper.lumira.neural' })}</li>
+          <li>{intl.formatMessage({ id: 'whitepaper.lumira.filtering' })}</li>
+          <li>{intl.formatMessage({ id: 'whitepaper.lumira.moderation' })}</li>
+          <li>{intl.formatMessage({ id: 'whitepaper.lumira.crosschain' })}</li>
+        </ul>
+
 
         <h2>{intl.formatMessage({ id: 'whitepaper.network.title' })}</h2>
-        {/*<p>{intl.formatMessage({ id: 'whitepaper.network.description' })}</p>*/}
-        <h3>WebSocket Protocol</h3>
-        <h4>Connection Management</h4>
+        <p>{intl.formatMessage({ id: 'whitepaper.network.description' })}</p>
+        <h3>{intl.formatMessage({ id: 'whitepaper.websocket.title' })}</h3>
+        <h4>{intl.formatMessage({ id: 'whitepaper.websocket.conn.title' })}</h4>
         <ul>
-          <li><strong>Authentication Flow</strong>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.websocket.auth.title' })}</strong>
             <ul>
-              <li>Wallet signature verification</li>
-              <li>Session token management</li>
-              <li>Heartbeat mechanism</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.websocket.auth.verify' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.websocket.auth.token' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.websocket.auth.heartbeat' })}</li>
             </ul>
           </li>
-          <li><strong>Message Types</strong>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.websocket.msg.title' })}</strong>
             <ul>
-              <li>auth: Initial authentication and session establishment</li>
-              <li>subscribe: Join music synchronization groups</li>
-              <li>sync: Playback state synchronization</li>
-              <li>location_update: Geographical node mapping</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.websocket.msg.auth' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.websocket.msg.subscribe' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.websocket.msg.sync' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.websocket.msg.location' })}</li>
             </ul>
           </li>
         </ul>
 
-        <h3>Synchronization Protocol</h3>
+        <h3>{intl.formatMessage({ id: 'whitepaper.sync.title' })}</h3>
         <ul>
-          <li><strong>State Management</strong>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.sync.state.title' })}</strong>
             <ul>
-              <li>Distributed timestamp synchronization</li>
-              <li>Leader election using Byzantine fault tolerance</li>
-              <li>State merkle tree verification</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.sync.state.timestamp' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.sync.state.election' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.sync.state.merkle' })}</li>
             </ul>
           </li>
-          <li><strong>Network Topology</strong>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.sync.topology.title' })}</strong>
             <ul>
-              <li>Dynamic mesh network formation</li>
-              <li>Geographical node clustering</li>
-              <li>Redundant connection paths</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.sync.topology.mesh' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.sync.topology.cluster' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.sync.topology.redundant' })}</li>
             </ul>
           </li>
         </ul>
 
         <h2>{intl.formatMessage({ id: 'whitepaper.storage.title' })}</h2>
-        {/*<p>{intl.formatMessage({ id: 'whitepaper.storage.description' })}</p>*/}
-        <h3>Content Distribution</h3>
+        <p>{intl.formatMessage({ id: 'whitepaper.storage.description' })}</p>
+        <h3>{intl.formatMessage({ id: 'whitepaper.storage.dist.title' })}</h3>
         <ul>
-          <li><strong>NEO FS Integration</strong>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.storage.neofs.title' })}</strong>
             <ul>
-              <li>Content-addressed storage</li>
-              <li>Redundancy factor: 3x</li>
-              <li>Geographic distribution</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.storage.neofs.address' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.storage.neofs.redundancy' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.storage.neofs.geo' })}</li>
             </ul>
           </li>
-          <li><strong>IPFS Fallback</strong>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.storage.ipfs.title' })}</strong>
             <ul>
-              <li>Hybrid storage approach</li>
-              <li>Gateway redundancy</li>
-              <li>Cache management</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.storage.ipfs.hybrid' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.storage.ipfs.gateway' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.storage.ipfs.cache' })}</li>
             </ul>
           </li>
         </ul>
 
         <h2>{intl.formatMessage({ id: 'whitepaper.challenges.title' })}</h2>
-        <h3>Playback Synchronization</h3>
+        <h3>{intl.formatMessage({ id: 'whitepaper.challenges.playback.title' })}</h3>
         <ul>
-          <li><strong>Rate Limiting and Adaptation</strong>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.challenges.rate.title' })}</strong>
             <ul>
-              <li>Adaptive rate limiting based on network conditions</li>
-              <li>Exponential backoff for reconnection attempts</li>
-              <li>Jitter buffer management</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.challenges.rate.adaptive' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.challenges.rate.backoff' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.challenges.rate.jitter' })}</li>
             </ul>
           </li>
-          <li><strong>Connection Management</strong>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.challenges.conn.title' })}</strong>
             <ul>
-              <li>Heartbeat interval: 30s with 10s grace period</li>
-              <li>Connection state machine with 5 distinct states</li>
-              <li>Automatic recovery mechanisms</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.challenges.conn.heartbeat' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.challenges.conn.state' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.challenges.conn.recovery' })}</li>
             </ul>
           </li>
-          <li><strong>Leader Election</strong>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.challenges.election.title' })}</strong>
             <ul>
-              <li>RAFT consensus implementation</li>
-              <li>Automatic failover with 3-second detection</li>
-              <li>State transfer protocol</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.challenges.election.raft' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.challenges.election.failover' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.challenges.election.transfer' })}</li>
             </ul>
           </li>
         </ul>
 
         <h2>{intl.formatMessage({ id: 'whitepaper.roadmap.title' })}</h2>
-        <h3>Network Resilience (Q2 2025)</h3>
+        <h3>{intl.formatMessage({ id: 'whitepaper.roadmap.resilience.title' })}</h3>
         <ul>
-          <li><strong>Performance Targets</strong>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.roadmap.resilience.targets.title' })}</strong>
             <ul>
-              <li>Reduce sync errors by 90% through enhanced PID tuning</li>
-              <li>Achieve 99.9% uptime via redundant infrastructure</li>
-              <li>Implement N+1 fallback mechanisms</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.roadmap.resilience.targets.errors' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.roadmap.resilience.targets.uptime' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.roadmap.resilience.targets.fallback' })}</li>
             </ul>
           </li>
         </ul>
 
-        <h3>Storage Optimization (Q3 2025)</h3>
+        <h3>{intl.formatMessage({ id: 'whitepaper.roadmap.storage.title' })}</h3>
         <ul>
-          <li><strong>Efficiency Improvements</strong>
+          <li><strong>{intl.formatMessage({ id: 'whitepaper.roadmap.storage.improvements.title' })}</strong>
             <ul>
-              <li>Reduce storage costs by 50% through smart compression</li>
-              <li>Implement adaptive bitrate streaming</li>
-              <li>Add edge-cached content delivery</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.roadmap.storage.improvements.costs' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.roadmap.storage.improvements.bitrate' })}</li>
+              <li>{intl.formatMessage({ id: 'whitepaper.roadmap.storage.improvements.edge' })}</li>
             </ul>
           </li>
         </ul>
 
-        <h3>Future Development</h3>
-        <h4>Lumira AI Roadmap</h4>
+        <h3>{intl.formatMessage({ id: 'whitepaper.roadmap.future.title' })}</h3>
+        <h4>{intl.formatMessage({ id: 'whitepaper.lumira.future.title' })}</h4>
         <ul>
-          <li>Enhanced synchronization with neural network models</li>
-          <li>Collaborative filtering for music recommendations</li>
-          <li>Automated content moderation</li>
-          <li>Cross-chain optimization strategies</li>
+          <li>{intl.formatMessage({ id: 'whitepaper.lumira.neural' })}</li>
+          <li>{intl.formatMessage({ id: 'whitepaper.lumira.filtering' })}</li>
+          <li>{intl.formatMessage({ id: 'whitepaper.lumira.moderation' })}</li>
+          <li>{intl.formatMessage({ id: 'whitepaper.lumira.crosschain' })}</li>
         </ul>
       </div>
     </Layout>
