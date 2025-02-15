@@ -10,7 +10,7 @@ interface NetworkNodeMap3DProps {
 
 const Node: FC<{ position: [number, number, number], node: NetworkNode }> = ({ position, node }) => {
   const meshRef = useRef<THREE.Mesh>(null)
-  
+
   useFrame((state) => {
     if (meshRef.current) {
       // Gentle floating animation
@@ -18,23 +18,43 @@ const Node: FC<{ position: [number, number, number], node: NetworkNode }> = ({ p
     }
   })
 
+  // Get color based on connection type
+  const getNodeColor = (type: string) => {
+    switch (type) {
+      case 'bluetooth':
+        return '#3B82F6' // Blue
+      case 'commercial':
+        return '#10B981' // Green
+      default:
+        return '#6B7280' // Gray
+    }
+  }
+
+  const nodeColor = getNodeColor(node.connectionType)
+
   return (
     <group>
       {/* Glowing sphere for the node */}
       <Sphere ref={meshRef} position={position} args={[0.3, 32, 32]}>
         <meshStandardMaterial
-          color="#4CAF50"
-          emissive="#4CAF50"
+          color={nodeColor}
+          emissive={nodeColor}
           emissiveIntensity={0.5}
           roughness={0.2}
           metalness={0.8}
         />
       </Sphere>
-      
-      {/* Node label */}
+
+      {/* Node label with connection info */}
       <Html position={[position[0], position[1] + 0.5, position[2]]}>
-        <div className="bg-black/50 text-white px-2 py-1 rounded text-sm whitespace-nowrap">
-          {node.id.slice(0, 6)}...
+        <div className="flex flex-col items-center">
+          <div className="bg-black/80 text-white px-3 py-1.5 rounded-lg text-sm whitespace-nowrap backdrop-blur-sm">
+            <div className="font-medium">{node.id.slice(0, 6)}...{node.id.slice(-4)}</div>
+            <div className="text-xs opacity-80 capitalize">{node.connectionType}</div>
+          </div>
+          <div className="text-xs mt-1 bg-black/60 px-2 py-0.5 rounded">
+            {Math.round(node.latency)}ms
+          </div>
         </div>
       </Html>
     </group>
@@ -76,7 +96,7 @@ const NodeConnections: FC<{ nodes: NetworkNode[] }> = ({ nodes }) => {
         const start = nodePositions[i]
         const end = nodePositions[j]
         const points = [start, end]
-        
+
         return (
           <Line
             key={`${i}-${j}`}
@@ -135,13 +155,13 @@ export const NetworkNodeMap3D: FC<NetworkNodeMap3DProps> = ({ nodes }) => {
         <ambientLight intensity={0.2} />
         <pointLight position={[10, 10, 10]} intensity={1} />
         <pointLight position={[-10, -10, -10]} intensity={0.5} />
-        
+
         {/* Particle background effect */}
         <ParticleField />
-        
+
         {/* Network nodes and connections */}
         <NodeConnections nodes={nodes} />
-        
+
         {/* Camera controls */}
         <OrbitControls
           enableZoom
