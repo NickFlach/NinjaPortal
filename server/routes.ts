@@ -8,6 +8,13 @@ import { incrementListenCount, getMapData } from './services/music';
 import { getLiveStats, broadcastStats, getClients, setClients } from './services/stats';
 import type { WebSocketMessage, ClientInfo } from './types/websocket';
 import neoStorageRouter from './routes/neo-storage';
+import { 
+  getClientStats, 
+  updateClient, 
+  addClient, 
+  removeClient,
+  broadcastStats as broadcastClientStats 
+} from './services/client-stats';
 
 // Track connected clients and their song subscriptions
 const clients = new Map<WebSocket, ClientInfo>();
@@ -84,53 +91,35 @@ export function registerRoutes(app: Express) {
   wss.on('connection', (ws) => {
     console.log('New client connected');
 
-    // Setup ping-pong to detect stale connections
-    let isAlive = true;
-    const pingInterval = setInterval(() => {
-      if (!isAlive) {
-        console.log('Client not responding to ping, terminating connection');
-        clearInterval(pingInterval);
-        ws.terminate();
-        return;
-      }
-      isAlive = false;
-      ws.ping();
-    }, 30000);
-
-    ws.on('pong', () => {
-      isAlive = true;
-    });
-
     // Initialize client info with connection timestamp
-    clients.set(ws, {
+    const clientInfo: ClientInfo = {
       connectedAt: Date.now(),
       isLeader: clients.size === 0 // First client becomes leader
-    });
+    };
 
+    // Add client to our tracking
+    addClient(ws, clientInfo);
     updateLeaderStatus();
 
     ws.on('message', async (data) => {
       try {
         const message = JSON.parse(data.toString()) as WebSocketMessage;
-        const clientInfo = clients.get(ws);
-
-        if (!clientInfo) {
-          console.error('Client info not found');
-          return;
-        }
 
         switch (message.type) {
           case 'auth': {
             if (message.address) {
-              clientInfo.address = message.address.toLowerCase();
+              updateClient(ws, { 
+                address: message.address.toLowerCase() 
+              });
               ws.send(JSON.stringify({ type: 'auth_success' }));
+              broadcastClientStats();
             }
             break;
           }
 
           case 'subscribe': {
             if (message.songId) {
-              clientInfo.currentSong = message.songId;
+              updateClient(ws, { currentSong: message.songId });
               ws.send(JSON.stringify({ 
                 type: 'subscribe_success',
                 songId: message.songId 
@@ -153,14 +142,13 @@ export function registerRoutes(app: Express) {
 
           case 'sync': {
             const { timestamp, playing, songId } = message;
-            clientInfo.isPlaying = playing;
-            clientInfo.currentTime = timestamp;
+            updateClient(ws, { isPlaying: playing, currentTime: timestamp });
 
             // Only broadcast sync if this is the leader
-            if (clientInfo.isLeader) {
+            const clientInfo = clients.get(ws);
+            if (clientInfo?.isLeader) {
               if (!playing) {
-                clientInfo.coordinates = undefined;
-                clientInfo.countryCode = undefined;
+                updateClient(ws, { coordinates: undefined, countryCode: undefined });
               }
 
               if (typeof songId === 'number') {
@@ -180,7 +168,7 @@ export function registerRoutes(app: Express) {
                       client.send(syncMessage);
                     } catch (error) {
                       console.error('Error sending sync message:', error);
-                      clients.delete(client);
+                      removeClient(client);
                     }
                   }
                 });
@@ -194,15 +182,13 @@ export function registerRoutes(app: Express) {
             console.log('Received location update:', { coordinates, countryCode });
 
             if (coordinates && countryCode) {
-              clientInfo.coordinates = coordinates;
-              clientInfo.countryCode = countryCode;
-              console.log('Updated client info:', clientInfo);
+              updateClient(ws, { coordinates, countryCode });
               ws.send(JSON.stringify({ 
                 type: 'location_update_success',
                 coordinates,
                 countryCode 
               }));
-              broadcastStats();
+              broadcastClientStats();
             } else {
               console.log('Invalid location update - missing coordinates or country code');
               ws.send(JSON.stringify({ 
@@ -224,34 +210,23 @@ export function registerRoutes(app: Express) {
 
     ws.on('error', (error) => {
       console.error('WebSocket error:', error);
-      clearInterval(pingInterval);
-      clients.delete(ws);
+      removeClient(ws);
       updateLeaderStatus();
-      broadcastStats();
+      broadcastClientStats();
     });
 
     ws.on('close', () => {
       console.log('Client disconnected');
-      clearInterval(pingInterval);
-      clients.delete(ws);
+      removeClient(ws);
       updateLeaderStatus();
-      broadcastStats();
+      broadcastClientStats();
     });
   });
 
-  // Regular cleanup of stale connections and broadcast updates
-  setInterval(() => {
-    let hadStaleConnections = false;
-    Array.from(clients.keys()).forEach((client) => {
-      if (client.readyState !== WebSocket.OPEN) {
-        clients.delete(client);
-        hadStaleConnections = true;
-      }
-    });
-    if (hadStaleConnections) {
-      broadcastStats();
-    }
-  }, 30000);
+  // Add REST endpoint for client stats
+  app.get('/api/clients/stats', (req, res) => {
+    res.json(getClientStats());
+  });
 
   // Map routes
   app.get('/api/music/map', async (req, res) => {
@@ -847,6 +822,20 @@ export function registerRoutes(app: Express) {
 
     res.json({ success: true });
   });
+
+  // Regular cleanup of stale connections and broadcast updates
+  setInterval(() => {
+    let hadStaleConnections = false;
+    Array.from(clients.keys()).forEach((client) => {
+      if (client.readyState !== WebSocket.OPEN) {
+        removeClient(client);
+        hadStaleConnections = true;
+      }
+    });
+    if (hadStaleConnections) {
+      broadcastClientStats();
+    }
+  }, 30000);
 
   return httpServer;
 }
