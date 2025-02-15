@@ -10,8 +10,9 @@ export class PIDController {
   private readonly windowSize = 50; // Number of samples to use for auto-tuning
   private lastTuneTime: number;
   private readonly tuneInterval = 10000; // Auto-tune every 10 seconds
+  private readonly maxIntegral = 1.0; // Prevent integral windup
 
-  constructor(kp = 0.5, ki = 0.2, kd = 0.1) {
+  constructor(kp = 0.1, ki = 0.05, kd = 0.02) { // Reduced default gains
     this.kp = kp;
     this.ki = ki;
     this.kd = kd;
@@ -27,9 +28,23 @@ export class PIDController {
     const deltaTime = (currentTime - this.lastTime) / 1000; // Convert to seconds
     this.lastTime = currentTime;
 
+    // Clamp input values
+    setpoint = Math.max(-2, Math.min(2, setpoint));
+    currentValue = Math.max(-2, Math.min(2, currentValue));
+
     const error = setpoint - currentValue;
-    this.integral += error * deltaTime;
-    this.derivative = deltaTime === 0 ? 0 : (error - this.previousError) / deltaTime;
+
+    // Anti-windup: only integrate if within bounds
+    const newIntegral = this.integral + error * deltaTime;
+    if (Math.abs(newIntegral) <= this.maxIntegral) {
+      this.integral = newIntegral;
+    }
+
+    // Derivative with low-pass filter
+    const alpha = 0.1; // Filter coefficient
+    this.derivative = deltaTime === 0 ? 0 : 
+      alpha * (error - this.previousError) / deltaTime + 
+      (1 - alpha) * this.derivative;
 
     // Store error for auto-tuning
     this.tuningWindow.push({ error, time: currentTime });
@@ -37,20 +52,24 @@ export class PIDController {
       this.tuningWindow.shift();
     }
 
-    // Auto-tune periodically
+    // Auto-tune periodically with more conservative adjustments
     if (currentTime - this.lastTuneTime > this.tuneInterval) {
       this.autoTune();
       this.lastTuneTime = currentTime;
     }
 
+    // Calculate output with improved clamping
     const output = 
       this.kp * error + 
       this.ki * this.integral + 
       this.kd * this.derivative;
 
+    // Clamp output to reasonable range
+    const clampedOutput = Math.tanh(output);
+
     this.previousError = error;
 
-    return output;
+    return clampedOutput;
   }
 
   getTerms() {
@@ -68,31 +87,31 @@ export class PIDController {
     const meanError = errors.reduce((a, b) => a + b) / errors.length;
     const variance = errors.reduce((a, b) => a + Math.pow(b - meanError, 2), 0) / errors.length;
 
-    // Adjust gains based on performance
+    // More conservative gain adjustments
     if (meanError > 0.5) {
-      // Large average error - increase proportional gain
-      this.kp *= 1.1;
+      // Large average error - increase proportional gain slightly
+      this.kp *= 1.05;
     } else if (meanError < 0.1) {
-      // Small average error - reduce proportional gain
-      this.kp *= 0.9;
+      // Small average error - reduce proportional gain slightly
+      this.kp *= 0.95;
     }
 
     if (variance > 0.25) {
       // High variance - increase derivative gain for stability
-      this.kd *= 1.1;
+      this.kd *= 1.05;
       // Reduce integral gain to prevent oscillation
-      this.ki *= 0.9;
+      this.ki *= 0.95;
     } else if (variance < 0.05) {
       // Low variance - can reduce derivative gain
-      this.kd *= 0.9;
+      this.kd *= 0.95;
       // Increase integral gain for better steady-state tracking
-      this.ki *= 1.1;
+      this.ki *= 1.05;
     }
 
-    // Clamp gains to reasonable ranges
-    this.kp = Math.max(0.1, Math.min(2.0, this.kp));
-    this.ki = Math.max(0.05, Math.min(1.0, this.ki));
-    this.kd = Math.max(0.05, Math.min(1.0, this.kd));
+    // Stricter gain limits
+    this.kp = Math.max(0.01, Math.min(0.5, this.kp));
+    this.ki = Math.max(0.005, Math.min(0.2, this.ki));
+    this.kd = Math.max(0.005, Math.min(0.2, this.kd));
 
     console.log('PID Auto-tuned:', {
       kp: this.kp,

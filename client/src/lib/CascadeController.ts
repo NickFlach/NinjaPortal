@@ -27,8 +27,8 @@ export class CascadeController {
   };
 
   constructor(
-    innerLoopParams = { kp: 0.5, ki: 0.2, kd: 0.1 },
-    outerLoopParams = { kp: 0.3, ki: 0.1, kd: 0.05 }
+    innerLoopParams = { kp: 0.1, ki: 0.05, kd: 0.02 }, // Reduced gains for stability
+    outerLoopParams = { kp: 0.05, ki: 0.02, kd: 0.01 }
   ) {
     this.innerLoop = new PIDController(
       innerLoopParams.kp,
@@ -47,11 +47,17 @@ export class CascadeController {
     currentFreeEnergy: number,
     currentEntropy: number
   ): { playbackRate: number; metrics: CascadeMetrics } {
+    // Clamp input values to reasonable ranges
+    targetFreeEnergy = Math.max(-2, Math.min(2, targetFreeEnergy));
+    currentFreeEnergy = Math.max(-2, Math.min(2, currentFreeEnergy));
+    currentEntropy = Math.max(0, Math.min(1, currentEntropy));
+
     // Outer loop computes target entropy based on free energy error
     const entropySetpoint = this.outerLoop.compute(targetFreeEnergy, currentFreeEnergy);
-    
+    const clampedEntropySetpoint = Math.max(0, Math.min(1, entropySetpoint));
+
     // Inner loop controls network entropy to match the setpoint
-    const playbackRateAdjustment = this.innerLoop.compute(entropySetpoint, currentEntropy);
+    const playbackRateAdjustment = this.innerLoop.compute(clampedEntropySetpoint, currentEntropy);
 
     // Get individual terms from both controllers
     const innerTerms = this.innerLoop.getTerms();
@@ -59,10 +65,10 @@ export class CascadeController {
 
     // Update metrics
     this.lastMetrics = {
-      entropyError: entropySetpoint - currentEntropy,
+      entropyError: clampedEntropySetpoint - currentEntropy,
       freeEnergyError: targetFreeEnergy - currentFreeEnergy,
       entropyOutput: playbackRateAdjustment,
-      freeEnergyOutput: entropySetpoint,
+      freeEnergyOutput: clampedEntropySetpoint,
       entropyIntegral: innerTerms.integral,
       freeEnergyIntegral: outerTerms.integral,
       entropyDerivative: innerTerms.derivative,
@@ -70,7 +76,9 @@ export class CascadeController {
     };
 
     // Convert controller output to playback rate (0.5 to 2.0 range)
-    const playbackRate = Math.max(0.5, Math.min(2.0, 1 + playbackRateAdjustment));
+    // Using smoother clamping with tanh
+    const clampedAdjustment = Math.tanh(playbackRateAdjustment * 0.5); // Reduced scaling factor
+    const playbackRate = Math.max(0.5, Math.min(2.0, 1 + clampedAdjustment));
 
     return {
       playbackRate,
