@@ -11,6 +11,7 @@ import { Layout } from "@/components/Layout";
 import { useIntl } from "react-intl";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { GpsVisualizationToolkit, MarkerLayer, PathLayer, HeatmapLayer } from "@/components/GpsVisualizationToolkit";
+import { NetworkSyncVisualization } from "@/components/NetworkSyncVisualization";
 
 interface MapData {
   countries: {
@@ -199,6 +200,8 @@ const MapPage: FC = () => {
             )}
           </div>
         </Card>
+
+        <NetworkSyncVisualization />
       </div>
     </Layout>
   );

@@ -7,6 +7,16 @@ interface MusicSyncContextType {
   syncEnabled: boolean;
   toggleSync: () => void;
   updateMetadata: (songId: number, metadata: { title: string; artist: string }) => Promise<void>;
+  pidMetrics: {
+    error: number;
+    output: number;
+    parameters: {
+      kp: number;
+      ki: number;
+      kd: number;
+    };
+  };
+  updatePIDParameters: (params: { kp: number; ki: number; kd: number }) => void;
 }
 
 const MusicSyncContext = createContext<MusicSyncContextType | undefined>(undefined);
@@ -21,6 +31,23 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
   const reconnectAttemptRef = useRef(0);
   const lastSyncRef = useRef<{ timestamp: number; playing: boolean } | null>(null);
   const pidController = useRef<PIDController>(new PIDController());
+  const [pidMetrics, setPidMetrics] = useState({
+    error: 0,
+    output: 0,
+    parameters: {
+      kp: 0.5,
+      ki: 0.2,
+      kd: 0.1
+    }
+  });
+
+  const updatePIDParameters = (params: { kp: number; ki: number; kd: number }) => {
+    pidController.current = new PIDController(params.kp, params.ki, params.kd);
+    setPidMetrics(prev => ({
+      ...prev,
+      parameters: params
+    }));
+  };
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -34,7 +61,6 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
     function connect() {
       try {
-        // Get the current hostname and port
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsHost = window.location.host;
         const wsPath = '/ws/music-sync';
@@ -61,16 +87,22 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
             if (message.type === 'sync' && audioRef.current && message.songId === currentSong?.id) {
               const currentTime = audioRef.current.currentTime;
 
-              // Use PID controller to adjust playback rate
+              // Use PID controller to adjust playback rate and capture metrics
               const newRate = pidController.current.compute(message.timestamp, currentTime);
               audioRef.current.playbackRate = newRate;
+
+              // Update PID metrics
+              setPidMetrics(prev => ({
+                ...prev,
+                error: message.timestamp - currentTime,
+                output: newRate - 1 // Normalize around 1.0
+              }));
 
               // Handle play/pause state
               if (message.playing !== isPlaying) {
                 await togglePlay();
               }
 
-              // Update last sync state
               lastSyncRef.current = {
                 timestamp: Date.now(),
                 playing: message.playing
@@ -128,7 +160,18 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
     };
   }, [syncEnabled, address, togglePlay, currentSong?.id, isPlaying]);
 
-  // Update metadata function
+  const toggleSync = () => {
+    setSyncEnabled(!syncEnabled);
+    if (!syncEnabled) {
+      pidController.current.reset();
+      setPidMetrics(prev => ({
+        ...prev,
+        error: 0,
+        output: 0
+      }));
+    }
+  };
+
   const updateMetadata = async (songId: number, metadata: { title: string; artist: string }) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       throw new Error('Not connected to sync server');
@@ -141,15 +184,16 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  const toggleSync = () => {
-    setSyncEnabled(!syncEnabled);
-    if (!syncEnabled) {
-      pidController.current.reset();
-    }
-  };
-
   return (
-    <MusicSyncContext.Provider value={{ syncEnabled, toggleSync, updateMetadata }}>
+    <MusicSyncContext.Provider 
+      value={{ 
+        syncEnabled, 
+        toggleSync, 
+        updateMetadata, 
+        pidMetrics,
+        updatePIDParameters
+      }}
+    >
       {children}
     </MusicSyncContext.Provider>
   );
