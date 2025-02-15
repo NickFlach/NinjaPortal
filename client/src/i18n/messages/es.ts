@@ -64,5 +64,21 @@ export default {
   'map.view.clusters': 'Grupos',
   'map.legend.active': 'Oyentes Activos',
   'map.legend.inactive': 'Oyentes Inactivos',
-  'map.legend.anonymous': 'Oyentes Anónimos'
+  'map.legend.anonymous': 'Oyentes Anónimos',
+  // Whitepaper related translations
+  'whitepaper.title': 'Documento Técnico',
+  'whitepaper.summary': 'Plataforma Descentralizada de Transmisión de Música',
+  'whitepaper.read': 'Leer Documento Técnico',
+  'whitepaper.ai.lumira': 'Asistente IA Lumira',
+  'whitepaper.ai.lumira.description': 'Sistema avanzado de IA para sincronización y optimización musical',
+  'whitepaper.menu.title': 'Documento Técnico',
+  'whitepaper.menu.description': 'Explora nuestra arquitectura técnica',
+  'whitepaper.arch.title': 'Arquitectura Técnica',
+  'whitepaper.arch.description': 'Sistema descentralizado de transmisión de música',
+  'whitepaper.storage.title': 'Almacenamiento Descentralizado',
+  'whitepaper.storage.description': 'Arquitectura híbrida NEO FS + IPFS',
+  'whitepaper.network.title': 'Sincronización de Red',
+  'whitepaper.network.description': 'Control en cascada y física estadística',
+  'whitepaper.future.title': 'Desarrollo Futuro',
+  'whitepaper.future.description': 'IA, puentes entre cadenas y gobernanza',
 } as const;

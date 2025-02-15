@@ -65,5 +65,21 @@ export default {
   'map.view.clusters': 'Cluster',
   'map.legend.active': 'Aktive Zuhörer',
   'map.legend.inactive': 'Inaktive Zuhörer',
-  'map.legend.anonymous': 'Anonyme Zuhörer'
+  'map.legend.anonymous': 'Anonyme Zuhörer',
+  // Whitepaper related translations
+  'whitepaper.title': 'Whitepaper',
+  'whitepaper.summary': 'Dezentralisierte Musik-Streaming-Plattform',
+  'whitepaper.read': 'Whitepaper lesen',
+  'whitepaper.ai.lumira': 'Lumira KI-Assistent',
+  'whitepaper.ai.lumira.description': 'Fortschrittliches KI-System für Musiksynchronisation und -optimierung',
+  'whitepaper.menu.title': 'Whitepaper',
+  'whitepaper.menu.description': 'Erkunden Sie unsere technische Architektur',
+  'whitepaper.arch.title': 'Technische Architektur',
+  'whitepaper.arch.description': 'Dezentrales Musik-Streaming-System',
+  'whitepaper.storage.title': 'Dezentraler Speicher',
+  'whitepaper.storage.description': 'Hybride NEO FS + IPFS Architektur',
+  'whitepaper.network.title': 'Netzwerksynchronisation',
+  'whitepaper.network.description': 'Kaskadenregelung und statistische Physik',
+  'whitepaper.future.title': 'Zukünftige Entwicklung',
+  'whitepaper.future.description': 'KI, Chain-Bridges und Governance',
 } as const;

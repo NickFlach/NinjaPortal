@@ -32,5 +32,21 @@ export default {
   'tour.welcome': 'Bem-vindo ao Ninja-Portal! Serei seu guia.',
   'tour.connect': 'Conecte sua carteira para explorar músicas.',
   'tour.upload': 'Envie suas músicas favoritas e compartilhe com o mundo!',
-  'tour.gotIt': 'Entendi!'
+  'tour.gotIt': 'Entendi!',
+  // Whitepaper related translations
+  'whitepaper.title': 'Whitepaper',
+  'whitepaper.summary': 'Plataforma Descentralizada de Streaming de Música',
+  'whitepaper.read': 'Ler Whitepaper',
+  'whitepaper.ai.lumira': 'Assistente IA Lumira',
+  'whitepaper.ai.lumira.description': 'Sistema avançado de IA para sincronização e otimização musical',
+  'whitepaper.menu.title': 'Whitepaper',
+  'whitepaper.menu.description': 'Explore nossa arquitetura técnica',
+  'whitepaper.arch.title': 'Arquitetura Técnica',
+  'whitepaper.arch.description': 'Sistema descentralizado de streaming de música',
+  'whitepaper.storage.title': 'Armazenamento Descentralizado',
+  'whitepaper.storage.description': 'Arquitetura híbrida NEO FS + IPFS',
+  'whitepaper.network.title': 'Sincronização de Rede',
+  'whitepaper.network.description': 'Controle em cascata e física estatística',
+  'whitepaper.future.title': 'Desenvolvimento Futuro',
+  'whitepaper.future.description': 'IA, pontes entre cadeias e governança',
 } as const;
