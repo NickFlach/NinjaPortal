@@ -8,28 +8,24 @@ import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 
 interface NetworkMetrics {
   timestamp: number;
-  error: number;
-  output: number;
-  integral: number;
-  derivative: number;
+  entropyError: number;
+  freeEnergyError: number;
+  entropyOutput: number;
+  freeEnergyOutput: number;
+  entropyIntegral: number;
+  freeEnergyIntegral: number;
+  entropyDerivative: number;
+  freeEnergyDerivative: number;
   entropy: number;
   freeEnergy: number;
-  targetTime: number;
-  currentTime: number;
-  kp: number;
-  ki: number;
-  kd: number;
-  controlLoop1Error?: number; // Added for control loop 1 error
-  controlLoop2Error?: number; // Added for control loop 2 error
-  controlLoop1Output?: number; // Added for control loop 1 output
-  controlLoop2Output?: number; // Added for control loop 2 output
-
 }
 
 export const NetworkSyncVisualization: FC = () => {
-  const { syncEnabled, pidMetrics, updatePIDParameters, connectedNodes, controlLoopMetrics } = useMusicSync();
+  const { syncEnabled, cascadeMetrics, updateControlParameters, connectedNodes } = useMusicSync();
   const { isPlaying, audioRef } = useMusicPlayer();
   const [metrics, setMetrics] = useState<NetworkMetrics[]>([]);
+  const [innerLoopParams, setInnerLoopParams] = useState({ kp: 0.5, ki: 0.2, kd: 0.1 });
+  const [outerLoopParams, setOuterLoopParams] = useState({ kp: 0.3, ki: 0.1, kd: 0.05 });
 
   // Update metrics every 100ms when playing and sync is enabled
   useEffect(() => {
@@ -42,30 +38,19 @@ export const NetworkSyncVisualization: FC = () => {
 
       const newMetric: NetworkMetrics = {
         timestamp: Date.now(),
-        error: pidMetrics.error,
-        output: pidMetrics.output,
-        integral: pidMetrics.integral,
-        derivative: pidMetrics.derivative,
+        ...cascadeMetrics,
         entropy,
-        freeEnergy,
-        targetTime: audioRef.current?.currentTime || 0,
-        currentTime: audioRef.current?.currentTime || 0,
-        ...pidMetrics.parameters,
-        controlLoop1Error: controlLoopMetrics?.loop1?.error, // Added for control loop 1 error
-        controlLoop2Error: controlLoopMetrics?.loop2?.error, // Added for control loop 2 error
-        controlLoop1Output: controlLoopMetrics?.loop1?.output, // Added for control loop 1 output
-        controlLoop2Output: controlLoopMetrics?.loop2?.output, // Added for control loop 2 output
+        freeEnergy
       };
 
       setMetrics(prev => [...prev.slice(-50), newMetric]); // Keep last 50 points
     }, 100);
 
     return () => clearInterval(interval);
-  }, [syncEnabled, isPlaying, pidMetrics, connectedNodes, audioRef, controlLoopMetrics]);
+  }, [syncEnabled, isPlaying, cascadeMetrics, connectedNodes]);
 
   const calculateNetworkEntropy = (nodes: typeof connectedNodes) => {
     if (nodes.length === 0) return 0;
-    // Implement entropy calculation based on sync errors distribution
     const totalError = nodes.reduce((sum, node) => sum + Math.abs(node.syncError), 0);
     const normalizedErrors = nodes.map(node => Math.abs(node.syncError) / totalError);
     return -normalizedErrors.reduce((entropy, p) =>
@@ -74,111 +59,124 @@ export const NetworkSyncVisualization: FC = () => {
 
   const calculateFreeEnergy = (nodes: typeof connectedNodes) => {
     if (nodes.length === 0) return 0;
-    // Implementation based on the article's free energy formula
     const avgPlaybackRate = nodes.reduce((sum, node) => sum + node.playbackRate, 0) / nodes.length;
     const avgLatency = nodes.reduce((sum, node) => sum + node.latency, 0) / nodes.length;
-    return Math.log(avgPlaybackRate) / avgLatency;
+    return avgLatency > 0 ? Math.log(avgPlaybackRate) / avgLatency : 0;
   };
 
-  const handlePIDChange = useCallback((param: keyof typeof pidMetrics.parameters, value: number) => {
-    updatePIDParameters({
-      ...pidMetrics.parameters,
-      [param]: value
+  const handleInnerLoopChange = useCallback((param: keyof typeof innerLoopParams, value: number) => {
+    setInnerLoopParams(prev => {
+      const updated = { ...prev, [param]: value };
+      updateControlParameters({ innerLoop: updated, outerLoop: outerLoopParams });
+      return updated;
     });
-  }, [pidMetrics.parameters, updatePIDParameters]);
+  }, [outerLoopParams, updateControlParameters]);
+
+  const handleOuterLoopChange = useCallback((param: keyof typeof outerLoopParams, value: number) => {
+    setOuterLoopParams(prev => {
+      const updated = { ...prev, [param]: value };
+      updateControlParameters({ innerLoop: innerLoopParams, outerLoop: updated });
+      return updated;
+    });
+  }, [innerLoopParams, updateControlParameters]);
 
   return (
     <Card className="p-4 mt-4">
       <h3 className="text-lg font-semibold mb-4">Network Synchronization Status</h3>
 
-      {/* PID Controller Parameters */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div>
-          <Label>Proportional Gain (Kp)</Label>
-          <Slider
-            value={[pidMetrics.parameters.kp]}
-            onValueChange={([value]) => handlePIDChange('kp', value)}
-            min={0}
-            max={2}
-            step={0.1}
-            className="mt-2"
-          />
-          <span className="text-sm text-muted-foreground">{pidMetrics.parameters.kp.toFixed(2)}</span>
-        </div>
-        <div>
-          <Label>Integral Gain (Ki)</Label>
-          <Slider
-            value={[pidMetrics.parameters.ki]}
-            onValueChange={([value]) => handlePIDChange('ki', value)}
-            min={0}
-            max={1}
-            step={0.05}
-            className="mt-2"
-          />
-          <span className="text-sm text-muted-foreground">{pidMetrics.parameters.ki.toFixed(2)}</span>
-        </div>
-        <div>
-          <Label>Derivative Gain (Kd)</Label>
-          <Slider
-            value={[pidMetrics.parameters.kd]}
-            onValueChange={([value]) => handlePIDChange('kd', value)}
-            min={0}
-            max={1}
-            step={0.05}
-            className="mt-2"
-          />
-          <span className="text-sm text-muted-foreground">{pidMetrics.parameters.kd.toFixed(2)}</span>
-        </div>
+      {/* Control Loop Parameters */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Inner Loop (Entropy) Parameters */}
+        <Card className="p-4">
+          <h4 className="font-medium mb-3">Inner Loop (Entropy) Parameters</h4>
+          <div className="space-y-4">
+            <div>
+              <Label>Proportional Gain (Kp)</Label>
+              <Slider
+                value={[innerLoopParams.kp]}
+                onValueChange={([value]) => handleInnerLoopChange('kp', value)}
+                min={0}
+                max={2}
+                step={0.1}
+                className="mt-2"
+              />
+              <span className="text-sm text-muted-foreground">{innerLoopParams.kp.toFixed(2)}</span>
+            </div>
+            <div>
+              <Label>Integral Gain (Ki)</Label>
+              <Slider
+                value={[innerLoopParams.ki]}
+                onValueChange={([value]) => handleInnerLoopChange('ki', value)}
+                min={0}
+                max={1}
+                step={0.05}
+                className="mt-2"
+              />
+              <span className="text-sm text-muted-foreground">{innerLoopParams.ki.toFixed(2)}</span>
+            </div>
+            <div>
+              <Label>Derivative Gain (Kd)</Label>
+              <Slider
+                value={[innerLoopParams.kd]}
+                onValueChange={([value]) => handleInnerLoopChange('kd', value)}
+                min={0}
+                max={1}
+                step={0.05}
+                className="mt-2"
+              />
+              <span className="text-sm text-muted-foreground">{innerLoopParams.kd.toFixed(2)}</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Outer Loop (Free Energy) Parameters */}
+        <Card className="p-4">
+          <h4 className="font-medium mb-3">Outer Loop (Free Energy) Parameters</h4>
+          <div className="space-y-4">
+            <div>
+              <Label>Proportional Gain (Kp)</Label>
+              <Slider
+                value={[outerLoopParams.kp]}
+                onValueChange={([value]) => handleOuterLoopChange('kp', value)}
+                min={0}
+                max={2}
+                step={0.1}
+                className="mt-2"
+              />
+              <span className="text-sm text-muted-foreground">{outerLoopParams.kp.toFixed(2)}</span>
+            </div>
+            <div>
+              <Label>Integral Gain (Ki)</Label>
+              <Slider
+                value={[outerLoopParams.ki]}
+                onValueChange={([value]) => handleOuterLoopChange('ki', value)}
+                min={0}
+                max={1}
+                step={0.05}
+                className="mt-2"
+              />
+              <span className="text-sm text-muted-foreground">{outerLoopParams.ki.toFixed(2)}</span>
+            </div>
+            <div>
+              <Label>Derivative Gain (Kd)</Label>
+              <Slider
+                value={[outerLoopParams.kd]}
+                onValueChange={([value]) => handleOuterLoopChange('kd', value)}
+                min={0}
+                max={1}
+                step={0.05}
+                className="mt-2"
+              />
+              <span className="text-sm text-muted-foreground">{outerLoopParams.kd.toFixed(2)}</span>
+            </div>
+          </div>
+        </Card>
       </div>
 
-      {/* Timing Information */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div>
-          <Label>Target Time</Label>
-          <div className="text-lg font-mono">
-            {metrics.length > 0 ? `${metrics[metrics.length - 1].targetTime.toFixed(1)}ms` : '0.0ms'}
-          </div>
-        </div>
-        <div>
-          <Label>Current Time</Label>
-          <div className="text-lg font-mono">
-            {metrics.length > 0 ? `${metrics[metrics.length - 1].currentTime.toFixed(1)}ms` : '0.0ms'}
-          </div>
-        </div>
-      </div>
-
-      {/* PID Terms Display */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div>
-          <Label>Error</Label>
-          <div className="text-lg font-mono">
-            {pidMetrics.error.toFixed(3)}ms
-          </div>
-        </div>
-        <div>
-          <Label>Output</Label>
-          <div className="text-lg font-mono">
-            {pidMetrics.output.toFixed(3)}
-          </div>
-        </div>
-        <div>
-          <Label>Integral Term</Label>
-          <div className="text-lg font-mono">
-            {pidMetrics.integral.toFixed(3)}
-          </div>
-        </div>
-        <div>
-          <Label>Derivative Term</Label>
-          <div className="text-lg font-mono">
-            {pidMetrics.derivative.toFixed(3)}
-          </div>
-        </div>
-      </div>
-
-      {/* Sync Error and PID Output Combined */}
+      {/* Controller Response Visualization */}
       <Card className="p-4 mb-6">
-        <Label>PID Controller Response</Label>
-        <div className="h-48">
+        <Label>Cascade Controller Response</Label>
+        <div className="h-60">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={metrics}>
               <XAxis
@@ -194,78 +192,34 @@ export const NetworkSyncVisualization: FC = () => {
                 labelFormatter={(value) => new Date(value).toLocaleTimeString()}
                 formatter={(value: number) => value.toFixed(3)}
               />
-              <Legend /> {/* Added Legend */}
+              <Legend />
               <Line
                 type="monotone"
-                dataKey="error"
+                dataKey="entropyError"
                 stroke="#ef4444"
                 dot={false}
-                name="Sync Error"
-                strokeWidth={2}
-                isAnimationActive={false}
+                name="Entropy Error"
               />
               <Line
                 type="monotone"
-                dataKey="output"
+                dataKey="entropyOutput"
                 stroke="#3b82f6"
                 dot={false}
-                name="PID Output"
-                strokeWidth={2}
-                isAnimationActive={false}
+                name="Entropy Output"
               />
               <Line
                 type="monotone"
-                dataKey="integral"
-                stroke="#10b981"
+                dataKey="freeEnergyError"
+                stroke="#f97316"
                 dot={false}
-                name="Integral Term"
-                strokeWidth={2}
-                isAnimationActive={false}
+                name="Free Energy Error"
               />
               <Line
                 type="monotone"
-                dataKey="derivative"
+                dataKey="freeEnergyOutput"
                 stroke="#8b5cf6"
                 dot={false}
-                name="Derivative Term"
-                strokeWidth={2}
-                isAnimationActive={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="controlLoop1Error"
-                stroke="#DC2626"
-                dot={false}
-                name="Control Loop 1 Error"
-                strokeWidth={2}
-                isAnimationActive={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="controlLoop2Error"
-                stroke="#65A30D"
-                dot={false}
-                name="Control Loop 2 Error"
-                strokeWidth={2}
-                isAnimationActive={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="controlLoop1Output"
-                stroke="#1A82F6"
-                dot={false}
-                name="Control Loop 1 Output"
-                strokeWidth={2}
-                isAnimationActive={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="controlLoop2Output"
-                stroke="#4ADE80"
-                dot={false}
-                name="Control Loop 2 Output"
-                strokeWidth={2}
-                isAnimationActive={false}
+                name="Free Energy Output"
               />
             </LineChart>
           </ResponsiveContainer>
@@ -298,8 +252,6 @@ export const NetworkSyncVisualization: FC = () => {
                   stroke="#10b981"
                   dot={false}
                   name="Entropy"
-                  strokeWidth={2}
-                  isAnimationActive={false}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -330,8 +282,6 @@ export const NetworkSyncVisualization: FC = () => {
                   stroke="#8b5cf6"
                   dot={false}
                   name="Free Energy"
-                  strokeWidth={2}
-                  isAnimationActive={false}
                 />
               </LineChart>
             </ResponsiveContainer>
