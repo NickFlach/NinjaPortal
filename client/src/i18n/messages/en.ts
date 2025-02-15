@@ -28,6 +28,29 @@ export default {
   'app.network.connect': 'Please make sure you\'re connected to the NEO X network',
   'app.disconnect.success': 'Wallet disconnected successfully!',
   'app.disconnect.error': 'Failed to disconnect wallet',
+  // Tour messages
+  'tour.welcome': 'Welcome to Ninja-Portal! I\'ll be your guide.',
+  'tour.connect': 'Connect your wallet to start exploring music.',
+  'tour.upload': 'Upload your favorite tunes and share them with the world!',
+  'tour.gotIt': 'Got it!',
+  // Map messages
+  'map.title': 'Global Listener Map',
+  'map.noActivity': 'No Activity',
+  'map.noData': 'No listener data available yet. Play some music to see activity on the map!',
+  'map.totalListeners': '{count} Active Listeners Worldwide',
+  'map.error': 'Error loading map data: {error}',
+  'map.tooltipDetail': '{country}: {total} {total, plural, one {Listener} other {Listeners}} ({percentage}%) - {geotagged} geotagged, {anonymous} anonymous',
+  // Map location messages
+  'map.location.error.title': 'Location Access',
+  'map.location.error.description': 'Unable to access your location. You can still use the map, but your plays won\'t be geotagged.',
+  // Neo Storage messages
+  'storage.title': 'Neo FS Storage',
+  'storage.upload': 'Upload to Neo FS',
+  'storage.uploading': 'Uploading...',
+  'storage.noFiles': 'No files stored in Neo FS yet',
+  'storage.success': 'File uploaded successfully to Neo FS',
+  'storage.error': 'Failed to upload file',
+  'storage.download.error': 'Failed to download file',
   // Whitepaper related translations
   'whitepaper.title': 'Whitepaper',
   'whitepaper.summary': 'Decentralized Music Streaming Platform',
