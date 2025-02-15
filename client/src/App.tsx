@@ -14,9 +14,10 @@ import Landing from "@/pages/Landing";
 import { useAccount } from 'wagmi';
 import { MusicPlayerProvider } from "@/contexts/MusicPlayerContext";
 import { MusicSyncProvider } from "@/contexts/MusicSyncContext";
+import { WebSocketProvider } from "@/contexts/WebSocketContext";
 import { useEffect } from "react";
 import { LocaleProvider } from "./contexts/LocaleContext";
-import Whitepaper from "./pages/Whitepaper"; // Added import for Whitepaper
+import Whitepaper from "./pages/Whitepaper";
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<
@@ -124,12 +125,14 @@ function App() {
       <WagmiConfig config={config}>
         <QueryClientProvider client={queryClient}>
           <LocaleProvider>
-            <MusicPlayerProvider>
-              <MusicSyncProvider>
-                <Router />
-                <Toaster />
-              </MusicSyncProvider>
-            </MusicPlayerProvider>
+            <WebSocketProvider>
+              <MusicPlayerProvider>
+                <MusicSyncProvider>
+                  <Router />
+                  <Toaster />
+                </MusicSyncProvider>
+              </MusicPlayerProvider>
+            </WebSocketProvider>
           </LocaleProvider>
         </QueryClientProvider>
       </WagmiConfig>
