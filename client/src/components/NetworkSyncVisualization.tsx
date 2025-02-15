@@ -2,7 +2,7 @@ import { FC, useEffect, useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useMusicSync } from "@/contexts/MusicSyncContext";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 
@@ -19,10 +19,15 @@ interface NetworkMetrics {
   kp: number;
   ki: number;
   kd: number;
+  controlLoop1Error?: number; // Added for control loop 1 error
+  controlLoop2Error?: number; // Added for control loop 2 error
+  controlLoop1Output?: number; // Added for control loop 1 output
+  controlLoop2Output?: number; // Added for control loop 2 output
+
 }
 
 export const NetworkSyncVisualization: FC = () => {
-  const { syncEnabled, pidMetrics, updatePIDParameters, connectedNodes } = useMusicSync();
+  const { syncEnabled, pidMetrics, updatePIDParameters, connectedNodes, controlLoopMetrics } = useMusicSync();
   const { isPlaying, audioRef } = useMusicPlayer();
   const [metrics, setMetrics] = useState<NetworkMetrics[]>([]);
 
@@ -45,21 +50,25 @@ export const NetworkSyncVisualization: FC = () => {
         freeEnergy,
         targetTime: audioRef.current?.currentTime || 0,
         currentTime: audioRef.current?.currentTime || 0,
-        ...pidMetrics.parameters
+        ...pidMetrics.parameters,
+        controlLoop1Error: controlLoopMetrics?.loop1?.error, // Added for control loop 1 error
+        controlLoop2Error: controlLoopMetrics?.loop2?.error, // Added for control loop 2 error
+        controlLoop1Output: controlLoopMetrics?.loop1?.output, // Added for control loop 1 output
+        controlLoop2Output: controlLoopMetrics?.loop2?.output, // Added for control loop 2 output
       };
 
       setMetrics(prev => [...prev.slice(-50), newMetric]); // Keep last 50 points
     }, 100);
 
     return () => clearInterval(interval);
-  }, [syncEnabled, isPlaying, pidMetrics, connectedNodes, audioRef]);
+  }, [syncEnabled, isPlaying, pidMetrics, connectedNodes, audioRef, controlLoopMetrics]);
 
   const calculateNetworkEntropy = (nodes: typeof connectedNodes) => {
     if (nodes.length === 0) return 0;
     // Implement entropy calculation based on sync errors distribution
     const totalError = nodes.reduce((sum, node) => sum + Math.abs(node.syncError), 0);
     const normalizedErrors = nodes.map(node => Math.abs(node.syncError) / totalError);
-    return -normalizedErrors.reduce((entropy, p) => 
+    return -normalizedErrors.reduce((entropy, p) =>
       entropy + (p > 0 ? p * Math.log(p) : 0), 0);
   };
 
@@ -172,20 +181,21 @@ export const NetworkSyncVisualization: FC = () => {
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={metrics}>
-              <XAxis 
+              <XAxis
                 dataKey="timestamp"
                 domain={['auto', 'auto']}
                 tickFormatter={(value) => new Date(value).toLocaleTimeString()}
               />
-              <YAxis 
-                domain={[-1, 1]}
+              <YAxis
+                domain={['auto', 'auto']}
                 tickFormatter={(value) => value.toFixed(2)}
               />
               <Tooltip
                 labelFormatter={(value) => new Date(value).toLocaleTimeString()}
                 formatter={(value: number) => value.toFixed(3)}
               />
-              <Line 
+              <Legend /> {/* Added Legend */}
+              <Line
                 type="monotone"
                 dataKey="error"
                 stroke="#ef4444"
@@ -194,7 +204,7 @@ export const NetworkSyncVisualization: FC = () => {
                 strokeWidth={2}
                 isAnimationActive={false}
               />
-              <Line 
+              <Line
                 type="monotone"
                 dataKey="output"
                 stroke="#3b82f6"
@@ -203,7 +213,7 @@ export const NetworkSyncVisualization: FC = () => {
                 strokeWidth={2}
                 isAnimationActive={false}
               />
-              <Line 
+              <Line
                 type="monotone"
                 dataKey="integral"
                 stroke="#10b981"
@@ -212,12 +222,48 @@ export const NetworkSyncVisualization: FC = () => {
                 strokeWidth={2}
                 isAnimationActive={false}
               />
-              <Line 
+              <Line
                 type="monotone"
                 dataKey="derivative"
                 stroke="#8b5cf6"
                 dot={false}
                 name="Derivative Term"
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="controlLoop1Error"
+                stroke="#DC2626"
+                dot={false}
+                name="Control Loop 1 Error"
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="controlLoop2Error"
+                stroke="#65A30D"
+                dot={false}
+                name="Control Loop 2 Error"
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="controlLoop1Output"
+                stroke="#1A82F6"
+                dot={false}
+                name="Control Loop 1 Output"
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="controlLoop2Output"
+                stroke="#4ADE80"
+                dot={false}
+                name="Control Loop 2 Output"
                 strokeWidth={2}
                 isAnimationActive={false}
               />
@@ -233,12 +279,12 @@ export const NetworkSyncVisualization: FC = () => {
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={metrics}>
-                <XAxis 
+                <XAxis
                   dataKey="timestamp"
                   domain={['auto', 'auto']}
                   tickFormatter={(value) => new Date(value).toLocaleTimeString()}
                 />
-                <YAxis 
+                <YAxis
                   domain={[0, 'auto']}
                   tickFormatter={(value) => value.toFixed(2)}
                 />
@@ -246,7 +292,7 @@ export const NetworkSyncVisualization: FC = () => {
                   labelFormatter={(value) => new Date(value).toLocaleTimeString()}
                   formatter={(value: number) => value.toFixed(3)}
                 />
-                <Line 
+                <Line
                   type="monotone"
                   dataKey="entropy"
                   stroke="#10b981"
@@ -265,12 +311,12 @@ export const NetworkSyncVisualization: FC = () => {
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={metrics}>
-                <XAxis 
+                <XAxis
                   dataKey="timestamp"
                   domain={['auto', 'auto']}
                   tickFormatter={(value) => new Date(value).toLocaleTimeString()}
                 />
-                <YAxis 
+                <YAxis
                   domain={[-2, 2]}
                   tickFormatter={(value) => value.toFixed(2)}
                 />
@@ -278,7 +324,7 @@ export const NetworkSyncVisualization: FC = () => {
                   labelFormatter={(value) => new Date(value).toLocaleTimeString()}
                   formatter={(value: number) => value.toFixed(3)}
                 />
-                <Line 
+                <Line
                   type="monotone"
                   dataKey="freeEnergy"
                   stroke="#8b5cf6"
@@ -298,7 +344,7 @@ export const NetworkSyncVisualization: FC = () => {
         <div>
           <Label>Sync Status</Label>
           <div className="flex items-center mt-2">
-            <div 
+            <div
               className={`w-3 h-3 rounded-full mr-2 ${
                 syncEnabled ? 'bg-green-500' : 'bg-red-500'
               }`}
@@ -310,8 +356,8 @@ export const NetworkSyncVisualization: FC = () => {
           <Label>Network Statistics</Label>
           <div className="mt-2 space-y-1 text-sm">
             <div>Connected Nodes: {connectedNodes.length}</div>
-            <div>Avg. Latency: {connectedNodes.length ? 
-              (connectedNodes.reduce((sum, n) => sum + n.latency, 0) / connectedNodes.length).toFixed(0) 
+            <div>Avg. Latency: {connectedNodes.length ?
+              (connectedNodes.reduce((sum, n) => sum + n.latency, 0) / connectedNodes.length).toFixed(0)
               : 'N/A'} ms</div>
           </div>
         </div>

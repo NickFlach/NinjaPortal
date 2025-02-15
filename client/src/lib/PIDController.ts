@@ -4,6 +4,7 @@ export class PIDController {
   private kd: number;
   private previousError: number;
   private integral: number;
+  private derivative: number;
   private lastTime: number;
   private tuningWindow: { error: number; time: number }[] = [];
   private readonly windowSize = 50; // Number of samples to use for auto-tuning
@@ -16,6 +17,7 @@ export class PIDController {
     this.kd = kd;
     this.previousError = 0;
     this.integral = 0;
+    this.derivative = 0;
     this.lastTime = Date.now();
     this.lastTuneTime = this.lastTime;
   }
@@ -27,7 +29,7 @@ export class PIDController {
 
     const error = setpoint - currentValue;
     this.integral += error * deltaTime;
-    const derivative = (error - this.previousError) / deltaTime;
+    this.derivative = deltaTime === 0 ? 0 : (error - this.previousError) / deltaTime;
 
     // Store error for auto-tuning
     this.tuningWindow.push({ error, time: currentTime });
@@ -44,12 +46,18 @@ export class PIDController {
     const output = 
       this.kp * error + 
       this.ki * this.integral + 
-      this.kd * derivative;
+      this.kd * this.derivative;
 
     this.previousError = error;
 
-    // Clamp output to reasonable playback rate range (0.5x to 2x)
-    return Math.max(0.5, Math.min(2, 1 + output));
+    return output;
+  }
+
+  getTerms() {
+    return {
+      integral: this.integral,
+      derivative: this.derivative
+    };
   }
 
   private autoTune() {
@@ -98,6 +106,7 @@ export class PIDController {
   reset() {
     this.previousError = 0;
     this.integral = 0;
+    this.derivative = 0;
     this.lastTime = Date.now();
     this.tuningWindow = [];
     this.lastTuneTime = this.lastTime;

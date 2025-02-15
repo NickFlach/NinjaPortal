@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAccount } from 'wagmi';
 import { useMusicPlayer } from './MusicPlayerContext';
-import { PIDController } from '@/lib/PIDController';
+import { CascadeController, type CascadeMetrics } from '@/lib/CascadeController';
 
 interface NetworkNode {
   id: string;
@@ -14,19 +14,12 @@ interface MusicSyncContextType {
   syncEnabled: boolean;
   toggleSync: () => void;
   updateMetadata: (songId: number, metadata: { title: string; artist: string }) => Promise<void>;
-  pidMetrics: {
-    error: number;
-    output: number;
-    integral: number;
-    derivative: number;
-    parameters: {
-      kp: number;
-      ki: number;
-      kd: number;
-    };
-  };
+  cascadeMetrics: CascadeMetrics;
   connectedNodes: NetworkNode[];
-  updatePIDParameters: (params: { kp: number; ki: number; kd: number }) => void;
+  updateControlParameters: (params: {
+    innerLoop: { kp: number; ki: number; kd: number };
+    outerLoop: { kp: number; ki: number; kd: number };
+  }) => void;
 }
 
 const MusicSyncContext = createContext<MusicSyncContextType | undefined>(undefined);
@@ -41,25 +34,41 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
   const maxReconnectAttempts = 5;
   const reconnectAttemptRef = useRef(0);
   const lastSyncRef = useRef<{ timestamp: number; playing: boolean } | null>(null);
-  const pidController = useRef<PIDController>(new PIDController());
-  const [pidMetrics, setPidMetrics] = useState({
-    error: 0,
-    output: 0,
-    integral: 0,
-    derivative: 0,
-    parameters: {
-      kp: 0.5,
-      ki: 0.2,
-      kd: 0.1
-    }
+  const cascadeController = useRef(new CascadeController());
+  const [cascadeMetrics, setCascadeMetrics] = useState<CascadeMetrics>({
+    entropyError: 0,
+    freeEnergyError: 0,
+    entropyOutput: 0,
+    freeEnergyOutput: 0,
+    entropyIntegral: 0,
+    freeEnergyIntegral: 0,
+    entropyDerivative: 0,
+    freeEnergyDerivative: 0
   });
 
-  const updatePIDParameters = (params: { kp: number; ki: number; kd: number }) => {
-    pidController.current = new PIDController(params.kp, params.ki, params.kd);
-    setPidMetrics(prev => ({
-      ...prev,
-      parameters: params
-    }));
+  const updateControlParameters = (params: {
+    innerLoop: { kp: number; ki: number; kd: number };
+    outerLoop: { kp: number; ki: number; kd: number };
+  }) => {
+    cascadeController.current = new CascadeController(params.innerLoop, params.outerLoop);
+  };
+
+  // Calculate network metrics
+  const calculateNetworkMetrics = (nodes: NetworkNode[]) => {
+    if (nodes.length === 0) return { entropy: 0, freeEnergy: 0 };
+
+    // Calculate entropy (flow diversity)
+    const totalError = nodes.reduce((sum, node) => sum + Math.abs(node.syncError), 0);
+    const normalizedErrors = nodes.map(node => Math.abs(node.syncError) / totalError);
+    const entropy = -normalizedErrors.reduce((sum, p) => 
+      sum + (p > 0 ? p * Math.log(p) : 0), 0);
+
+    // Calculate free energy (signal speed)
+    const avgPlaybackRate = nodes.reduce((sum, node) => sum + node.playbackRate, 0) / nodes.length;
+    const avgLatency = nodes.reduce((sum, node) => sum + node.latency, 0) / nodes.length;
+    const freeEnergy = avgLatency > 0 ? Math.log(avgPlaybackRate) / avgLatency : 0;
+
+    return { entropy, freeEnergy };
   };
 
   // Initialize WebSocket connection
@@ -89,13 +98,8 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
           if (address) {
             ws.send(JSON.stringify({ 
               type: 'auth', 
-              address,
-              currentTime: 0 // Always start from 0
+              address 
             }));
-          }
-          if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-            reconnectTimeoutRef.current = undefined;
           }
         };
 
@@ -103,37 +107,24 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
           try {
             const message = JSON.parse(event.data);
             if (message.type === 'sync' && audioRef.current && message.songId === currentSong?.id) {
-              const currentTime = audioRef.current.currentTime * 1000; // Convert to milliseconds
-              let targetTime = 0; // Default target time is 0
+              // Calculate current network metrics
+              const { entropy, freeEnergy } = calculateNetworkMetrics(message.nodes || []);
 
-              // Only calculate target time if we have multiple nodes
-              if (message.nodes?.length > 1) {
-                const elapsedTime = Date.now() - message.serverTime;
-                targetTime = elapsedTime % 1000; // Keep within 0-999ms range
-              }
+              // Target values (these could be adjusted based on network conditions)
+              const targetFreeEnergy = 1.0; // Optimal signal speed
 
-              console.log('Sync adjustment:', {
-                targetTime,
-                currentTime,
-                newRate: pidController.current.compute(targetTime, currentTime),
-                diff: targetTime - currentTime,
-                nodesCount: message.nodes?.length
-              });
+              // Use cascade controller to compute new playback rate
+              const { playbackRate, metrics } = cascadeController.current.compute(
+                targetFreeEnergy,
+                freeEnergy,
+                entropy
+              );
 
-              // Use PID controller to adjust playback rate and capture metrics
-              const newRate = pidController.current.compute(targetTime, currentTime);
-              const { integral, derivative } = pidController.current.getTerms();
+              // Apply the computed playback rate
+              audioRef.current.playbackRate = playbackRate;
 
-              audioRef.current.playbackRate = Math.max(0.5, Math.min(2.0, newRate)); // Clamp playback rate
-
-              // Update PID metrics with all terms
-              setPidMetrics(prev => ({
-                ...prev,
-                error: targetTime - currentTime,
-                output: newRate - 1, // Normalize around 1.0
-                integral,
-                derivative
-              }));
+              // Update metrics for visualization
+              setCascadeMetrics(metrics);
 
               // Update connected nodes information
               if (message.nodes) {
@@ -162,14 +153,12 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
 
         ws.onerror = (error) => {
           console.error('WebSocket error:', error);
-          // Don't disable sync on error, let the reconnection logic handle it
         };
 
         ws.onclose = (event) => {
           console.log('WebSocket disconnected:', event.code, event.reason);
-          setConnectedNodes([]); // Clear connected nodes on disconnect
+          setConnectedNodes([]);
 
-          // Only attempt reconnect if sync is still enabled and we haven't exceeded max attempts
           if (syncEnabled && !reconnectTimeoutRef.current && reconnectAttemptRef.current < maxReconnectAttempts) {
             const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
             console.log(`Attempting reconnect in ${delay}ms (attempt ${reconnectAttemptRef.current + 1}/${maxReconnectAttempts})`);
@@ -211,14 +200,17 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
   const toggleSync = () => {
     setSyncEnabled(!syncEnabled);
     if (!syncEnabled) {
-      pidController.current.reset();
-      setPidMetrics(prev => ({
-        ...prev,
-        error: 0,
-        output: 0,
-        integral: 0,
-        derivative: 0
-      }));
+      cascadeController.current.reset();
+      setCascadeMetrics({
+        entropyError: 0,
+        freeEnergyError: 0,
+        entropyOutput: 0,
+        freeEnergyOutput: 0,
+        entropyIntegral: 0,
+        freeEnergyIntegral: 0,
+        entropyDerivative: 0,
+        freeEnergyDerivative: 0
+      });
     }
   };
 
@@ -238,11 +230,11 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
     <MusicSyncContext.Provider 
       value={{ 
         syncEnabled, 
-        toggleSync, 
-        updateMetadata, 
-        pidMetrics,
+        toggleSync,
+        updateMetadata,
+        cascadeMetrics,
         connectedNodes,
-        updatePIDParameters
+        updateControlParameters
       }}
     >
       {children}
