@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Translate } from '@google-cloud/translate/build/src/v2';
+import { Translate } from '@google-cloud/translate';
 import { lumiraService } from './lumira';
 
 const router = Router();
