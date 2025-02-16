@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getFromIPFS } from "@/lib/ipfs";
 import { useAccount } from 'wagmi';
 import { PIDController } from '@/lib/PIDController';
+import { useWebSocket } from './WebSocketContext';
 
 interface Song {
   id: number;
@@ -50,8 +51,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [isBluetoothEnabled, setIsBluetoothEnabled] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const bluetoothDeviceRef = useRef<BluetoothDevice | null>(null);
   const { address: userAddress } = useAccount();
   const defaultWallet = "REDACTED_WALLET_ADDRESS";
   const landingAddress = userAddress || defaultWallet;
@@ -62,6 +61,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const lastSyncRef = useRef<{ timestamp: number; playing: boolean } | null>(null);
   const pidControllerRef = useRef<PIDController>(new PIDController());
   const syncIntervalRef = useRef<NodeJS.Timeout>();
+  const socket = useWebSocket();
 
   // Initialize audio element
   useEffect(() => {
@@ -90,26 +90,26 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           });
         });
 
-        console.log('Geolocation obtained:', {
+        const coordinates = {
           lat: position.coords.latitude,
           lng: position.coords.longitude
-        });
+        };
 
-        setUserCoordinates({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
+        setUserCoordinates(coordinates);
+
+        // Send location update if connected
+        if (socket?.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({
+            type: 'location_update',
+            coordinates,
+            countryCode: 'US' // Default to US for demo
+          }));
+        }
       } catch (error) {
         console.error('Error getting location:', error);
       }
     }
   };
-
-  // Initialize geolocation on component mount
-  useEffect(() => {
-    console.log('Initializing geolocation...');
-    requestGeolocation();
-  }, []);
 
   // Fetch landing page feed (recent songs)
   const { data: recentSongs } = useQuery<Song[]>({
@@ -331,9 +331,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       if (audioRef.current) {
         audioRef.current.pause();
       }
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      // WebSocket cleanup handled by WebSocketContext
       if (syncIntervalRef.current) {
         clearInterval(syncIntervalRef.current);
       }
@@ -343,101 +341,63 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
-  // WebSocket connection setup
+
+  // Handle WebSocket messages
   useEffect(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/music-sync`;
+    if (!socket) return;
 
-    const connectWebSocket = () => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    const handleMessage = async (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        switch (data.type) {
+          case 'stats_update':
+            setActiveListeners(data.data.activeListeners);
+            break;
+          case 'leader_update':
+            console.log('Leader status updated:', data.isLeader);
+            setIsLeader(data.isLeader);
+            break;
+          case 'sync':
+            if (!isLeader && audioRef.current && data.songId === currentSong?.id) {
+              lastSyncRef.current = {
+                timestamp: data.timestamp,
+                playing: data.playing
+              };
 
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log('WebSocket connected');
-        setIsSynced(true);
-        if (userAddress) {
-          ws.send(JSON.stringify({ type: 'auth', address: userAddress }));
-        }
-      };
-
-      ws.onmessage = async (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          switch (data.type) {
-            case 'stats_update':
-              setActiveListeners(data.data.activeListeners);
-              break;
-            case 'auth_success':
-              console.log('Authentication successful');
-              break;
-            case 'leader_update':
-              console.log('Leader status updated:', data.isLeader);
-              setIsLeader(data.isLeader);
-              break;
-            case 'sync':
-              // Only follow sync messages if we're not the leader
-              if (!isLeader && audioRef.current && data.songId === currentSong?.id) {
-                // Update last sync reference for PID controller
-                lastSyncRef.current = {
-                  timestamp: data.timestamp,
-                  playing: data.playing
-                };
-
-                // If we're too far behind (> 5 seconds), do a hard seek
-                const timeDiff = Math.abs(audioRef.current.currentTime - data.timestamp);
-                if (timeDiff > 5) {
-                  audioRef.current.currentTime = data.timestamp;
-                  pidControllerRef.current.reset();
-                }
-                // Handle play/pause state
-                if (data.playing !== isPlaying) {
-                  await togglePlay();
-                }
+              const timeDiff = Math.abs(audioRef.current.currentTime - data.timestamp);
+              if (timeDiff > 5) {
+                audioRef.current.currentTime = data.timestamp;
+                pidControllerRef.current.reset();
               }
-              break;
-            case 'error':
-              console.error('WebSocket error message:', data.message);
-              break;
-            default:
-              console.log('Received websocket message:', data);
-          }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+              if (data.playing !== isPlaying) {
+                await togglePlay();
+              }
+            }
+            break;
+          case 'error':
+            console.error('WebSocket error message:', data.message);
+            break;
+          default:
+            console.log('Received websocket message:', data);
         }
-      };
-
-      ws.onclose = () => {
-        console.log('WebSocket disconnected');
-        setIsSynced(false);
-        setActiveListeners(0);
-        setIsLeader(false);
-        setTimeout(connectWebSocket, 5000);
-      };
-
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
-    };
-
-    connectWebSocket();
-
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-        setIsSynced(false);
-        setIsLeader(false);
+      } catch (error) {
+        console.error('Error handling WebSocket message:', error);
       }
     };
-  }, [userAddress, isPlaying, currentSong?.id]);
+
+    socket.addEventListener('message', handleMessage);
+    setIsSynced(socket.readyState === WebSocket.OPEN);
+
+    return () => {
+      socket.removeEventListener('message', handleMessage);
+    };
+  }, [socket, currentSong, isPlaying, isLeader]);
 
   // Update sync state when we're the leader
   useEffect(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN && currentSong && isLeader) {
+    if (socket?.readyState === WebSocket.OPEN && currentSong && isLeader) {
       try {
-        wsRef.current.send(JSON.stringify({
+        socket.send(JSON.stringify({
           type: 'sync',
           songId: currentSong.id,
           playing: isPlaying,
@@ -446,7 +406,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
         if (isPlaying && userCoordinates) {
           console.log('Sending location update:', userCoordinates);
-          wsRef.current.send(JSON.stringify({
+          socket.send(JSON.stringify({
             type: 'location_update',
             coordinates: userCoordinates,
             countryCode: 'US' // Default to US for demo purposes
@@ -456,7 +416,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         console.error('Error sending WebSocket message:', error);
       }
     }
-  }, [isPlaying, currentSong, userCoordinates, isLeader]);
+  }, [isPlaying, currentSong, userCoordinates, isLeader, socket]);
+
 
 
   const adjustPlaybackSync = useCallback(() => {
@@ -529,7 +490,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           pidControllerRef.current.reset();
 
           // Request current playback state from leader
-          wsRef.current?.send(JSON.stringify({
+          socket?.send(JSON.stringify({
             type: 'request_sync',
             songId: currentSong.id
           }));
@@ -543,7 +504,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       // This is our "innovative" approach - always staying in sync!
       setIsBluetoothEnabled(true);
     }
-  }, [isBluetoothEnabled, currentSong, isLeader]);
+  }, [isBluetoothEnabled, currentSong, isLeader, socket]);
 
   return (
     <MusicPlayerContext.Provider

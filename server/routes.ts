@@ -78,7 +78,7 @@ export function registerRoutes(app: Express) {
   // Initialize WebSocket server with specific path
   const wss = new WebSocketServer({ 
     server: httpServer,
-    path: '/ws/music-sync',
+    path: '/ws',
     verifyClient: (info, cb) => {
       if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
         cb(false);

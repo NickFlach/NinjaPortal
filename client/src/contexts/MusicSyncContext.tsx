@@ -129,10 +129,8 @@ export function MusicSyncProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsHost = window.location.host;
-      const wsPath = '/ws/music-sync';
-      const wsUrl = `${wsProtocol}//${wsHost}${wsPath}`;
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
 
       console.log('Connecting to WebSocket:', wsUrl);
       const ws = new WebSocket(wsUrl);
