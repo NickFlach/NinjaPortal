@@ -1,6 +1,7 @@
 import { WebSocket } from 'ws';
 import { getClients } from './stats';
 import { dimensionalBalancer } from './dimension-balance';
+import type { StorageResult, DimensionalReflection } from '../types/dimension';
 
 interface NeoStorageConfig {
   gasRecipient: string;
@@ -42,7 +43,7 @@ export async function prepareNeoContainer(metadata: SongMetadata): Promise<strin
     return containerId;
   } catch (error) {
     console.error('Error preparing NEO container:', error);
-    throw error;
+    throw new Error('Failed to prepare NEO container');
   }
 }
 
@@ -52,14 +53,19 @@ export async function prepareNeoContainer(metadata: SongMetadata): Promise<strin
 export async function storeInNeoFS(
   fileData: Buffer,
   metadata: SongMetadata
-): Promise<{ containerId: string; objectId: string; dimensions: { [key: number]: number } }> {
+): Promise<StorageResult> {
   try {
     const gas = calculateRequiredGas(fileData.length, 24); // 24 hours storage
+    console.log('Calculated gas cost:', gas);
+
     const fileEnergy = calculateFileEnergy(fileData);
+    console.log('Calculated file energy:', fileEnergy);
+
     const dimensions = dimensionalBalancer.createReflection(
       metadata.ipfsHash,
       fileEnergy
     );
+    console.log('Created dimensional reflections:', dimensions);
 
     const containerId = await prepareNeoContainer(metadata);
     const objectId = ''; // Would be returned from NEO FS
@@ -67,7 +73,7 @@ export async function storeInNeoFS(
     return { containerId, objectId, dimensions };
   } catch (error) {
     console.error('Error storing in NEO FS:', error);
-    throw error;
+    throw new Error(error instanceof Error ? error.message : 'Failed to store in NEO FS');
   }
 }
 
@@ -75,46 +81,55 @@ export async function storeInNeoFS(
  * Calculates energy signature of a file using Shannon entropy
  */
 function calculateFileEnergy(fileData: Buffer): number {
-  const bytes = new Uint8Array(fileData);
-  const frequency = new Array(256).fill(0);
+  try {
+    const bytes = new Uint8Array(fileData);
+    const frequency = new Array(256).fill(0);
 
-  // Calculate byte frequency using traditional for loop for compatibility
-  for (let i = 0; i < bytes.length; i++) {
-    frequency[bytes[i]]++;
-  }
-
-  // Calculate Shannon entropy
-  let entropy = 0;
-  for (let i = 0; i < 256; i++) {
-    if (frequency[i] > 0) {
-      const p = frequency[i] / bytes.length;
-      entropy -= p * Math.log2(p);
+    // Calculate byte frequency using traditional for loop for compatibility
+    for (let i = 0; i < bytes.length; i++) {
+      frequency[bytes[i]]++;
     }
-  }
 
-  return entropy / 8; // Normalize to 0-1 range
+    // Calculate Shannon entropy
+    let entropy = 0;
+    for (let i = 0; i < 256; i++) {
+      if (frequency[i] > 0) {
+        const p = frequency[i] / bytes.length;
+        entropy -= p * Math.log2(p);
+      }
+    }
+
+    return entropy / 8; // Normalize to 0-1 range
+  } catch (error) {
+    console.error('Error calculating file energy:', error);
+    throw new Error('Failed to calculate file energy');
+  }
 }
 
 /**
  * Broadcasts storage status updates to connected clients
  */
-export function broadcastStorageStatus(message: any) {
-  const clients = getClients();
-  const broadcastMessage = JSON.stringify({
-    type: 'storage_status',
-    data: message
-  });
+export function broadcastStorageStatus(message: Record<string, unknown>): void {
+  try {
+    const clients = getClients();
+    const broadcastMessage = JSON.stringify({
+      type: 'storage_status',
+      data: message
+    });
 
-  // Use Array.from for compatibility with client iteration
-  Array.from(clients.entries()).forEach(([client]) => {
-    if (client.readyState === WebSocket.OPEN) {
-      try {
-        client.send(broadcastMessage);
-      } catch (error) {
-        console.error('Error broadcasting storage status:', error);
+    // Use Array.from for compatibility with client iteration
+    Array.from(clients.entries()).forEach(([client]) => {
+      if (client.readyState === WebSocket.OPEN) {
+        try {
+          client.send(broadcastMessage);
+        } catch (error) {
+          console.error('Error broadcasting to client:', error);
+        }
       }
-    }
-  });
+    });
+  } catch (error) {
+    console.error('Error in broadcast:', error);
+  }
 }
 
 /**
@@ -132,6 +147,6 @@ export async function updateSongMetadata(
     });
   } catch (error) {
     console.error('Error updating song metadata:', error);
-    throw error;
+    throw new Error('Failed to update song metadata');
   }
 }
