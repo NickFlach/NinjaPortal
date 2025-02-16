@@ -62,6 +62,11 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const pidControllerRef = useRef<PIDController>(new PIDController());
   const syncIntervalRef = useRef<NodeJS.Timeout>();
   const socket = useWebSocket();
+  const [syncExperience, setSyncExperience] = useState<{
+    audio: number;
+    visual: number;
+    interaction: number;
+  }>({ audio: 0, visual: 0, interaction: 0 });
 
   // Initialize audio element
   useEffect(() => {
@@ -418,7 +423,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [isPlaying, currentSong, userCoordinates, isLeader, socket]);
 
-
   // Add playback rate validation
   const adjustPlaybackSync = useCallback(() => {
     if (!audioRef.current || !currentSong || isLeader) return;
@@ -437,6 +441,14 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     if (audioRef.current) {
       try {
         audioRef.current.playbackRate = clampedRate;
+
+        // Update sync experience based on how well we're maintaining sync
+        const timeDiff = Math.abs(targetTime - currentTime);
+        const syncQuality = Math.max(0, 1 - (timeDiff / 2));
+        setSyncExperience(prev => ({
+          ...prev,
+          audio: syncQuality
+        }));
       } catch (error) {
         console.warn('Failed to set playback rate:', error);
         // Reset to normal playback on error
@@ -455,17 +467,52 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       // Start sync adjustment interval
       syncIntervalRef.current = setInterval(adjustPlaybackSync, 100); // 10Hz update rate
 
+      // Report experience data every second
+      const experienceInterval = setInterval(async () => {
+        try {
+          if (audioRef.current) {
+            const currentTime = audioRef.current.currentTime;
+            const targetTime = lastSyncRef.current?.timestamp || 0;
+            const timeDiff = Math.abs(currentTime - targetTime);
+
+            // Calculate experience metrics
+            const audioQuality = Math.max(0, 1 - (timeDiff / 5)); // 0-1 scale, lower diff = better
+            const syncQuality = isPlaying === (lastSyncRef.current?.playing || false) ? 1 : 0;
+
+            await fetch('/api/lumira/experience', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'audio',
+                sentiment: audioQuality * 2 - 1, // Convert to -1 to 1 scale
+                intensity: syncQuality,
+                context: 'sync',
+                songId: currentSong?.id
+              })
+            });
+
+            // Update PID parameters based on experience
+            const kp = 0.5 + (audioQuality * 0.5); // Adjust proportional gain
+            const ki = 0.1 + (syncQuality * 0.1); // Adjust integral gain
+            pidControllerRef.current.setParameters(kp, ki, 0.01);
+          }
+        } catch (error) {
+          console.error('Error reporting sync experience:', error);
+        }
+      }, 1000);
+
       return () => {
         if (syncIntervalRef.current) {
           clearInterval(syncIntervalRef.current);
         }
+        clearInterval(experienceInterval);
         // Reset playback rate when stopping sync
         if (audioRef.current) {
           audioRef.current.playbackRate = 1;
         }
       };
     }
-  }, [isLeader, isBluetoothEnabled, adjustPlaybackSync]);
+  }, [isLeader, isBluetoothEnabled, currentSong, isPlaying]);
 
 
   const toggleBluetoothSync = useCallback(async () => {
