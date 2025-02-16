@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Map, BarChart2 } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAccount } from "wagmi";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +13,19 @@ export function Navigation() {
   const { address } = useAccount();
   const { toast } = useToast();
   const intl = useIntl();
-  const { isSynced } = useMusicPlayer();
+  const { isSynced, connectToSyncServer, disconnectFromSyncServer } = useMusicPlayer();
+
+  // Cleanup WebSocket connection on navigation
+  useEffect(() => {
+    return () => {
+      disconnectFromSyncServer();
+    };
+  }, [location, disconnectFromSyncServer]);
+
+  // Reconnect when location changes
+  useEffect(() => {
+    connectToSyncServer();
+  }, [location, connectToSyncServer]);
 
   const requestLocation = useCallback(async (e: React.MouseEvent) => {
     // Check if we already have location permission
@@ -81,8 +93,9 @@ export function Navigation() {
     {
       href: "/lumira",
       label: (
-        <span className="flex items-center">
+        <span className="flex items-center gap-2">
           <BarChart2 className="h-4 w-4" />
+          Lumira
         </span>
       ),
       show: location !== '/lumira'
