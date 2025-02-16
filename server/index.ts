@@ -4,10 +4,16 @@ import { setupVite, serveStatic, log } from "./vite";
 import path from "path";
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
+import { WebSocketServer, WebSocket } from 'ws';
 
 // ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Custom WebSocket type with isAlive property
+interface CustomWebSocket extends WebSocket {
+  isAlive: boolean;
+}
 
 const app = express();
 app.use(express.json());
@@ -52,6 +58,50 @@ const startServer = async (retryCount = 0) => {
   try {
     const server = registerRoutes(app);
 
+    // Initialize WebSocket server with a distinct path
+    const wss = new WebSocketServer({ 
+      server, 
+      path: '/ws',
+      perMessageDeflate: {
+        zlibDeflateOptions: {
+          chunkSize: 1024,
+          memLevel: 7,
+          level: 3
+        },
+        zlibInflateOptions: {
+          chunkSize: 10 * 1024
+        },
+        clientNoContextTakeover: true,
+        serverNoContextTakeover: true,
+        serverMaxWindowBits: 10,
+        concurrencyLimit: 10,
+        threshold: 1024
+      }
+    });
+
+    // WebSocket connection handling with proper error handling
+    wss.on('connection', (ws: CustomWebSocket) => {
+      ws.isAlive = true;
+      const pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.ping();
+        }
+      }, 30000);
+
+      ws.on('pong', () => {
+        ws.isAlive = true;
+      });
+
+      ws.on('error', (error: Error) => {
+        console.error('WebSocket error:', error);
+        clearInterval(pingInterval);
+      });
+
+      ws.on('close', () => {
+        clearInterval(pingInterval);
+      });
+    });
+
     // Error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
@@ -80,9 +130,11 @@ const startServer = async (retryCount = 0) => {
 
     // Ensure cleanup of existing connections before starting
     const cleanup = () => {
-      server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
+      wss.close(() => {
+        server.close(() => {
+          console.log('Server and WebSocket connections closed');
+          process.exit(0);
+        });
       });
     };
 
@@ -92,7 +144,7 @@ const startServer = async (retryCount = 0) => {
     await new Promise<void>((resolve, reject) => {
       server.listen(port, "0.0.0.0")
         .once('listening', () => {
-          log(`serving on port ${port}`);
+          log(`Server running on port ${port}`);
           resolve();
         })
         .once('error', (err: NodeJS.ErrnoException) => {
@@ -103,6 +155,21 @@ const startServer = async (retryCount = 0) => {
             reject(err);
           }
         });
+    });
+
+    // Health check interval
+    const healthCheckInterval = setInterval(() => {
+      wss.clients.forEach((ws: CustomWebSocket) => {
+        if (!ws.isAlive) {
+          return ws.terminate();
+        }
+        ws.isAlive = false;
+        ws.ping();
+      });
+    }, 30000);
+
+    wss.on('close', () => {
+      clearInterval(healthCheckInterval);
     });
 
   } catch (error) {

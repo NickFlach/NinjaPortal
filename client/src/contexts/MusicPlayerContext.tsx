@@ -67,6 +67,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     visual: number;
     interaction: number;
   }>({ audio: 0, visual: 0, interaction: 0 });
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Initialize audio element
   useEffect(() => {
@@ -165,13 +166,24 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [userAddress]);
 
-  // Initialize audio context
+  // Initialize audio context with better error handling
   useEffect(() => {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    audioContextRef.current = new AudioContext();
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+        console.log('AudioContext initialized successfully');
+      }
+    } catch (error) {
+      console.error('Failed to initialize AudioContext:', error);
+    }
 
     return () => {
-      audioContextRef.current?.close();
+      try {
+        audioContextRef.current?.close().catch(console.error);
+      } catch (error) {
+        console.error('Error closing AudioContext:', error);
+      }
     };
   }, []);
 
@@ -347,7 +359,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   }, []);
 
 
-  // Handle WebSocket messages
+  // Enhanced WebSocket connection handling
   useEffect(() => {
     if (!socket) return;
 
@@ -375,12 +387,15 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
                 pidControllerRef.current.reset();
               }
               if (data.playing !== isPlaying) {
-                await togglePlay();
+                await togglePlay().catch(console.error);
               }
             }
             break;
           case 'error':
             console.error('WebSocket error message:', data.message);
+            break;
+          case 'pong':
+            // Handle pong response for connection quality monitoring
             break;
           default:
             console.log('Received websocket message:', data);
@@ -390,11 +405,54 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       }
     };
 
+    const handleClose = () => {
+      console.log('WebSocket connection closed, attempting to reconnect...');
+      setIsSynced(false);
+
+      // Clear any existing reconnect timeout
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+
+      // Attempt to reconnect after a delay
+      reconnectTimeoutRef.current = setTimeout(() => {
+        if (socket?.readyState === WebSocket.CLOSED) {
+          console.log('Attempting to reconnect WebSocket...');
+          // The WebSocketContext will handle the reconnection
+        }
+      }, 5000);
+    };
+
+    const handleError = (error: Event) => {
+      console.error('WebSocket error:', error);
+      setIsSynced(false);
+    };
+
     socket.addEventListener('message', handleMessage);
+    socket.addEventListener('close', handleClose);
+    socket.addEventListener('error', handleError);
     setIsSynced(socket.readyState === WebSocket.OPEN);
+
+    // Ping for connection quality monitoring
+    const pingInterval = setInterval(() => {
+      if (socket.readyState === WebSocket.OPEN) {
+        try {
+          socket.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+        } catch (error) {
+          console.error('Error sending ping:', error);
+          setIsSynced(false);
+        }
+      }
+    }, 5000);
 
     return () => {
       socket.removeEventListener('message', handleMessage);
+      socket.removeEventListener('close', handleClose);
+      socket.removeEventListener('error', handleError);
+      clearInterval(pingInterval);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
     };
   }, [socket, currentSong, isPlaying, isLeader]);
 
@@ -515,6 +573,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   }, [isLeader, isBluetoothEnabled, currentSong, isPlaying]);
 
 
+
   const toggleBluetoothSync = useCallback(async () => {
     if (isBluetoothEnabled) {
       setIsBluetoothEnabled(false);
@@ -559,24 +618,22 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   }, [isBluetoothEnabled, currentSong, isLeader, socket]);
 
   return (
-    <MusicPlayerContext.Provider
-      value={{
-        currentSong,
-        isPlaying,
-        togglePlay,
-        playSong,
-        recentSongs,
-        isLandingPage,
-        currentContext,
-        audioRef,
-        userCoordinates,
-        activeListeners,
-        isSynced,
-        toggleBluetoothSync,
-        isBluetoothEnabled,
-        isLeader
-      }}
-    >
+    <MusicPlayerContext.Provider value={{
+      currentSong,
+      isPlaying,
+      togglePlay,
+      playSong,
+      recentSongs,
+      isLandingPage,
+      currentContext,
+      audioRef,
+      userCoordinates,
+      activeListeners,
+      isSynced,
+      toggleBluetoothSync,
+      isBluetoothEnabled,
+      isLeader
+    }}>
       {children}
     </MusicPlayerContext.Provider>
   );

@@ -1,8 +1,9 @@
-import { Router, Request } from 'express';
+import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import axios, { AxiosRequestConfig } from 'axios';
 import { db } from '@db';
 import { eq } from 'drizzle-orm';
+import { WebSocket } from 'ws';
 
 // Define custom request type with multer file
 interface MulterRequest extends Request {
@@ -313,6 +314,27 @@ router.get('/download/:address/:fileId', async (req, res) => {
     }
     res.status(500).json({ error: 'Failed to download file from Neo FS', details: error.message });
   }
+});
+
+// Add error handling middleware
+router.use((err: Error, req: Request, res: Response, next: Function) => {
+  console.error('NEO Storage error:', err);
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ 
+      error: 'File upload error',
+      details: err.message
+    });
+  }
+  if (err.message.includes('Neo FS')) {
+    return res.status(503).json({
+      error: 'Neo FS service temporarily unavailable',
+      details: err.message
+    });
+  }
+  res.status(500).json({ 
+    error: 'Internal server error',
+    details: err.message
+  });
 });
 
 export default router;
