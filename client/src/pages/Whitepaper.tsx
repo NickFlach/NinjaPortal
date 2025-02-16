@@ -14,208 +14,171 @@ export default function Whitepaper() {
       <div className="prose prose-invert max-w-4xl mx-auto">
         <h1>Evolutionary, Decentralized AI-Powered Music & Intelligence Network</h1>
         <p className="lead">
-          A next-generation decentralized music streaming and AI-driven intelligence network that seamlessly 
-          integrates Web3, zero-data intelligence, quantum-ready architectures, and adaptive governance for 
-          an autonomous, privacy-preserving, and continuously evolving system.
+          A next-generation decentralized streaming & intelligence network integrating Web3, data-less AI, 
+          statistical physics, and quantum-ready architectures.
         </p>
 
-        {/* Lumira AI Assistant Section */}
+        {/* Introduction Section */}
+        <h2>Introduction</h2>
+        <p>
+          This system extends the existing Decentralized Music Streaming Platform into a self-adaptive 
+          intelligence network, incorporating data-less learning, evolutionary control systems, and federated 
+          governance. It fuses the original cascade-controlled decentralized music streaming with statistical 
+          physics-based network compression, graph neural networks (GNNs) for flow optimization, and free 
+          energy control for adaptive synchronization.
+        </p>
+
+        {/* Key Innovations */}
+        <h3>Key Innovations</h3>
+        <ul>
+          <li>
+            <strong>Data-Less AI Learning:</strong> Processes real-time signals without storing data, leveraging 
+            federated learning, homomorphic encryption, and zero-knowledge proofs (ZKPs).
+          </li>
+          <li>
+            <strong>Statistical Physics-Based Network Compression:</strong> Graph Neural Networks (GNNs) identify 
+            coarse-grained network structures that preserve information flow and minimize computational overhead.
+          </li>
+          <li>
+            <strong>Web3-Integrated AI Governance:</strong> Uses DAOs, tokenized incentives, and quadratic 
+            voting for decentralized decision-making.
+          </li>
+          <li>
+            <strong>Self-Evolving Architecture:</strong> Implements swarm intelligence, quantum-ready processing, 
+            and affective interfaces to dynamically adapt.
+          </li>
+        </ul>
+
+        {/* Lumira AI Section */}
         <div className="bg-accent/20 p-6 rounded-lg mb-8">
           <h2 className="flex items-center gap-2">
             <span className="text-2xl">🤖</span>
-            Lumira AI Integration
+            Lumira AI & Statistical Physics Integration
           </h2>
           <p>
-            Lumira acts as an intelligent data standardization and processing layer, transforming raw inputs 
-            into structured, analyzed data streams. It processes GPS and playback data in real-time, providing 
-            standardized outputs for both frontend visualization and API consumption.
+            Lumira now incorporates Graph Neural Networks (GNNs) for network compression and optimization, 
+            transforming raw inputs into structured, analyzed data streams while minimizing computational 
+            overhead through statistical physics principles.
           </p>
+          <h4>Key Capabilities:</h4>
+          <ul>
+            <li>Network Compression via GNNs
+              <ul>
+                <li>Identifies redundant nodes while preserving network entropy</li>
+                <li>Self-organizing coarse-graining for multi-scale adaptation</li>
+                <li>Optimized information diffusion through Laplacian renormalization</li>
+              </ul>
+            </li>
+            <li>Zero-Data Intelligence
+              <ul>
+                <li>Homomorphic encryption for private computation</li>
+                <li>Federated learning across edge nodes</li>
+                <li>Zero-knowledge proofs for data verification</li>
+              </ul>
+            </li>
+          </ul>
         </div>
 
+        {/* Technical Architecture */}
         <h2>Technical Architecture</h2>
-        <p>
-          The system integrates decentralized music streaming, real-time data processing, and Web3 technologies 
-          into a cohesive, scalable platform.
-        </p>
-
-        <h3>Core Components</h3>
-        <h4>Smart Contracts</h4>
+        <h3>Smart Contracts & Web3 Infrastructure</h3>
         <ul>
           <li>
-            <strong>MusicTreasury.sol</strong>: Manages platform economics and rewards
+            <strong>MusicTreasury.sol</strong>
             <ul>
-              <li>Upload Reward: 1 PFORK for contributing music content</li>
-              <li>Playlist Reward: 2 PFORK for curating playlists</li>
-              <li>NFT Reward: 3 PFORK for community engagement</li>
+              <li>Upload Reward: 1 PFORK → Content contribution</li>
+              <li>Playlist Reward: 2 PFORK → Curation</li>
+              <li>NFT Reward: 3 PFORK → Community ownership</li>
+              <li>Zero-Knowledge Proofs (ZKPs) for privacy-preserving verification</li>
             </ul>
           </li>
           <li>
-            <strong>NeoFsManager.sol</strong>: Handles decentralized storage
+            <strong>NeoFsManager.sol</strong>
             <ul>
-              <li>Content-addressed storage integration</li>
-              <li>Storage integrity verification</li>
-              <li>Incentive distribution mechanisms</li>
+              <li>Content-addressed decentralized storage (NEO FS + IPFS)</li>
+              <li>Storage verification via Merkle trees</li>
+              <li>Distributed proof-of-storage system</li>
             </ul>
           </li>
         </ul>
 
-        <h4>Real-Time Synchronization System</h4>
+        <h3>Cascade Control System</h3>
+        <h4>Controller Architecture</h4>
+        <ul>
+          <li>
+            <strong>Inner Loop (Entropy Control)</strong>
+            <ul>
+              <li>Anti-Windup Mechanisms</li>
+              <li>Adaptive Gain Scheduling</li>
+              <li>Low-Pass Filtered Derivative Action</li>
+            </ul>
+          </li>
+          <li>
+            <strong>Outer Loop (Free Energy Control)</strong>
+            <ul>
+              <li>Statistical Physics-Based Network Renormalization</li>
+              <li>Oscillation Detection & Damping</li>
+              <li>Steady-State Error Compensation</li>
+              <li>Quantum-Ready Parallel Processing</li>
+            </ul>
+          </li>
+        </ul>
+
+        {/* Blockchain Integration */}
+        <h3>Blockchain Configuration</h3>
+        <ul>
+          <li>Chain ID: {import.meta.env.VITE_CHAIN_ID}</li>
+          <li>Native Currency: GAS</li>
+          <li>RPC Endpoint: mainnet-1.rpc.banelabs.org</li>
+        </ul>
+
+        {/* Development Roadmap */}
+        <h2>Updated Development Roadmap</h2>
+        <div className="space-y-4">
+          <div>
+            <h3>Phase 1: Web3 Integration (Q2 2025)</h3>
+            <ul>
+              <li>Deploy AI-powered DAOs</li>
+              <li>Implement tokenized incentive system</li>
+              <li>First-generation AI synchronization</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3>Phase 2: Federated AI Expansion (Q3 2025)</h3>
+            <ul>
+              <li>Homomorphic encryption for private data processing</li>
+              <li>Neural network-enhanced synchronization</li>
+              <li>Adaptive AI-based curation and filtering</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3>Phase 3: Quantum Optimization (Q1 2026)</h3>
+            <ul>
+              <li>Quantum-assisted music recommendation engine</li>
+              <li>Graph-Based Network Flow Compression</li>
+              <li>Zero-knowledge music provenance verification</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3>Phase 4: Self-Healing Intelligence (Q4 2026)</h3>
+            <ul>
+              <li>Fully autonomous, self-adaptive AI</li>
+              <li>Real-time evolutionary learning</li>
+              <li>Hybrid human-AI co-governance through DAOs</li>
+            </ul>
+          </div>
+        </div>
+
+        <h2>Conclusion</h2>
         <p>
-          Our platform implements a sophisticated real-time synchronization system for coordinated music playback 
-          across distributed nodes.
+          This next-generation decentralized AI-powered music network extends beyond streaming into a 
+          self-evolving global intelligence ecosystem. By leveraging statistical physics, graph neural 
+          networks, data-less AI learning, and quantum-ready processing, it ensures transparent, ethical, 
+          and resilient decision-making at a planetary scale.
         </p>
-        <h5>Architecture Components</h5>
-        <ul>
-          <li><strong>Leader Election Protocol</strong>
-            <ul>
-              <li>Dynamic leader selection based on connection time</li>
-              <li>Automatic failover mechanisms</li>
-              <li>State synchronization across nodes</li>
-              <li>Real-time playback coordination</li>
-            </ul>
-          </li>
-          <li><strong>Network Topology</strong>
-            <ul>
-              <li>WebSocket-based real-time communication</li>
-              <li>Geographic distribution optimization</li>
-              <li>Latency-aware synchronization</li>
-              <li>Error compensation algorithms</li>
-            </ul>
-          </li>
-        </ul>
-
-        <h4>Blockchain Integration</h4>
-        <ul>
-          <li><strong>Configuration</strong>
-            <ul>
-              <li>Chain ID: {import.meta.env.VITE_CHAIN_ID}</li>
-              <li>Native Currency: GAS</li>
-              <li>RPC Integration: Managed endpoints</li>
-            </ul>
-          </li>
-          <li><strong>Wallet Integration</strong>
-            <ul>
-              <li>Multi-wallet compatibility</li>
-              <li>Automatic network configuration</li>
-              <li>Transaction management</li>
-            </ul>
-          </li>
-        </ul>
-
-        <h4>Lumira Data Processing</h4>
-        <p>
-          Lumira serves as our central data processing and standardization engine, providing real-time 
-          insights and analytics.
-        </p>
-        <ul>
-          <li>Real-time data standardization for:
-            <ul>
-              <li>GPS and location tracking</li>
-              <li>Playback synchronization</li>
-              <li>User interaction metrics</li>
-              <li>Network performance data</li>
-            </ul>
-          </li>
-        </ul>
-
-        <h3>Data Architecture</h3>
-        <ul>
-          <li><strong>Storage System</strong>
-            <ul>
-              <li>NEO FS Integration for decentralized storage</li>
-              <li>Redundant data distribution</li>
-              <li>Geographic optimization</li>
-            </ul>
-          </li>
-          <li><strong>Database Schema</strong>
-            <ul>
-              <li>User profiles and authentication</li>
-              <li>Music content metadata</li>
-              <li>Playlist management</li>
-              <li>Analytics and metrics</li>
-            </ul>
-          </li>
-        </ul>
-
-        <h2>Network Architecture</h2>
-        <p>
-          The platform utilizes a distributed network architecture optimized for real-time music streaming 
-          and data synchronization.
-        </p>
-        <h3>WebSocket Protocol</h3>
-        <h4>Connection Management</h4>
-        <ul>
-          <li><strong>Authentication Flow</strong>
-            <ul>
-              <li>Wallet-based verification</li>
-              <li>Session management</li>
-              <li>Heartbeat monitoring</li>
-            </ul>
-          </li>
-          <li><strong>Message Types</strong>
-            <ul>
-              <li>auth: Identity validation</li>
-              <li>subscribe: Music synchronization</li>
-              <li>sync: Playback coordination</li>
-              <li>location_update: Geographic tracking</li>
-            </ul>
-          </li>
-        </ul>
-
-        <h3>Synchronization Protocol</h3>
-        <ul>
-          <li><strong>State Management</strong>
-            <ul>
-              <li>Timestamp synchronization</li>
-              <li>Leader election mechanisms</li>
-              <li>State verification</li>
-            </ul>
-          </li>
-          <li><strong>Network Topology</strong>
-            <ul>
-              <li>Mesh network structure</li>
-              <li>Geographic clustering</li>
-              <li>Redundancy management</li>
-            </ul>
-          </li>
-        </ul>
-
-        <h2>Future Development</h2>
-        <h3>Planned Enhancements</h3>
-        <ul>
-          <li><strong>AI Integration</strong>
-            <ul>
-              <li>Enhanced content recommendations</li>
-              <li>Automated content moderation</li>
-              <li>Network optimization</li>
-            </ul>
-          </li>
-          <li><strong>Platform Scaling</strong>
-            <ul>
-              <li>Increased decentralization</li>
-              <li>Enhanced security measures</li>
-              <li>Cross-chain compatibility</li>
-            </ul>
-          </li>
-        </ul>
-
-        <h3>Development Roadmap</h3>
-        <ul>
-          <li>Phase 1: Core Infrastructure Enhancement
-            <ul>
-              <li>Optimized data processing</li>
-              <li>Enhanced synchronization</li>
-              <li>Improved scalability</li>
-            </ul>
-          </li>
-          <li>Phase 2: Advanced Features
-            <ul>
-              <li>AI-powered recommendations</li>
-              <li>Enhanced security features</li>
-              <li>Cross-platform integration</li>
-            </ul>
-          </li>
-        </ul>
       </div>
     </Layout>
   );
