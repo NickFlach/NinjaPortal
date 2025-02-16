@@ -934,8 +934,25 @@ export function registerRoutes(app: Express) {
 
       const encryptedCount = await encryptLoveCount(total);
 
-      // Encrypt the response
+      // In development, send unencrypted response if no secure channel
+      if (process.env.NODE_ENV === 'development' && !(req as any).secureChannel) {
+        return res.json({ 
+          loved: !existingLove,
+          totalLoves: total,
+          dev: true
+        });
+      }
+
+      // For production or when secure channel exists
       const channel = (req as any).secureChannel;
+      if (!channel || !channel.encryptionKey) {
+        console.error('No secure channel established');
+        return res.status(400).json({ 
+          message: "Secure channel required",
+          dev: process.env.NODE_ENV === 'development'
+        });
+      }
+
       const encryptedResponse = encryptMessage({
         loved: !existingLove,
         totalLoves: encryptedCount
@@ -947,7 +964,10 @@ export function registerRoutes(app: Express) {
       });
     } catch (error) {
       console.error('Error managing love:', error);
-      res.status(500).json({ message: "Failed to manage love" });
+      res.status(500).json({ 
+        message: "Failed to manage love",
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 
@@ -956,7 +976,6 @@ export function registerRoutes(app: Express) {
       const songId = parseInt(req.params.id);
       const userAddress = req.headers['x-wallet-address'] as string;
 
-      // Get total loves
       const [{ total }] = await db
         .select({ total: count() })
         .from(loves)
