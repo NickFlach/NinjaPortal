@@ -82,13 +82,25 @@ const startServer = async (retryCount = 0) => {
 
     // Generate stats function with access to wss
     function generateStats() {
-      return {
+      const stats = {
         activeListeners: wss.clients.size,
         geotaggedListeners: 0,
         anonymousListeners: wss.clients.size,
         listenersByCountry: {},
         locations: []
       };
+      console.log('Generated stats:', stats);
+      return stats;
+    }
+
+    // Broadcast updates to all connected clients
+    function broadcastUpdate(type: string, data: any) {
+      const message = JSON.stringify({ type, data });
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+        }
+      });
     }
 
     // Keep track of handled sockets to prevent duplicate upgrades
@@ -136,11 +148,67 @@ const startServer = async (retryCount = 0) => {
 
       // Send initial stats to the new client
       const stats = generateStats();
-      console.log('Generated stats:', stats);
       ws.send(JSON.stringify({
         type: 'stats_update',
         data: stats
       }));
+
+      // Handle incoming messages
+      ws.on('message', async (message: string) => {
+        try {
+          const data = JSON.parse(message.toString());
+
+          switch (data.type) {
+            case 'sync':
+              // Validate sync data before broadcasting
+              if (!data.songId || typeof data.timestamp !== 'number') {
+                console.error('Invalid sync data received:', data);
+                return;
+              }
+
+              // Broadcast sync data to all clients except sender
+              wss.clients.forEach((client) => {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                  client.send(JSON.stringify({
+                    type: 'sync',
+                    songId: data.songId,
+                    timestamp: data.timestamp,
+                    playing: data.playing
+                  }));
+                }
+              });
+              break;
+
+            case 'location_update':
+              // Validate location data
+              if (!data.coordinates || typeof data.coordinates.lat !== 'number' || typeof data.coordinates.lng !== 'number') {
+                console.error('Invalid location data received:', data);
+                return;
+              }
+
+              // Update client location and broadcast new stats
+              const updatedStats = generateStats();
+              broadcastUpdate('stats_update', updatedStats);
+              break;
+
+            case 'ping':
+              ws.send(JSON.stringify({ 
+                type: 'pong', 
+                timestamp: Date.now() 
+              }));
+              break;
+
+            default:
+              console.log('Received unknown message type:', data.type);
+          }
+        } catch (error) {
+          console.error('Error handling WebSocket message:', error);
+          ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Failed to process message'
+          }));
+        }
+      });
 
       const pingInterval = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
@@ -161,19 +229,9 @@ const startServer = async (retryCount = 0) => {
         console.log('Client disconnected:', code);
         clearInterval(pingInterval);
 
-        // Generate updated stats after client disconnection
-        const updatedStats = generateStats();
-        console.log('Generated stats:', updatedStats);
-
         // Broadcast updated stats to remaining clients
-        wss.clients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({
-              type: 'stats_update',
-              data: updatedStats
-            }));
-          }
-        });
+        const updatedStats = generateStats();
+        broadcastUpdate('stats_update', updatedStats);
       });
     });
 
