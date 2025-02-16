@@ -18,6 +18,13 @@ import {
   broadcastStats as broadcastClientStats 
 } from './services/client-stats';
 import wsHealthService from './services/websocket-health';
+import { 
+  encryptLoveCount, 
+  addEncryptedCounts, 
+  establishSecureChannel,
+  encryptMessage,
+  decryptMessage
+} from './services/encryption';
 
 // Track connected clients and their song subscriptions
 const clients = new Map<WebSocket, ClientInfo>();
@@ -80,7 +87,7 @@ export function registerRoutes(app: Express) {
   // Add Lumira route - ensure this is before WebSocket setup
   app.use('/api/lumira', lumiraRouter);
 
-  // Initialize WebSocket server with specific path
+  // Initialize WebSocket server with enhanced security
   const wss = new WebSocketServer({ 
     server: httpServer,
     path: '/ws',
@@ -92,10 +99,34 @@ export function registerRoutes(app: Express) {
           return;
         }
 
-        // Allow all other WebSocket connections
+        // Get client key with development fallback
+        const clientKey = info.req.headers['x-quantum-key'] || process.env.NODE_ENV === 'development' ? 'dev-quantum-key' : null;
+
+        if (!clientKey) {
+          console.warn('Client attempted connection without quantum key');
+          console.log('Connection headers:', info.req.headers);
+          cb(false);
+          return;
+        }
+
+        console.log('Establishing secure channel for client');
+
+        // Establish secure channel
+        const channel = establishSecureChannel(clientKey as string);
+        (info.req as any).secureChannel = channel;
+
+        console.log('Secure channel established:', {
+          channelId: channel.channelId,
+          hasEncryptionKey: !!channel.encryptionKey
+        });
+
         cb(true);
       } catch (error) {
         console.error('Error in verifyClient:', error);
+        console.error('Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          headers: info.req.headers
+        });
         cb(false);
       }
     }
@@ -882,7 +913,6 @@ export function registerRoutes(app: Express) {
       });
 
       if (existingLove) {
-        // Unlove: Remove the love
         await db.delete(loves).where(
           and(
             eq(loves.songId, songId),
@@ -890,22 +920,30 @@ export function registerRoutes(app: Express) {
           )
         );
       } else {
-        // Love: Add new love
         await db.insert(loves).values({
           songId,
           address: userAddress.toLowerCase(),
         });
       }
 
-      // Get updated love count
+      // Get updated love count and encrypt it
       const [{ total }] = await db
         .select({ total: count() })
         .from(loves)
         .where(eq(loves.songId, songId));
 
-      res.json({ 
+      const encryptedCount = await encryptLoveCount(total);
+
+      // Encrypt the response
+      const channel = (req as any).secureChannel;
+      const encryptedResponse = encryptMessage({
         loved: !existingLove,
-        totalLoves: total
+        totalLoves: encryptedCount
+      }, channel.encryptionKey);
+
+      res.json({ 
+        data: encryptedResponse,
+        channelId: channel.channelId
       });
     } catch (error) {
       console.error('Error managing love:', error);
@@ -913,7 +951,6 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Add endpoint to get love status and count
   app.get("/api/songs/:id/loves", async (req, res) => {
     try {
       const songId = parseInt(req.params.id);
