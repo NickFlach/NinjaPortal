@@ -8,7 +8,8 @@ import { incrementListenCount, getMapData } from './services/music';
 import { getLiveStats, broadcastStats, getClients, setClients } from './services/stats';
 import type { WebSocketMessage, ClientInfo } from './types/websocket';
 import neoStorageRouter from './routes/neo-storage';
-import translationRouter from './routes/translation'; // Add translation router import
+import translationRouter from './routes/translation';
+import lumiraRouter from './routes/lumira';
 import { 
   getClientStats, 
   updateClient, 
@@ -16,7 +17,6 @@ import {
   removeClient,
   broadcastStats as broadcastClientStats 
 } from './services/client-stats';
-import lumiraRouter from './routes/lumira';
 
 // Track connected clients and their song subscriptions
 const clients = new Map<WebSocket, ClientInfo>();
@@ -76,7 +76,7 @@ export function registerRoutes(app: Express) {
   // Add translation routes
   app.use('/api/translate', translationRouter);
 
-  // Add Lumira route
+  // Add Lumira route - ensure this is before WebSocket setup
   app.use('/api/lumira', lumiraRouter);
 
   // Initialize WebSocket server with specific path

@@ -65,6 +65,7 @@ export function Navigation() {
       label: (
         <span className="flex items-center gap-2">
           <Map className="h-4 w-4" />
+          {intl.formatMessage({ id: 'nav.map' })}
         </span>
       ),
       onClick: requestLocation,
@@ -75,6 +76,7 @@ export function Navigation() {
       label: (
         <span className="flex items-center gap-2">
           <BarChart2 className="h-4 w-4" />
+          {intl.formatMessage({ id: 'nav.analytics' })}
         </span>
       ),
       show: location !== '/lumira'
@@ -84,6 +86,7 @@ export function Navigation() {
       label: (
         <span className="flex items-center gap-2">
           <Heart className="h-4 w-4 text-red-500 animate-pulse" />
+          {intl.formatMessage({ id: 'nav.whitepaper' })}
         </span>
       ),
       show: location !== '/whitepaper'
