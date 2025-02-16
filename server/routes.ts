@@ -17,6 +17,7 @@ import {
   removeClient,
   broadcastStats as broadcastClientStats 
 } from './services/client-stats';
+import wsHealthService from './services/websocket-health';
 
 // Track connected clients and their song subscriptions
 const clients = new Map<WebSocket, ClientInfo>();
@@ -110,12 +111,16 @@ export function registerRoutes(app: Express) {
     // Initialize client info with connection timestamp
     const clientInfo: ClientInfo = {
       connectedAt: Date.now(),
-      isLeader: clients.size === 0 // First client becomes leader
+      isLeader: clients.size === 0, // First client becomes leader
+      lastSyncTime: Date.now()
     };
 
     // Add client to our tracking
     addClient(ws, clientInfo);
     updateLeaderStatus();
+
+    // Add to health monitoring
+    wsHealthService.addConnection(ws);
 
     // Send initial stats to the new client
     try {
@@ -133,6 +138,11 @@ export function registerRoutes(app: Express) {
         console.log('Received message type:', message.type);
 
         switch (message.type) {
+          case 'ping': {
+            // Respond immediately to pings with pongs for latency measurement
+            ws.send(JSON.stringify({ type: 'pong' }));
+            break;
+          }
           case 'auth': {
             if (message.address) {
               const normalizedAddress = message.address.toLowerCase();
@@ -150,11 +160,20 @@ export function registerRoutes(app: Express) {
                 type: 'subscribe_success',
                 songId: message.songId 
               }));
+
+              // Send immediate sync state if available
+              const leaderState = getLeaderState();
+              if (leaderState && leaderState.songId === message.songId) {
+                ws.send(JSON.stringify({
+                  type: 'sync',
+                  ...leaderState
+                }));
+              }
             }
             break;
           }
           case 'request_sync': {
-            // New case to handle sync requests from followers
+            // Handle sync requests from followers
             const leaderState = getLeaderState();
             if (leaderState && leaderState.songId === message.songId) {
               ws.send(JSON.stringify({
@@ -166,28 +185,37 @@ export function registerRoutes(app: Express) {
           }
           case 'sync': {
             const { timestamp, playing, songId } = message;
-            updateClient(ws, { isPlaying: playing, currentTime: timestamp });
+            updateClient(ws, { 
+              isPlaying: playing, 
+              currentTime: timestamp,
+              lastSyncTime: Date.now() 
+            });
 
-            // Only broadcast sync if this is the leader
             const clientInfo = clients.get(ws);
             if (clientInfo?.isLeader) {
               if (!playing) {
                 updateClient(ws, { coordinates: undefined, countryCode: undefined });
               }
 
-              if (typeof songId === 'number') {
-                // Broadcast sync message to other listeners
+              // Get connection health before broadcasting
+              const health = wsHealthService.getConnectionHealth(ws);
+              if (health && health.quality > 0.5) { // Only broadcast if connection quality is good
+                // Broadcast sync message...
                 const syncMessage = JSON.stringify({
                   type: 'sync',
                   timestamp,
                   playing,
-                  songId
+                  songId,
+                  quality: health.quality
                 });
 
-                Array.from(clients.entries()).forEach(([client, info]) => {
+                // Enhanced sync broadcast with health consideration
+                for (const [client, info] of clients.entries()) {
+                  const clientHealth = wsHealthService.getConnectionHealth(client);
                   if (client !== ws && 
                       info.currentSong === songId && 
-                      client.readyState === WebSocket.OPEN) {
+                      client.readyState === WebSocket.OPEN &&
+                      clientHealth?.quality > 0.3) { // Only sync to relatively healthy connections
                     try {
                       client.send(syncMessage);
                     } catch (error) {
@@ -195,7 +223,7 @@ export function registerRoutes(app: Express) {
                       removeClient(client);
                     }
                   }
-                });
+                }
               }
             }
             break;
@@ -235,40 +263,52 @@ export function registerRoutes(app: Express) {
       }
     });
 
-    ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
-      removeClient(ws);
-      updateLeaderStatus();
-      broadcastClientStats();
+    // Handle connection health events
+    wsHealthService.on('connectionUnhealthy', (unhealthyWs) => {
+      if (unhealthyWs === ws) {
+        console.log('Connection became unhealthy:', req.socket.remoteAddress);
+        removeClient(ws);
+        updateLeaderStatus();
+        broadcastClientStats();
+      }
+    });
+
+    wsHealthService.on('qualityUpdate', (updatedWs, quality) => {
+      if (updatedWs === ws) {
+        const clientInfo = clients.get(ws);
+        if (clientInfo) {
+          updateClient(ws, { connectionQuality: quality });
+          // If leader's connection quality drops significantly, consider leader rotation
+          if (clientInfo.isLeader && quality < 0.3) {
+            updateLeaderStatus();
+          }
+        }
+      }
     });
 
     ws.on('close', (code, reason) => {
       console.log('Client disconnected:', code, reason.toString());
+      wsHealthService.removeConnection(ws);
       removeClient(ws);
       updateLeaderStatus();
       broadcastClientStats();
     });
   });
 
-  // Regular cleanup of stale connections and broadcast updates
+  // Regular cleanup now considers health service stats
   const cleanupInterval = setInterval(() => {
-    let hadStaleConnections = false;
-    // Convert Map iterator to array before forEach to fix type error
-    [...clients.entries()].forEach(([client]) => {
-      if (client.readyState !== WebSocket.OPEN) {
-        removeClient(client);
-        hadStaleConnections = true;
-      }
-    });
-    if (hadStaleConnections) {
-      updateLeaderStatus();
-      broadcastClientStats();
-    }
-  }, 30000);
+    const stats = wsHealthService.getAggregateStats();
+    console.log('WebSocket health stats:', stats);
 
-  // Cleanup interval when server closes
+    if (stats.averageQuality < 0.5) {
+      console.warn('Poor average connection quality detected:', stats.averageQuality);
+    }
+  }, 5000);
+
+  // Cleanup on server close
   httpServer.on('close', () => {
     clearInterval(cleanupInterval);
+    wsHealthService.shutdown();
   });
 
   // Add REST endpoint for client stats

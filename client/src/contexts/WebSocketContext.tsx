@@ -4,11 +4,13 @@ import { useAccount } from 'wagmi';
 interface WebSocketContextType {
   socket: WebSocket | null;
   isConnected: boolean;
+  connectionQuality: number; // 0-1 scale
 }
 
 const WebSocketContext = createContext<WebSocketContextType>({
   socket: null,
   isConnected: false,
+  connectionQuality: 1
 });
 
 export const useWebSocket = () => {
@@ -22,10 +24,29 @@ export const useWebSocket = () => {
 export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionQuality, setConnectionQuality] = useState(1);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout>();
+  const lastHeartbeatRef = useRef<number>(Date.now());
+  const lastPingRef = useRef<number>(0);
   const { address } = useAccount();
+
+  const pingServer = (ws: WebSocket) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      lastPingRef.current = Date.now();
+      ws.send(JSON.stringify({ type: 'ping' }));
+    }
+  };
+
+  const handlePong = () => {
+    const latency = Date.now() - lastPingRef.current;
+    // Update connection quality based on latency (0-1 scale)
+    const quality = Math.max(0, Math.min(1, 1 - (latency / 1000)));
+    setConnectionQuality(quality);
+    lastHeartbeatRef.current = Date.now();
+  };
 
   const connect = () => {
     try {
@@ -50,6 +71,21 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         console.log('Connected to music sync server');
         setIsConnected(true);
         reconnectAttempts.current = 0;
+        setConnectionQuality(1);
+
+        // Start heartbeat
+        if (heartbeatIntervalRef.current) {
+          clearInterval(heartbeatIntervalRef.current);
+        }
+        heartbeatIntervalRef.current = setInterval(() => {
+          pingServer(ws);
+
+          // Check if we haven't received a heartbeat in 5 seconds
+          if (Date.now() - lastHeartbeatRef.current > 5000) {
+            console.warn('No heartbeat received, reconnecting...');
+            ws.close();
+          }
+        }, 1000);
 
         // Send auth message if wallet is connected
         if (address) {
@@ -65,6 +101,8 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const data = JSON.parse(event.data);
           if (data.type === 'error') {
             console.error('Server error:', data.message);
+          } else if (data.type === 'pong') {
+            handlePong();
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
@@ -75,6 +113,16 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         console.log('WebSocket disconnected:', event.code, event.reason);
         setIsConnected(false);
         setSocket(null);
+        setConnectionQuality(0);
+
+        if (heartbeatIntervalRef.current) {
+          clearInterval(heartbeatIntervalRef.current);
+        }
+
+        // Don't reconnect if it was a clean close
+        if (event.code === 1000) {
+          return;
+        }
 
         // Attempt to reconnect if we haven't exceeded max attempts
         if (reconnectAttempts.current < maxReconnectAttempts) {
@@ -92,6 +140,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        setConnectionQuality(0);
       };
 
       setSocket(ws);
@@ -99,6 +148,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.error('Error creating WebSocket connection:', error);
       setSocket(null);
       setIsConnected(false);
+      setConnectionQuality(0);
     }
   };
 
@@ -110,8 +160,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+      }
       if (socket) {
-        socket.close();
+        socket.close(1000); // Clean close
       }
     };
   }, []);
@@ -127,7 +180,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [address, socket]);
 
   return (
-    <WebSocketContext.Provider value={{ socket, isConnected }}>
+    <WebSocketContext.Provider value={{ socket, isConnected, connectionQuality }}>
       {children}
     </WebSocketContext.Provider>
   );
