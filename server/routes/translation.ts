@@ -3,9 +3,9 @@ import { Translate } from '@google-cloud/translate/build/src/v2';
 
 const router = Router();
 
-// Initialize Google Translate
+// Initialize Google Translate with API key from environment variable
 const translate = new Translate({
-  key: process.env.GOOGLE_TRANSLATE_API_KEY
+  key: process.env.TRANSLATION_API_KEY
 });
 
 router.post('/translate', async (req, res) => {
@@ -17,7 +17,7 @@ router.post('/translate', async (req, res) => {
     }
 
     const [translation] = await translate.translate(text, targetLanguage);
-    
+
     res.json({
       translatedText: translation,
       sourceLanguage: 'en',

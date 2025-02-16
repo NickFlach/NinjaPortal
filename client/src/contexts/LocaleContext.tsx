@@ -1,19 +1,12 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { IntlProvider } from 'react-intl';
 import { LocaleType } from '../i18n';
-//import { Translate } from '@google-cloud/translate/build/src/v2'; //Removed as not used
 
-// Translation service types
-//interface TranslationResponse { //Removed
-//  translations: Array<{
-//    text: string;
-//    to: string;
-//  }>;
-//}
-//interface TranslationError extends Error { //Removed
-//  code: string;
-//  details?: unknown;
-//}
+interface TranslationResponse {
+  translatedText: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+}
 
 interface CachedTranslation {
   text: string;
@@ -81,7 +74,7 @@ async function translateText(text: string, targetLocale: string): Promise<string
         throw new Error(`Translation API error: ${response.status} - ${errorText}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as TranslationResponse;
       const translatedText = data.translatedText;
 
       // Cache the result
@@ -119,7 +112,7 @@ interface LocaleContextType {
   translate: (text: string) => Promise<string>;
 }
 
-const LocaleContext = createContext<LocaleContextType | null>(null);
+const LocaleContext = createContext<LocaleContextType | undefined>(undefined);
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<LocaleType>('en');
@@ -168,7 +161,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
 
 export function useLocale() {
   const context = useContext(LocaleContext);
-  if (context === null) {
+  if (context === undefined) {
     throw new Error('useLocale must be used within a LocaleProvider');
   }
   return context;
