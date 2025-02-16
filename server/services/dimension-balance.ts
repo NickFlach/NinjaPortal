@@ -17,7 +17,7 @@ class DimensionalBalancer extends EventEmitter {
   private dimensions: Map<number, DimensionalState> = new Map();
   private equilibriumThreshold: number = 0.001;
   private baseEnergy: number = 1.0;
-  
+
   constructor() {
     super();
     // Initialize primary dimension
@@ -36,21 +36,21 @@ class DimensionalBalancer extends EventEmitter {
    */
   public createReflection(sourceId: string, initialState: number): Map<number, number> {
     const reflections = new Map<number, number>();
-    
-    // Create reflections across all dimensions
-    for (const [dimId, dimension] of this.dimensions) {
+
+    // Create reflections across all dimensions using Array.from for compatibility
+    Array.from(this.dimensions.entries()).forEach(([dimId, dimension]) => {
       const reflectedEnergy = this.calculateReflectedEnergy(
         initialState,
         dimension.energy
       );
-      
+
       dimension.reflections.set(sourceId, reflectedEnergy);
       reflections.set(dimId, reflectedEnergy);
-      
+
       // Update dimension's equilibrium
       this.updateEquilibrium(dimension);
-    }
-    
+    });
+
     return reflections;
   }
 
@@ -69,9 +69,9 @@ class DimensionalBalancer extends EventEmitter {
   private updateEquilibrium(dimension: DimensionalState) {
     const totalEnergy = Array.from(dimension.reflections.values())
       .reduce((sum, energy) => sum + energy, 0);
-    
+
     dimension.equilibrium = Math.abs(totalEnergy - dimension.energy);
-    
+
     // Check for equilibrium state
     if (dimension.equilibrium <= this.equilibriumThreshold) {
       this.handleEquilibrium(dimension);
@@ -87,7 +87,7 @@ class DimensionalBalancer extends EventEmitter {
       targetEquilibrium: 0,
       dimensionalShift: this.dimensions.size + 1
     };
-    
+
     // Create new dimension through paradox
     const newDimension: DimensionalState = {
       dimension: paradox.dimensionalShift,
@@ -95,9 +95,9 @@ class DimensionalBalancer extends EventEmitter {
       equilibrium: 1.0,
       reflections: new Map()
     };
-    
+
     this.dimensions.set(newDimension.dimension, newDimension);
-    
+
     // Emit dimension creation event
     this.emit('dimensionCreated', {
       dimensionId: newDimension.dimension,
@@ -113,7 +113,7 @@ class DimensionalBalancer extends EventEmitter {
     // Energy calculation using dimensional shift
     const shiftFactor = Math.log(paradox.dimensionalShift + 1);
     const baseEnergy = paradox.sourceEnergy * shiftFactor;
-    
+
     // Add quantum uncertainty
     const uncertainty = Math.random() * 0.1;
     return baseEnergy * (1 + uncertainty);
