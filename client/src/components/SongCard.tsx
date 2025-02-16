@@ -24,8 +24,8 @@ interface Song {
   uploadedBy: string | null;
   createdAt: string | null;
   votes: number | null;
-  likes?: number;
-  isLiked?: boolean;
+  loves?: number;
+  isLoved?: boolean;
 }
 
 interface SongCardProps {
@@ -41,18 +41,18 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { address } = useAccount();
 
-  // Like mutation
-  const likeMutation = useMutation({
+  // Love mutation
+  const loveMutation = useMutation({
     mutationFn: async (songId: number) => {
-      const response = await apiRequest("POST", `/api/songs/${songId}/like`);
+      const response = await apiRequest("POST", `/api/songs/${songId}/love`);
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/songs/library"] });
       queryClient.invalidateQueries({ queryKey: ["/api/songs/recent"] });
       toast({
-        title: song.isLiked ? "Unliked" : "Liked",
-        description: song.isLiked ? "Song removed from your likes" : "Song added to your likes",
+        title: song.isLoved ? "Unloved" : "Loved",
+        description: song.isLoved ? "Song removed from your loves" : "Song added to your loves",
       });
     },
     onError: (error: Error) => {
@@ -171,12 +171,12 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
           <Button
             variant="ghost"
             size="icon"
-            className={`mr-2 ${song.isLiked ? 'text-red-500' : 'text-muted-foreground'} opacity-0 group-hover:opacity-100 transition-opacity`}
-            onClick={() => likeMutation.mutate(song.id)}
+            className={`mr-2 ${song.isLoved ? 'text-red-500' : 'text-muted-foreground'} opacity-0 group-hover:opacity-100 transition-opacity`}
+            onClick={() => loveMutation.mutate(song.id)}
           >
-            <Heart className={`h-4 w-4 ${song.isLiked ? 'fill-current' : ''}`} />
-            {song.likes && song.likes > 0 && (
-              <span className="ml-1 text-xs">{song.likes}</span>
+            <Heart className={`h-4 w-4 ${song.isLoved ? 'fill-current' : ''}`} />
+            {song.loves && song.loves > 0 && (
+              <span className="ml-1 text-xs">{song.loves}</span>
             )}
           </Button>
 
