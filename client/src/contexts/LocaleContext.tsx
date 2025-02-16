@@ -23,6 +23,16 @@ interface CachedTranslation {
 // Define supported locales to fix type issues
 type SupportedLocale = 'en' | 'es';
 
+// List of terms that should not be translated
+const preservedTerms = [
+  'ninja-portal',
+  'Lumira',
+  'PFORK',
+  'NEO',
+  'Flaukowski',
+  'Plump'
+];
+
 // Minimal static translations for UI elements
 const staticMessages: Record<SupportedLocale, Record<string, string>> = {
   en: {
@@ -34,7 +44,7 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'app.upload': 'Upload',
     'app.discovery': 'Discovery',
     'app.recent': 'Recent',
-    'app.title': 'Title',
+    'app.title': 'ninja-portal',  // Preserve brand name
     'app.disconnect': 'Disconnect',
     'app.connect': 'Connect',
     'app.library': 'Library',
@@ -56,7 +66,7 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'app.upload': 'Subir',
     'app.discovery': 'Descubrimiento',
     'app.recent': 'Reciente',
-    'app.title': 'Título',
+    'app.title': 'ninja-portal',  // Keep brand name untranslated
     'app.disconnect': 'Desconectar',
     'app.connect': 'Conectar',
     'app.library': 'Biblioteca',
@@ -84,7 +94,10 @@ async function sleep(ms: number): Promise<void> {
 }
 
 async function translateText(text: string, targetLocale: string): Promise<string> {
-  if (targetLocale === 'en') return text;
+  // Don't translate if it's English or a preserved term
+  if (targetLocale === 'en' || preservedTerms.includes(text)) {
+    return text;
+  }
 
   const cacheKey = `${text}_${targetLocale}`;
   const cached = translationCache.get(cacheKey);
