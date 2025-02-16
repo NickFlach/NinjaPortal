@@ -25,6 +25,7 @@ import {
   encryptMessage,
   decryptMessage
 } from './services/encryption';
+import { storeInNeoFS } from './services/neofs'; // Assuming this function exists
 
 // Track connected clients and their song subscriptions
 const clients = new Map<WebSocket, ClientInfo>();
@@ -544,6 +545,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // In the POST "/api/songs" endpoint
   app.post("/api/songs", async (req, res) => {
     const { title, artist, ipfsHash } = req.body;
     const uploadedBy = req.headers['x-wallet-address'] as string;
@@ -552,14 +554,33 @@ export function registerRoutes(app: Express) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const newSong = await db.insert(songs).values({
-      title,
-      artist,
-      ipfsHash,
-      uploadedBy,
-    }).returning();
+    try {
+      // Store song metadata first
+      const [newSong] = await db.insert(songs).values({
+        title,
+        artist,
+        ipfsHash,
+        uploadedBy: uploadedBy.toLowerCase(),
+      }).returning();
 
-    res.json(newSong[0]);
+      // Attempt NEO storage without dimensional features by default
+      try {
+        await storeInNeoFS(Buffer.from(ipfsHash), {
+          title,
+          artist,
+          uploadedBy: uploadedBy.toLowerCase(),
+          ipfsHash,
+          createdAt: new Date()
+        });
+      } catch (storageError) {
+        console.warn('NEO storage failed but continuing:', storageError);
+      }
+
+      res.json(newSong);
+    } catch (error) {
+      console.error('Error creating song:', error);
+      res.status(500).json({ message: "Failed to create song" });
+    }
   });
 
   app.delete("/api/songs/:id", async (req, res) => {
@@ -974,7 +995,7 @@ export function registerRoutes(app: Express) {
   app.get("/api/songs/:id/loves", async (req, res) => {
     try {
       const songId = parseInt(req.params.id);
-      const userAddress = req.headers['x-wallet-address'] as string;
+            const userAddress = req.headers['x-wallet-address'] as string;
 
       const [{ total }] = await db
         .select({ total: count() })
