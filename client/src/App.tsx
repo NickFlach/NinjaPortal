@@ -18,6 +18,7 @@ import { WebSocketProvider } from "@/contexts/WebSocketContext";
 import { useEffect } from "react";
 import { LocaleProvider } from "./contexts/LocaleContext";
 import Whitepaper from "./pages/Whitepaper";
+import LumiraData from "@/pages/LumiraData"; // Added import
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<
@@ -109,9 +110,12 @@ function Router() {
       <Route path="/map">
         <ProtectedRoute component={Map} />
       </Route>
-      <Route path="/whitepaper"> {/* Added route for whitepaper */}
-        <ProtectedRoute component={Whitepaper} /> {/* Added route for whitepaper */}
-      </Route> {/* Added route for whitepaper */}
+      <Route path="/lumira">
+        <ProtectedRoute component={LumiraData} />
+      </Route>
+      <Route path="/whitepaper">
+        <ProtectedRoute component={Whitepaper} />
+      </Route>
       <Route>
         <NotFound />
       </Route>

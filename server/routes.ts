@@ -15,6 +15,7 @@ import {
   removeClient,
   broadcastStats as broadcastClientStats 
 } from './services/client-stats';
+import lumiraRouter from './routes/lumira';
 
 // Track connected clients and their song subscriptions
 const clients = new Map<WebSocket, ClientInfo>();
@@ -70,6 +71,9 @@ function getLeaderState(): { songId?: number; timestamp: number; playing: boolea
 
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
+
+  // Add Lumira route
+  app.use('/api/lumira', lumiraRouter);
 
   // Initialize WebSocket server with specific path
   const wss = new WebSocketServer({ 
