@@ -56,13 +56,6 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center gap-2">
             {!isCompactView ? (
               <>
-                <Link 
-                  href="/whitepaper"
-                  className="text-sm transition-colors hover:text-primary"
-                  title="Read Whitepaper"
-                >
-                  Whitepaper
-                </Link>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
