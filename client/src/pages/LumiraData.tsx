@@ -58,51 +58,45 @@ export default function LumiraData() {
 
   const { start, end, interval } = getTimeRange();
 
-  const { data: metrics, isLoading, error } = useQuery<LumiraMetric[]>({
+  const { data: metrics, isLoading } = useQuery<LumiraMetric[]>({
     queryKey: ["/api/lumira/metrics", { start: start.toISOString(), end: end.toISOString(), interval }],
     refetchInterval: 30000, // Refresh every 30 seconds instead of 5
     staleTime: 15000, // Consider data fresh for 15 seconds
-    keepPreviousData: true, // Keep showing old data while fetching new data
   });
 
-  const renderChart = (data: LumiraDataPoint[] = [], height: number = 400, dotRadius: number = 6) => (
-    <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" className="opacity-50" />
-        <XAxis 
-          dataKey="timestamp" 
-          tickFormatter={(value) => new Date(value).toLocaleTimeString()} 
-          stroke="hsl(var(--muted-foreground))"
-        />
-        <YAxis stroke="hsl(var(--muted-foreground))" />
-        <Tooltip 
-          labelFormatter={(value) => new Date(value).toLocaleString()}
-          contentStyle={{
-            backgroundColor: 'hsl(var(--background))',
-            border: '1px solid hsl(var(--border))',
-            borderRadius: '6px'
-          }}
-        />
-        <Line 
-          type="monotone" 
-          dataKey="value" 
-          stroke="hsl(var(--primary))" 
-          strokeWidth={2}
-          dot={false}
-          activeDot={{ r: dotRadius, fill: 'hsl(var(--primary))' }}
-        />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-
-  if (error) {
+  if (isLoading && !metrics) {
     return (
       <Layout>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-destructive">Error loading Lumira data. Please try again later.</div>
-          </CardContent>
-        </Card>
+        <div className="space-y-8">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold">Network Performance Overview</h1>
+            <Skeleton className="h-10 w-[180px]" />
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Network Performance Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[400px] w-full flex items-center justify-center">
+                <Skeleton className="h-[90%] w-[95%]" />
+              </div>
+            </CardContent>
+          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array(2).fill(null).map((_, idx) => (
+              <Card key={idx}>
+                <CardHeader>
+                  <CardTitle><Skeleton className="h-6 w-32" /></CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[200px] w-full flex items-center justify-center">
+                    <Skeleton className="h-[90%] w-[95%]" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       </Layout>
     );
   }
@@ -130,32 +124,72 @@ export default function LumiraData() {
           </CardHeader>
           <CardContent>
             <div className="h-[400px]">
-              {isLoading && !metrics ? (
-                <div className="h-full w-full flex items-center justify-center">
-                  <Skeleton className="h-[90%] w-[95%]" />
-                </div>
-              ) : (
-                renderChart(metrics?.[0]?.data)
-              )}
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={metrics?.[0]?.data ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-50" />
+                  <XAxis 
+                    dataKey="timestamp" 
+                    tickFormatter={(value) => new Date(value).toLocaleTimeString()} 
+                    stroke="hsl(var(--muted-foreground))"
+                  />
+                  <YAxis stroke="hsl(var(--muted-foreground))" />
+                  <Tooltip 
+                    labelFormatter={(value) => new Date(value).toLocaleString()}
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--background))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px'
+                    }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="value" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 6, fill: 'hsl(var(--primary))' }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(isLoading && !metrics ? Array(2).fill(null) : metrics?.slice(1) || []).map((metric, idx) => (
-            <Card key={metric?.name || idx}>
+          {(metrics?.slice(1) ?? []).map((metric) => (
+            <Card key={metric.name}>
               <CardHeader>
-                <CardTitle>{metric?.name || <Skeleton className="h-6 w-32" />}</CardTitle>
+                <CardTitle>{metric.name}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-[200px]">
-                  {metric ? (
-                    renderChart(metric.data, 200, 4)
-                  ) : (
-                    <div className="h-full w-full flex items-center justify-center">
-                      <Skeleton className="h-[90%] w-[95%]" />
-                    </div>
-                  )}
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={metric.data}>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-50" />
+                      <XAxis 
+                        dataKey="timestamp" 
+                        tickFormatter={(value) => new Date(value).toLocaleTimeString()} 
+                        stroke="hsl(var(--muted-foreground))"
+                      />
+                      <YAxis stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip 
+                        labelFormatter={(value) => new Date(value).toLocaleString()}
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--background))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '6px'
+                        }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="value" 
+                        stroke="hsl(var(--primary))" 
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4, fill: 'hsl(var(--primary))' }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
