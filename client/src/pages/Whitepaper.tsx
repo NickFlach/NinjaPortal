@@ -1,10 +1,7 @@
 import { Layout } from "@/components/Layout";
 import { useEffect } from 'react';
-import { useIntl } from 'react-intl';
 
 export default function Whitepaper() {
-  const intl = useIntl();
-
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -12,40 +9,44 @@ export default function Whitepaper() {
   return (
     <Layout>
       <div className="prose prose-invert max-w-4xl mx-auto">
-        <h1>Evolutionary, Decentralized AI-Powered Music & Intelligence Network</h1>
+        <h1>The Evolutionary AI-Powered Music & Intelligence Network</h1>
         <p className="lead">
-          A next-generation decentralized streaming & intelligence network integrating Web3, data-less AI, 
-          statistical physics, and quantum-ready architectures.
+          A decentralized revolution in music, intelligence, and community-engineered innovation that seamlessly 
+          integrates Web3, data-less AI, statistical physics, and quantum-ready architectures.
         </p>
 
         {/* Introduction Section */}
-        <h2>Introduction</h2>
+        <h2>Introduction: The Intersection of Music, Intelligence & Moral-Techno-Economics</h2>
         <p>
-          This system extends the existing Decentralized Music Streaming Platform into a self-adaptive 
-          intelligence network, incorporating data-less learning, evolutionary control systems, and federated 
-          governance. It fuses the original cascade-controlled decentralized music streaming with statistical 
-          physics-based network compression, graph neural networks (GNNs) for flow optimization, and free 
-          energy control for adaptive synchronization.
+          In a world where technology shapes not just industries but the very fabric of human experience, 
+          we are forging a new path—one where music, AI, and decentralized intelligence evolve together. 
+          This isn't just about streaming music. It's about engineering societal systems, embedding ethics 
+          into technology, and embracing paradox as a catalyst for innovation.
+        </p>
+        <p>
+          We believe in the fusion of moral-techno-economics—a framework where technology serves human 
+          progress, economic models are regenerative, and community-driven governance ensures accountability. 
+          This system is not controlled by a single entity but evolves through decentralized intelligence, 
+          statistical physics, and quantum computation.
         </p>
 
-        {/* Key Innovations */}
-        <h3>Key Innovations</h3>
+        {/* Core Innovations */}
+        <h3>Core System Capabilities</h3>
         <ul>
           <li>
-            <strong>Data-Less AI Learning:</strong> Processes real-time signals without storing data, leveraging 
-            federated learning, homomorphic encryption, and zero-knowledge proofs (ZKPs).
+            <strong>Data-less Intelligence:</strong> Learns, adapts, and optimizes in real-time without 
+            centralizing or storing personal data
           </li>
           <li>
-            <strong>Statistical Physics-Based Network Compression:</strong> Graph Neural Networks (GNNs) identify 
-            coarse-grained network structures that preserve information flow and minimize computational overhead.
+            <strong>Web3 & Decentralized Governance:</strong> Ensures power stays with the people, not 
+            corporate monopolies
           </li>
           <li>
-            <strong>Web3-Integrated AI Governance:</strong> Uses DAOs, tokenized incentives, and quadratic 
-            voting for decentralized decision-making.
+            <strong>Quantum-Ready Architecture:</strong> Designed to handle paradoxes and solve problems 
+            at planetary scale
           </li>
           <li>
-            <strong>Self-Evolving Architecture:</strong> Implements swarm intelligence, quantum-ready processing, 
-            and affective interfaces to dynamically adapt.
+            <strong>Self-Healing Evolution:</strong> Grows alongside the communities it serves
           </li>
         </ul>
 
@@ -53,56 +54,57 @@ export default function Whitepaper() {
         <div className="bg-accent/20 p-6 rounded-lg mb-8">
           <h2 className="flex items-center gap-2">
             <span className="text-2xl">🤖</span>
-            Lumira AI & Statistical Physics Integration
+            Lumira AI: Bridge Between Music & Intelligence
           </h2>
-          <p>
-            Lumira now incorporates Graph Neural Networks (GNNs) for network compression and optimization, 
-            transforming raw inputs into structured, analyzed data streams while minimizing computational 
-            overhead through statistical physics principles.
-          </p>
-          <h4>Key Capabilities:</h4>
+          <h4>Network Optimization</h4>
           <ul>
-            <li>Network Compression via GNNs
+            <li>Graph Neural Networks (GNNs)
               <ul>
-                <li>Identifies redundant nodes while preserving network entropy</li>
+                <li>Identifies redundant nodes while preserving entropy</li>
                 <li>Self-organizing coarse-graining for multi-scale adaptation</li>
-                <li>Optimized information diffusion through Laplacian renormalization</li>
+                <li>Optimized information diffusion based on statistical physics</li>
               </ul>
             </li>
             <li>Zero-Data Intelligence
               <ul>
                 <li>Homomorphic encryption for private computation</li>
-                <li>Federated learning across edge nodes</li>
-                <li>Zero-knowledge proofs for data verification</li>
+                <li>Federated learning across decentralized nodes</li>
+                <li>Zero-Knowledge Proofs for integrity verification</li>
               </ul>
             </li>
           </ul>
         </div>
 
         {/* Technical Architecture */}
-        <h2>Technical Architecture</h2>
+        <h2>Technical Architecture: The Living System</h2>
+
         <h3>Smart Contracts & Web3 Infrastructure</h3>
         <ul>
           <li>
-            <strong>MusicTreasury.sol</strong>
+            <strong>MusicTreasury.sol (Incentivization Layer)</strong>
             <ul>
-              <li>Upload Reward: 1 PFORK → Content contribution</li>
-              <li>Playlist Reward: 2 PFORK → Curation</li>
-              <li>NFT Reward: 3 PFORK → Community ownership</li>
-              <li>Zero-Knowledge Proofs (ZKPs) for privacy-preserving verification</li>
+              <li>Upload Reward: 1 PFORK → Incentivizes content contribution</li>
+              <li>Playlist Reward: 2 PFORK → Rewards community curation</li>
+              <li>NFT Reward: 3 PFORK → Fosters decentralized ownership</li>
+              <li>Zero-Knowledge Proofs for privacy-preserving verification</li>
             </ul>
           </li>
           <li>
-            <strong>NeoFsManager.sol</strong>
+            <strong>NeoFsManager.sol (Decentralized Storage)</strong>
             <ul>
-              <li>Content-addressed decentralized storage (NEO FS + IPFS)</li>
-              <li>Storage verification via Merkle trees</li>
-              <li>Distributed proof-of-storage system</li>
+              <li>Content-addressed storage using NEO FS & IPFS</li>
+              <li>Merkle tree verification for proof-of-storage</li>
+              <li>Hybrid storage redundancy for resilience</li>
             </ul>
           </li>
         </ul>
 
-        <h3>Cascade Control System</h3>
+        <h3>Cascade Control System: Synchronizing Music & Intelligence</h3>
+        <p>
+          Our adaptive synchronization system is designed to function like a biological organism, 
+          constantly adjusting and evolving based on external inputs.
+        </p>
+
         <h4>Controller Architecture</h4>
         <ul>
           <li>
@@ -124,30 +126,42 @@ export default function Whitepaper() {
           </li>
         </ul>
 
-        {/* Blockchain Integration */}
-        <h3>Blockchain Configuration</h3>
+        <h3>Decentralized Synchronization & Web3 Communication</h3>
         <ul>
-          <li>Chain ID: {import.meta.env.VITE_CHAIN_ID}</li>
-          <li>Native Currency: GAS</li>
-          <li>RPC Endpoint: mainnet-1.rpc.banelabs.org</li>
+          <li>
+            <strong>WebSocket Protocol</strong>
+            <ul>
+              <li>Wallet Signature Verification (DID-based)</li>
+              <li>Heartbeat Mechanism (30s intervals, 10s grace)</li>
+              <li>Geographic Node Mapping</li>
+            </ul>
+          </li>
+          <li>
+            <strong>Dynamic Mesh Networking</strong>
+            <ul>
+              <li>Redundant connection paths for resilience</li>
+              <li>Byzantine Fault Tolerance (BFT) leader election</li>
+              <li>Distributed timestamp synchronization</li>
+            </ul>
+          </li>
         </ul>
 
         {/* Development Roadmap */}
-        <h2>Updated Development Roadmap</h2>
+        <h2>The Development Roadmap: An Evolutionary Pathway</h2>
         <div className="space-y-4">
           <div>
             <h3>Phase 1: Web3 Integration (Q2 2025)</h3>
             <ul>
               <li>Deploy AI-powered DAOs</li>
-              <li>Implement tokenized incentive system</li>
-              <li>First-generation AI synchronization</li>
+              <li>Implement tokenized incentive systems</li>
+              <li>First-generation AI-driven synchronization</li>
             </ul>
           </div>
 
           <div>
             <h3>Phase 2: Federated AI Expansion (Q3 2025)</h3>
             <ul>
-              <li>Homomorphic encryption for private data processing</li>
+              <li>Homomorphic encryption for private AI computations</li>
               <li>Neural network-enhanced synchronization</li>
               <li>Adaptive AI-based curation and filtering</li>
             </ul>
@@ -157,7 +171,7 @@ export default function Whitepaper() {
             <h3>Phase 3: Quantum Optimization (Q1 2026)</h3>
             <ul>
               <li>Quantum-assisted music recommendation engine</li>
-              <li>Graph-Based Network Flow Compression</li>
+              <li>Graph-based network flow compression</li>
               <li>Zero-knowledge music provenance verification</li>
             </ul>
           </div>
@@ -172,12 +186,24 @@ export default function Whitepaper() {
           </div>
         </div>
 
-        <h2>Conclusion</h2>
+        <h2>The Big Picture: Beyond Music, Toward Collective Intelligence</h2>
         <p>
-          This next-generation decentralized AI-powered music network extends beyond streaming into a 
-          self-evolving global intelligence ecosystem. By leveraging statistical physics, graph neural 
-          networks, data-less AI learning, and quantum-ready processing, it ensures transparent, ethical, 
-          and resilient decision-making at a planetary scale.
+          This isn't just a music platform—it's a prototype for a planetary intelligence system. A system that:
+        </p>
+        <ul>
+          <li>Learns in real-time without ever needing to collect data</li>
+          <li>Balances control with freedom, ensuring ethics are built into the fabric of its intelligence</li>
+          <li>Leverages paradox to solve problems that traditional AI can't handle</li>
+          <li>Grows with us—continuously evolving, self-correcting, and adapting to human needs</li>
+        </ul>
+
+        <p>
+          The fusion of moral-techno-economics, quantum computation, and decentralized intelligence is how 
+          we build a future where technology empowers humanity, rather than enslaving it.
+        </p>
+
+        <p className="text-xl font-semibold mt-8">
+          This is a symphony of intelligence. And you are part of it.
         </p>
       </div>
     </Layout>
