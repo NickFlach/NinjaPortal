@@ -6,29 +6,24 @@ import type { StandardizedData, GpsData, PlaybackData } from '../types/lumira';
 
 const router = Router();
 
-// In-memory stores for metrics and code patterns
+// In-memory stores for metrics, patterns and community feedback
 const metricsStore = new Map<string, {
   count: number;
   aggregates: Record<string, number>;
   lastUpdated: Date;
 }>();
 
-const translationStore = new Map<string, {
-  usageCount: number;
-  successRate: number;
-  commonPhrases: { [key: string]: number };
-  lastUpdated: Date;
-}>();
-
-const codePatternStore = new Map<string, {
-  frequency: number;
-  context: string;
-  success: boolean;
+const communityFeedbackStore = new Map<string, {
+  category: string;
+  sentiment: number;
   impact: number;
+  suggestions: string[];
+  votes: number;
+  status: 'new' | 'reviewing' | 'implemented' | 'declined';
   lastUpdated: Date;
 }>();
 
-// Privacy-preserving data processing
+// Process metrics while preserving privacy
 function processMetricsPrivately(data: StandardizedData) {
   const key = `${data.type}_${new Date().toISOString().split('T')[0]}`;
   const current = metricsStore.get(key) || {
@@ -39,7 +34,52 @@ function processMetricsPrivately(data: StandardizedData) {
 
   // Process standard metrics
   current.count++;
-  if (data.type === 'translation') {
+
+  if (data.type === 'feedback') {
+    const feedbackData = data.data;
+    const feedbackKey = `${feedbackData.category}_${new Date().toISOString()}`;
+
+    communityFeedbackStore.set(feedbackKey, {
+      category: feedbackData.category,
+      sentiment: feedbackData.sentiment,
+      impact: feedbackData.impact,
+      suggestions: feedbackData.suggestions,
+      votes: 1,
+      status: 'new',
+      lastUpdated: new Date()
+    });
+
+    // Update aggregates for feedback metrics
+    current.aggregates.avgSentiment = updateRunningAverage(
+      current.aggregates.avgSentiment || 0,
+      feedbackData.sentiment,
+      current.count
+    );
+    current.aggregates.avgImpact = updateRunningAverage(
+      current.aggregates.avgImpact || 0,
+      feedbackData.impact,
+      current.count
+    );
+  } else if (data.type === 'gps') {
+    const gpsData = data.data as GpsData;
+    current.aggregates.avgAccuracy = updateRunningAverage(
+      current.aggregates.avgAccuracy || 0,
+      gpsData.accuracy || 0,
+      current.count
+    );
+    current.aggregates.avgSpeed = updateRunningAverage(
+      current.aggregates.avgSpeed || 0,
+      gpsData.speed || 0,
+      current.count
+    );
+  } else if (data.type === 'playback') {
+    const playbackData = data.data as PlaybackData;
+    current.aggregates.playingPercentage = updateRunningAverage(
+      current.aggregates.playingPercentage || 0,
+      playbackData.isPlaying ? 1 : 0,
+      current.count
+    );
+  } else if (data.type === 'translation') {
     const langKey = `${data.data.sourceLanguage}_${data.data.targetLanguage}`;
     const translationData = translationStore.get(langKey) || {
       usageCount: 0,
@@ -51,13 +91,13 @@ function processMetricsPrivately(data: StandardizedData) {
     // Update translation metrics without storing actual translations
     translationData.usageCount++;
     if (data.data.success === false) {
-      translationData.successRate = 
+      translationData.successRate =
         (translationData.successRate * (translationData.usageCount - 1) + 0) / translationData.usageCount;
     }
 
     // Store phrase patterns without actual content
     const phraseLength = data.data.text.split(' ').length;
-    translationData.commonPhrases[phraseLength] = 
+    translationData.commonPhrases[phraseLength] =
       (translationData.commonPhrases[phraseLength] || 0) + 1;
 
     translationData.lastUpdated = new Date();
@@ -81,26 +121,8 @@ function processMetricsPrivately(data: StandardizedData) {
     existingPattern.lastUpdated = new Date();
 
     codePatternStore.set(patternKey, existingPattern);
-  } else if (data.type === 'gps') {
-    const gpsData = data.data as GpsData;
-    current.aggregates.avgAccuracy = updateRunningAverage(
-      current.aggregates.avgAccuracy || 0,
-      gpsData.accuracy || 0,
-      current.count
-    );
-    current.aggregates.avgSpeed = updateRunningAverage(
-      current.aggregates.avgSpeed || 0,
-      gpsData.speed || 0,
-      current.count
-    );
-  } else if (data.type === 'playback') {
-    const playbackData = data.data as PlaybackData;
-    current.aggregates.playingPercentage = updateRunningAverage(
-      current.aggregates.playingPercentage || 0,
-      playbackData.isPlaying ? 1 : 0,
-      current.count
-    );
   }
+
 
   current.lastUpdated = new Date();
   metricsStore.set(key, current);
@@ -127,6 +149,11 @@ function pruneOldMetrics() {
     }
   }
 
+  for (const [key, value] of communityFeedbackStore.entries()) {
+    if (value.lastUpdated < thirtyDaysAgo && value.status === 'implemented') {
+      communityFeedbackStore.delete(key);
+    }
+  }
   for (const [key, value] of translationStore.entries()) {
     if (value.lastUpdated < thirtyDaysAgo) {
       translationStore.delete(key);
@@ -140,25 +167,96 @@ function pruneOldMetrics() {
   }
 }
 
-// Process incoming data without persistence
-router.post('/data', async (req, res) => {
+// Process incoming feedback and data
+router.post('/feedback', async (req, res) => {
   try {
-    const data: StandardizedData = {
-      type: req.body.type,
+    const feedbackData = {
+      type: 'feedback',
       timestamp: new Date().toISOString(),
       data: req.body,
       metadata: {
-        source: req.body.source || 'anonymous',
+        source: req.body.source || 'community',
         processed: true
       }
     };
 
-    const metrics = processMetricsPrivately(data);
-    res.json({ success: true, aggregatedMetrics: metrics });
+    const metrics = processMetricsPrivately(feedbackData);
+    res.json({ success: true, metrics });
   } catch (error) {
-    console.error('Error processing data:', error);
-    res.status(500).json({ 
-      error: 'Failed to process data',
+    console.error('Error processing feedback:', error);
+    res.status(500).json({
+      error: 'Failed to process feedback',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get community insights and action items
+router.get('/community-insights', async (req, res) => {
+  try {
+    const insights = Array.from(communityFeedbackStore.entries())
+      .map(([key, data]) => ({
+        id: key,
+        ...data,
+        actionable: data.impact > 7 && data.votes > 5,
+        priority: (data.impact * data.votes) / 10
+      }))
+      .sort((a, b) => b.priority - a.priority);
+
+    res.json(insights);
+  } catch (error) {
+    console.error('Error fetching community insights:', error);
+    res.status(500).json({
+      error: 'Failed to fetch community insights',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Vote on feedback
+router.post('/feedback/:id/vote', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const feedback = communityFeedbackStore.get(id);
+
+    if (!feedback) {
+      return res.status(404).json({ error: 'Feedback not found' });
+    }
+
+    feedback.votes += 1;
+    feedback.lastUpdated = new Date();
+    communityFeedbackStore.set(id, feedback);
+
+    res.json({ success: true, feedback });
+  } catch (error) {
+    console.error('Error processing vote:', error);
+    res.status(500).json({
+      error: 'Failed to process vote',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Update feedback status
+router.patch('/feedback/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const feedback = communityFeedbackStore.get(id);
+
+    if (!feedback) {
+      return res.status(404).json({ error: 'Feedback not found' });
+    }
+
+    feedback.status = status;
+    feedback.lastUpdated = new Date();
+    communityFeedbackStore.set(id, feedback);
+
+    res.json({ success: true, feedback });
+  } catch (error) {
+    console.error('Error updating status:', error);
+    res.status(500).json({
+      error: 'Failed to update status',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
@@ -189,12 +287,13 @@ router.get('/code-suggestions', async (req, res) => {
     res.json(suggestions);
   } catch (error) {
     console.error('Error fetching code suggestions:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to fetch code suggestions',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
+
 
 // Get translation analytics without exposing individual translations
 router.get('/translation-analytics', async (req, res) => {
@@ -210,7 +309,7 @@ router.get('/translation-analytics', async (req, res) => {
     res.json(analytics);
   } catch (error) {
     console.error('Error fetching translation analytics:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to fetch translation analytics',
       details: error instanceof Error ? error.message : 'Unknown error'
     });

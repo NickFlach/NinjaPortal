@@ -5,39 +5,25 @@ import { useIntl } from "react-intl";
 import { useLocation } from "wouter";
 import { useAccount } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
-import { Code2, CheckCircle2, XCircle } from "lucide-react";
+import { Code2, ThumbsUp, MessageSquare, Sparkles } from "lucide-react";
 
 interface TourStep {
   message: string;
   messageId: string;
 }
 
-interface CodeSuggestion {
-  pattern: string;
-  context: string;
-  confidence: number;
-  usage: number;
-  lastUsed: Date;
+interface CommunityFeedback {
+  id: string;
+  category: string;
+  sentiment: number;
+  impact: number;
+  suggestions: string[];
+  votes: number;
+  status: 'new' | 'reviewing' | 'implemented' | 'declined';
+  lastUpdated: Date;
+  actionable: boolean;
+  priority: number;
 }
-
-const wisdomQuotes = [
-  "Music is the harmony of the universe made audible.",
-  "The journey of a thousand songs begins with a single note.",
-  "Music in the heart can be heard by the universe.",
-  "Silence is a source of great strength, but music is the voice of the soul.",
-  "In music, as in war, victory belongs to those who listen carefully.",
-  "The supreme art of creation is to compose without conflict.",
-  "Do nothing that is of no use - in music and in life.",
-  "Like the way of the sword, the way of music requires dedication to master.",
-  "I often think in music. I live my daydreams in music.",
-  "If I were not a physicist, I would probably be a musician.",
-  "Art and music are the windows to one's soul.",
-  "Learn to listen as nature listens - in perfect harmony.",
-  "Like a ninja in shadows, true music moves silently through hearts.",
-  "As the bamboo bends with wind, let your rhythm flow with time.",
-  "In silence, find rhythm. In rhythm, find wisdom.",
-  "Let your heart be like a bamboo flute, hollow and ready to make music."
-];
 
 export function NinjaTour() {
   const [currentStep, setCurrentStep] = useState(0);
@@ -45,6 +31,9 @@ export function NinjaTour() {
   const [currentQuote, setCurrentQuote] = useState(0);
   const [suggestions, setSuggestions] = useState<CodeSuggestion[]>([]);
   const [activeSuggestion, setActiveSuggestion] = useState<CodeSuggestion | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackInput, setFeedbackInput] = useState('');
+  const [feedbackCategory, setFeedbackCategory] = useState('feature');
   const controls = useAnimation();
   const { isPlaying, currentSong } = useMusicPlayer();
   const intl = useIntl();
@@ -63,6 +52,18 @@ export function NinjaTour() {
     },
     enabled: isVisible,
     refetchInterval: 10000 // Refresh every 10 seconds when visible
+  });
+
+  // Fetch community insights from Lumira
+  const { data: communityInsights } = useQuery({
+    queryKey: ['community-insights'],
+    queryFn: async () => {
+      const response = await fetch('/api/lumira/community-insights');
+      if (!response.ok) throw new Error('Failed to fetch community insights');
+      return response.json() as Promise<CommunityFeedback[]>;
+    },
+    enabled: showFeedback,
+    refetchInterval: 30000 // Refresh every 30 seconds when visible
   });
 
   // Update suggestions when new data arrives
@@ -167,6 +168,71 @@ export function NinjaTour() {
       setActiveSuggestion(null);
     }
   };
+
+  const handleFeedbackSubmit = async () => {
+    try {
+      const response = await fetch('/api/lumira/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: feedbackCategory,
+          sentiment: 1, // Positive by default
+          impact: 8, // High impact by default
+          suggestions: [feedbackInput],
+          source: 'ninja-helper'
+        })
+      });
+
+      if (response.ok) {
+        setFeedbackInput('');
+        // Show success animation
+        await controls.start({
+          scale: [1, 1.1, 1],
+          transition: { duration: 0.3 }
+        });
+      }
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+    }
+  };
+
+  const handleVote = async (feedbackId: string) => {
+    try {
+      await fetch(`/api/lumira/feedback/${feedbackId}/vote`, {
+        method: 'POST'
+      });
+    } catch (error) {
+      console.error('Error voting on feedback:', error);
+    }
+  };
+
+  const wisdomQuotes = [
+    "Music is the harmony of the universe made audible.",
+    "The journey of a thousand songs begins with a single note.",
+    "Music in the heart can be heard by the universe.",
+    "Silence is a source of great strength, but music is the voice of the soul.",
+    "In music, as in war, victory belongs to those who listen carefully.",
+    "The supreme art of creation is to compose without conflict.",
+    "Do nothing that is of no use - in music and in life.",
+    "Like the way of the sword, the way of music requires dedication to master.",
+    "I often think in music. I live my daydreams in music.",
+    "If I were not a physicist, I would probably be a musician.",
+    "Art and music are the windows to one's soul.",
+    "Learn to listen as nature listens - in perfect harmony.",
+    "Like a ninja in shadows, true music moves silently through hearts.",
+    "As the bamboo bends with wind, let your rhythm flow with time.",
+    "In silence, find rhythm. In rhythm, find wisdom.",
+    "Let your heart be like a bamboo flute, hollow and ready to make music."
+  ];
+
+  interface CodeSuggestion {
+    pattern: string;
+    context: string;
+    confidence: number;
+    usage: number;
+    lastUsed: Date;
+  }
+
 
   if (!isVisible) return null;
 
@@ -367,6 +433,102 @@ export function NinjaTour() {
               </motion.button>
             )}
           </motion.div>
+        </motion.div>
+        {/* New Community Feedback Component */}
+        <motion.div className="fixed bottom-4 right-4 z-50">
+          <motion.button
+            className="bg-primary text-primary-foreground rounded-full p-3 shadow-lg"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowFeedback(!showFeedback)}
+          >
+            <MessageSquare className="h-6 w-6" />
+          </motion.button>
+
+          {showFeedback && (
+            <motion.div
+              className="absolute bottom-full right-0 mb-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg shadow-lg"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              style={{ width: '300px' }}
+            >
+              <h3 className="text-sm font-medium mb-2">
+                {intl.formatMessage({ id: 'community.feedback' })}
+              </h3>
+
+              <div className="space-y-4">
+                <select
+                  value={feedbackCategory}
+                  onChange={(e) => setFeedbackCategory(e.target.value)}
+                  className="w-full text-sm rounded-md border border-input bg-transparent px-3 py-2"
+                >
+                  <option value="feature">Feature Request</option>
+                  <option value="bug">Bug Report</option>
+                  <option value="improvement">Improvement</option>
+                </select>
+
+                <textarea
+                  value={feedbackInput}
+                  onChange={(e) => setFeedbackInput(e.target.value)}
+                  placeholder={intl.formatMessage({ id: 'community.feedback.placeholder' })}
+                  className="w-full text-sm rounded-md border border-input bg-transparent px-3 py-2 min-h-[100px]"
+                />
+
+                <motion.button
+                  className="w-full bg-primary text-primary-foreground rounded-md py-2 text-sm"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleFeedbackSubmit}
+                  disabled={!feedbackInput.trim()}
+                >
+                  {intl.formatMessage({ id: 'community.feedback.submit' })}
+                </motion.button>
+              </div>
+
+              {communityInsights && communityInsights.length > 0 && (
+                <div className="mt-4 border-t border-border pt-4">
+                  <h4 className="text-xs font-medium mb-2">
+                    {intl.formatMessage({ id: 'community.insights' })}
+                  </h4>
+
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                    {communityInsights.map((insight) => (
+                      <motion.div
+                        key={insight.id}
+                        className="flex items-start gap-2 text-xs p-2 rounded-md bg-muted/50"
+                        whileHover={{ scale: 1.02 }}
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium">{insight.suggestions[0]}</p>
+                          <div className="flex items-center gap-2 mt-1 text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <ThumbsUp className="h-3 w-3" />
+                              {insight.votes}
+                            </span>
+                            {insight.actionable && (
+                              <span className="flex items-center gap-1 text-yellow-500">
+                                <Sparkles className="h-3 w-3" />
+                                {intl.formatMessage({ id: 'community.actionable' })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <motion.button
+                          className="text-primary hover:text-primary/80"
+                          onClick={() => handleVote(insight.id)}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <ThumbsUp className="h-4 w-4" />
+                        </motion.button>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>
