@@ -4,10 +4,20 @@ import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useIntl } from "react-intl";
 import { useLocation } from "wouter";
 import { useAccount } from "wagmi";
+import { useQuery } from "@tanstack/react-query";
+import { Code2, CheckCircle2, XCircle } from "lucide-react";
 
 interface TourStep {
   message: string;
   messageId: string;
+}
+
+interface CodeSuggestion {
+  pattern: string;
+  context: string;
+  confidence: number;
+  usage: number;
+  lastUsed: Date;
 }
 
 const wisdomQuotes = [
@@ -33,6 +43,8 @@ export function NinjaTour() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const [currentQuote, setCurrentQuote] = useState(0);
+  const [suggestions, setSuggestions] = useState<CodeSuggestion[]>([]);
+  const [activeSuggestion, setActiveSuggestion] = useState<CodeSuggestion | null>(null);
   const controls = useAnimation();
   const { isPlaying, currentSong } = useMusicPlayer();
   const intl = useIntl();
@@ -40,6 +52,25 @@ export function NinjaTour() {
   const [location] = useLocation();
   const animationFrameRef = useRef(0);
   const [freqData, setFreqData] = useState<Uint8Array | null>(null);
+
+  // Fetch code suggestions from Lumira
+  const { data: codeSuggestions } = useQuery({
+    queryKey: ['code-suggestions'],
+    queryFn: async () => {
+      const response = await fetch('/api/lumira/code-suggestions');
+      if (!response.ok) throw new Error('Failed to fetch code suggestions');
+      return response.json() as Promise<CodeSuggestion[]>;
+    },
+    enabled: isVisible,
+    refetchInterval: 10000 // Refresh every 10 seconds when visible
+  });
+
+  // Update suggestions when new data arrives
+  useEffect(() => {
+    if (codeSuggestions) {
+      setSuggestions(codeSuggestions);
+    }
+  }, [codeSuggestions]);
 
   const tourSteps: TourStep[] = [
     {
@@ -105,6 +136,36 @@ export function NinjaTour() {
   const handleDismiss = () => {
     localStorage.setItem('ninja-tour-dismissed', 'true');
     setIsVisible(false);
+  };
+
+  const handleSuggestionApply = async (suggestion: CodeSuggestion) => {
+    try {
+      setActiveSuggestion(suggestion);
+      // Send feedback to Lumira about the applied suggestion
+      await fetch('/api/lumira/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'code',
+          data: {
+            pattern: suggestion.pattern,
+            context: suggestion.context,
+            success: true,
+            impact: 1
+          }
+        })
+      });
+
+      // Show success animation
+      await controls.start({
+        scale: [1, 1.1, 1],
+        transition: { duration: 0.3 }
+      });
+    } catch (error) {
+      console.error('Error applying suggestion:', error);
+    } finally {
+      setActiveSuggestion(null);
+    }
   };
 
   if (!isVisible) return null;
@@ -251,6 +312,39 @@ export function NinjaTour() {
             <p className="text-sm mb-2">
               {intl.formatMessage({ id: tourSteps[currentStep].messageId })}
             </p>
+
+            {suggestions.length > 0 && (
+              <div className="mt-4 border-t border-border pt-2">
+                <p className="text-xs font-medium mb-2">
+                  {intl.formatMessage({ id: 'ninja.suggestions' })}
+                </p>
+                <div className="space-y-2">
+                  {suggestions.map((suggestion, index) => (
+                    <motion.div
+                      key={`${suggestion.pattern}_${index}`}
+                      className="flex items-center gap-2 text-xs"
+                      whileHover={{ scale: 1.02 }}
+                    >
+                      <Code2 className="h-3 w-3" />
+                      <span className="flex-1">{suggestion.pattern}</span>
+                      <motion.button
+                        className="text-primary hover:text-primary/80 disabled:opacity-50"
+                        onClick={() => handleSuggestionApply(suggestion)}
+                        disabled={!!activeSuggestion}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        {activeSuggestion?.pattern === suggestion.pattern ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        ) : (
+                          'Apply'
+                        )}
+                      </motion.button>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <motion.p
               className="text-xs italic text-muted-foreground mt-2 border-t border-border pt-2"

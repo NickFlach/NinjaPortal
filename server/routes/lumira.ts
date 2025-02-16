@@ -6,7 +6,7 @@ import type { StandardizedData, GpsData, PlaybackData } from '../types/lumira';
 
 const router = Router();
 
-// In-memory store for aggregated metrics and translation patterns
+// In-memory stores for metrics and code patterns
 const metricsStore = new Map<string, {
   count: number;
   aggregates: Record<string, number>;
@@ -17,6 +17,14 @@ const translationStore = new Map<string, {
   usageCount: number;
   successRate: number;
   commonPhrases: { [key: string]: number };
+  lastUpdated: Date;
+}>();
+
+const codePatternStore = new Map<string, {
+  frequency: number;
+  context: string;
+  success: boolean;
+  impact: number;
   lastUpdated: Date;
 }>();
 
@@ -54,6 +62,25 @@ function processMetricsPrivately(data: StandardizedData) {
 
     translationData.lastUpdated = new Date();
     translationStore.set(langKey, translationData);
+  } else if (data.type === 'code') {
+    // Process code patterns
+    const { pattern, context, success, impact } = data.data;
+    const patternKey = `${pattern}_${context}`;
+
+    const existingPattern = codePatternStore.get(patternKey) || {
+      frequency: 0,
+      context,
+      success: true,
+      impact: 0,
+      lastUpdated: new Date()
+    };
+
+    existingPattern.frequency++;
+    existingPattern.success = success;
+    existingPattern.impact = (existingPattern.impact + impact) / 2;
+    existingPattern.lastUpdated = new Date();
+
+    codePatternStore.set(patternKey, existingPattern);
   } else if (data.type === 'gps') {
     const gpsData = data.data as GpsData;
     current.aggregates.avgAccuracy = updateRunningAverage(
@@ -105,6 +132,12 @@ function pruneOldMetrics() {
       translationStore.delete(key);
     }
   }
+
+  for (const [key, value] of codePatternStore.entries()) {
+    if (value.lastUpdated < thirtyDaysAgo) {
+      codePatternStore.delete(key);
+    }
+  }
 }
 
 // Process incoming data without persistence
@@ -126,6 +159,38 @@ router.post('/data', async (req, res) => {
     console.error('Error processing data:', error);
     res.status(500).json({ 
       error: 'Failed to process data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// New endpoint for code pattern suggestions
+router.get('/code-suggestions', async (req, res) => {
+  try {
+    const { context, limit = 5 } = req.query;
+
+    const suggestions = Array.from(codePatternStore.entries())
+      .filter(([_, data]) => !context || data.context === context)
+      .sort((a, b) => {
+        // Sort by success rate and impact
+        const scoreA = a[1].success ? (a[1].impact * a[1].frequency) : 0;
+        const scoreB = b[1].success ? (b[1].impact * b[1].frequency) : 0;
+        return scoreB - scoreA;
+      })
+      .slice(0, Number(limit))
+      .map(([key, data]) => ({
+        pattern: key.split('_')[0],
+        context: data.context,
+        confidence: data.success ? (data.impact * data.frequency) / 100 : 0,
+        usage: data.frequency,
+        lastUsed: data.lastUpdated
+      }));
+
+    res.json(suggestions);
+  } catch (error) {
+    console.error('Error fetching code suggestions:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch code suggestions',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
