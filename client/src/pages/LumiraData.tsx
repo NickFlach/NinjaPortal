@@ -6,53 +6,42 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-interface LumiraDataPoint {
-  timestamp: string;
-  value: number;
-  metric: string;
+interface AggregatedMetric {
+  bucket: string;
+  data_type: string;
+  aggregates: Record<string, number>;
+  count: number;
 }
 
-interface LumiraMetric {
-  name: string;
-  data: LumiraDataPoint[];
-}
-
-// Process raw database metrics into chart-friendly format
-function processMetrics(rawMetrics: any[]): LumiraMetric[] {
+// Process raw metrics into chart-friendly format
+function processMetrics(rawMetrics: AggregatedMetric[]) {
   if (!Array.isArray(rawMetrics) || rawMetrics.length === 0) {
     return [];
   }
 
   // Group by data_type
-  const metricsByType = new Map<string, LumiraDataPoint[]>();
+  const metricsByType = new Map<string, Array<{
+    timestamp: string;
+    value: number;
+    metric: string;
+  }>>();
 
-  rawMetrics.forEach(row => {
-    if (!row || !row.data_type || !row.bucket || !Array.isArray(row.data_points)) {
-      return;
+  rawMetrics.forEach(metric => {
+    if (!metricsByType.has(metric.data_type)) {
+      metricsByType.set(metric.data_type, []);
     }
 
-    const { bucket, data_type, data_points } = row;
-
-    if (!metricsByType.has(data_type)) {
-      metricsByType.set(data_type, []);
-    }
-
-    // Calculate average value from data points
-    const value = data_points.reduce((sum: number, point: any) => {
-      const pointValue = data_type === 'playback' ? 
-        (point.isPlaying ? 1 : 0) : // For playback, use playing state
-        (point.speed || point.accuracy || 0); // For GPS, use speed or accuracy
-      return sum + pointValue;
-    }, 0) / Math.max(data_points.length, 1); // Prevent division by zero
-
-    metricsByType.get(data_type)!.push({
-      timestamp: bucket,
-      value,
-      metric: data_type
+    // Convert aggregates into separate data points
+    Object.entries(metric.aggregates).forEach(([key, value]) => {
+      metricsByType.get(metric.data_type)!.push({
+        timestamp: metric.bucket,
+        value: value,
+        metric: key
+      });
     });
   });
 
-  // Convert to array of metrics
+  // Convert to array format for charts
   return Array.from(metricsByType.entries()).map(([type, data]) => ({
     name: type.charAt(0).toUpperCase() + type.slice(1),
     data: data.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -79,29 +68,29 @@ export default function LumiraData() {
     switch (selectedRange) {
       case '1h':
         start.setHours(end.getHours() - 1);
-        return { start, end, interval: 1 };
+        return { start, end };
       case '6h':
         start.setHours(end.getHours() - 6);
-        return { start, end, interval: 5 };
+        return { start, end };
       case '24h':
         start.setHours(end.getHours() - 24);
-        return { start, end, interval: 15 };
+        return { start, end };
       case '7d':
         start.setDate(end.getDate() - 7);
-        return { start, end, interval: 60 };
+        return { start, end };
       case '30d':
         start.setDate(end.getDate() - 30);
-        return { start, end, interval: 240 };
+        return { start, end };
       default:
         start.setHours(end.getHours() - 24);
-        return { start, end, interval: 15 };
+        return { start, end };
     }
   };
 
-  const { start, end, interval } = getTimeRange();
+  const { start, end } = getTimeRange();
 
   const { data: metrics = [], isLoading } = useQuery({
-    queryKey: ["/api/lumira/metrics", { start: start.toISOString(), end: end.toISOString(), interval }],
+    queryKey: ["/api/lumira/metrics", { start: start.toISOString(), end: end.toISOString() }],
     select: processMetrics,
     refetchInterval: 30000, // Refresh every 30 seconds
     staleTime: 15000, // Consider data fresh for 15 seconds
@@ -115,12 +104,12 @@ export default function LumiraData() {
       <Layout>
         <div className="space-y-8">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">Network Performance Overview</h1>
+            <h1 className="text-2xl font-bold">Privacy-Preserving Analytics</h1>
             <Skeleton className="h-10 w-[180px]" />
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Performance Metrics</CardTitle>
+              <CardTitle>Aggregated Metrics</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
@@ -144,7 +133,7 @@ export default function LumiraData() {
     <Layout>
       <div className="space-y-8">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Network Performance Overview</h1>
+          <h1 className="text-2xl font-bold">Privacy-Preserving Analytics</h1>
           <Select value={selectedRange} onValueChange={setSelectedRange}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select time range" />
@@ -160,7 +149,7 @@ export default function LumiraData() {
         {metrics.length === 0 ? (
           <Card>
             <CardContent className="py-8">
-              <p className="text-center text-muted-foreground">No metrics data available for the selected time range.</p>
+              <p className="text-center text-muted-foreground">No metrics available for the selected time range.</p>
             </CardContent>
           </Card>
         ) : (
@@ -168,7 +157,10 @@ export default function LumiraData() {
             {metrics.map((metric) => (
               <Card key={metric.name}>
                 <CardHeader>
-                  <CardTitle>{metric.name} Metrics</CardTitle>
+                  <CardTitle>{metric.name} Analytics</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Showing aggregated, privacy-preserving metrics with no individual data stored
+                  </p>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
