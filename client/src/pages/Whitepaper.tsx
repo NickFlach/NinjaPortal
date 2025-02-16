@@ -1,52 +1,72 @@
 import { Layout } from "@/components/Layout";
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocale } from "@/contexts/LocaleContext";
 
 export default function Whitepaper() {
+  const { translate } = useLocale();
+  const [translatedContent, setTranslatedContent] = useState<{
+    title?: string;
+    lead?: string;
+    sections?: Record<string, string>;
+  }>({});
+
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+
+    async function translateContent() {
+      const translated = {
+        title: await translate('The Evolutionary AI-Powered Music & Intelligence Network'),
+        lead: await translate('A decentralized revolution in music, intelligence, and community-engineered innovation, seamlessly integrating Web3, data-less AI, statistical physics, and quantum-ready architectures.'),
+        sections: {
+          intro: await translate('In an age where technology doesn\'t just reshape industries but the very core of human experience, we are forging a new evolutionary paradigm—where music, AI, and decentralized intelligence coalesce into a living system.'),
+          foundation: await translate('At its foundation is moral-techno-economics—a framework where:'),
+          capabilities: await translate('Core System Capabilities'),
+          lumiraAI: await translate('Lumira AI: The Bridge Between Music & Intelligence'),
+          technicalArch: await translate('Technical Architecture: The Living System'),
+          roadmap: await translate('The Development Roadmap: An Evolutionary Pathway'),
+          bigPicture: await translate('The Big Picture: Beyond Music, Toward Collective Intelligence'),
+          conclusion: await translate('This is More Than Music—This is a Symphony of Intelligence. And you are part of it.')
+        }
+      };
+      setTranslatedContent(translated);
+    }
+
+    translateContent();
+  }, [translate]);
 
   return (
     <Layout>
       <div className="prose prose-invert max-w-4xl mx-auto">
-        <h1>The Evolutionary AI-Powered Music & Intelligence Network</h1>
+        <h1>{translatedContent.title || 'The Evolutionary AI-Powered Music & Intelligence Network'}</h1>
         <p className="lead">
-          A decentralized revolution in music, intelligence, and community-engineered innovation, seamlessly 
-          integrating Web3, data-less AI, statistical physics, and quantum-ready architectures.
+          {translatedContent.lead || 'A decentralized revolution in music, intelligence, and community-engineered innovation, seamlessly integrating Web3, data-less AI, statistical physics, and quantum-ready architectures.'}
         </p>
 
         {/* Introduction Section */}
-        <h2>🌍 Introduction: The Fusion of Music, Intelligence & Moral-Techno-Economics</h2>
+        <h2>🌍 {translatedContent.sections?.intro || 'In an age where technology doesn\'t just reshape industries but the very core of human experience, we are forging a new evolutionary paradigm—where music, AI, and decentralized intelligence coalesce into a living system.'}</h2>
         <p>
-          In an age where technology doesn't just reshape industries but the very core of human experience, 
-          we are forging a new evolutionary paradigm—where music, AI, and decentralized intelligence coalesce 
-          into a living system.
-        </p>
-        <p>
-          At its foundation is moral-techno-economics—a framework where:
+          {translatedContent.sections?.foundation || 'At its foundation is moral-techno-economics—a framework where:'}
         </p>
         <ul>
-          <li>Technology serves human progress, rather than extracting from it</li>
-          <li>Economic models regenerate value rather than concentrating wealth</li>
-          <li>Community-driven governance ensures transparency, accountability, and autonomy</li>
+          <li>{translate('Technology serves human progress, rather than extracting from it')}</li>
+          <li>{translate('Economic models regenerate value rather than concentrating wealth')}</li>
+          <li>{translate('Community-driven governance ensures transparency, accountability, and autonomy')}</li>
         </ul>
 
         {/* Core System Capabilities */}
-        <h3>✨ Core System Capabilities</h3>
+        <h3>✨ {translatedContent.sections?.capabilities || 'Core System Capabilities'}</h3>
         <ul>
           <li>
-            <strong>Data-less Intelligence:</strong> Learns, adapts, and optimizes in real-time without 
-            storing personal data
+            <strong>{translate('Data-less Intelligence')}:</strong> {translate('Learns, adapts, and optimizes in real-time without storing personal data')}
           </li>
           <li>
-            <strong>Web3 & Decentralized Governance:</strong> Ensures power stays with the people, not 
-            corporate monopolies
+            <strong>{translate('Web3 & Decentralized Governance')}:</strong> {translate('Ensures power stays with the people, not corporate monopolies')}
           </li>
           <li>
-            <strong>Quantum-Ready Architecture:</strong> Handles paradoxes and solves problems at planetary scale
+            <strong>{translate('Quantum-Ready Architecture')}:</strong> {translate('Handles paradoxes and solves problems at planetary scale')}
           </li>
           <li>
-            <strong>Self-Healing Evolution:</strong> Grows alongside the communities it serves
+            <strong>{translate('Self-Healing Evolution')}:</strong> {translate('Grows alongside the communities it serves')}
           </li>
         </ul>
 
@@ -54,7 +74,7 @@ export default function Whitepaper() {
         <div className="bg-accent/20 p-6 rounded-lg mb-8">
           <h2 className="flex items-center gap-2">
             <span className="text-2xl">🤖</span>
-            Lumira AI: The Bridge Between Music & Intelligence
+            {translatedContent.sections?.lumiraAI || 'Lumira AI: The Bridge Between Music & Intelligence'}
           </h2>
           <h4>Network Optimization</h4>
           <ul>
@@ -78,8 +98,7 @@ export default function Whitepaper() {
         </div>
 
         {/* Technical Architecture */}
-        <h2>💠 Technical Architecture: The Living System</h2>
-
+        <h2>💠 {translatedContent.sections?.technicalArch || 'Technical Architecture: The Living System'}</h2>
         <h3>Smart Contracts & Web3 Infrastructure</h3>
         <ul>
           <li>
@@ -104,7 +123,7 @@ export default function Whitepaper() {
 
         <h3>Cascade Control System: Synchronizing Music & Intelligence</h3>
         <p>
-          Our adaptive synchronization system functions like a living organism, continuously adjusting 
+          Our adaptive synchronization system functions like a living organism, continuously adjusting
           and evolving based on external stimuli.
         </p>
 
@@ -186,7 +205,7 @@ export default function Whitepaper() {
         </ul>
 
         {/* Development Roadmap */}
-        <h2>📅 The Development Roadmap: An Evolutionary Pathway</h2>
+        <h2>📅 {translatedContent.sections?.roadmap || 'The Development Roadmap: An Evolutionary Pathway'}</h2>
         <div className="space-y-4">
           <div>
             <h3>🚀 Phase 1: Web3 Integration (Q2 2025)</h3>
@@ -229,7 +248,7 @@ export default function Whitepaper() {
           </div>
         </div>
 
-        <h2>🌌 The Big Picture: Beyond Music, Toward Collective Intelligence</h2>
+        <h2>🌌 {translatedContent.sections?.bigPicture || 'The Big Picture: Beyond Music, Toward Collective Intelligence'}</h2>
         <p>
           This isn't just a music platform—it's a blueprint for a planetary intelligence system that:
         </p>
@@ -241,13 +260,12 @@ export default function Whitepaper() {
         </ul>
 
         <p>
-          This is a system that does not merely "respond"—it anticipates, adapts, and thrives through the 
+          This is a system that does not merely "respond"—it anticipates, adapts, and thrives through the
           fusion of moral-techno-economics, quantum computation, and decentralized intelligence.
         </p>
 
         <p className="text-xl font-semibold mt-8">
-          🎼 This is More Than Music—This is a Symphony of Intelligence.
-          And you are part of it.
+          🎼 {translatedContent.sections?.conclusion || 'This is More Than Music—This is a Symphony of Intelligence. And you are part of it.'}
         </p>
       </div>
     </Layout>
