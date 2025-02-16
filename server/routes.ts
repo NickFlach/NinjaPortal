@@ -2,8 +2,8 @@ import type { Express } from "express";
 import { createServer } from "http";
 import { WebSocketServer, WebSocket } from 'ws';
 import { db } from "@db";
-import { songs, users, playlists, followers, playlistSongs, recentlyPlayed, userRewards } from "@db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { songs, users, playlists, followers, playlistSongs, recentlyPlayed, userRewards, likes } from "@db/schema";
+import { eq, desc, and, count } from "drizzle-orm";
 import { incrementListenCount, getMapData } from './services/music';
 import { getLiveStats, broadcastStats, getClients, setClients } from './services/stats';
 import type { WebSocketMessage, ClientInfo } from './types/websocket';
@@ -422,13 +422,37 @@ export function registerRoutes(app: Express) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // Convert both addresses to lowercase for case-insensitive comparison
+    // Get songs with their like counts and user's like status
     const userSongs = await db.query.songs.findMany({
       where: eq(songs.uploadedBy, userAddress.toLowerCase()),
       orderBy: desc(songs.createdAt),
+      with: {
+        likes: true,
+      },
     });
 
-    res.json(userSongs);
+    // Transform the results to include like information
+    const songsWithLikes = await Promise.all(userSongs.map(async (song) => {
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(likes)
+        .where(eq(likes.songId, song.id));
+
+      const userLike = await db.query.likes.findFirst({
+        where: and(
+          eq(likes.songId, song.id),
+          eq(likes.address, userAddress.toLowerCase())
+        ),
+      });
+
+      return {
+        ...song,
+        likes: total,
+        isLiked: !!userLike
+      };
+    }));
+
+    res.json(songsWithLikes);
   });
 
   app.post("/api/songs/play/:id", async (req, res) => {
@@ -838,6 +862,89 @@ export function registerRoutes(app: Express) {
       .where(eq(userRewards.address, userAddress));
 
     res.json({ success: true });
+  });
+
+  app.post("/api/songs/:id/like", async (req, res) => {
+    try {
+      const songId = parseInt(req.params.id);
+      const userAddress = req.headers['x-wallet-address'] as string;
+
+      if (!userAddress) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Check if the user has already liked this song
+      const existingLike = await db.query.likes.findFirst({
+        where: and(
+          eq(likes.songId, songId),
+          eq(likes.address, userAddress.toLowerCase())
+        ),
+      });
+
+      if (existingLike) {
+        // Unlike: Remove the like
+        await db.delete(likes).where(
+          and(
+            eq(likes.songId, songId),
+            eq(likes.address, userAddress.toLowerCase())
+          )
+        );
+      } else {
+        // Like: Add new like
+        await db.insert(likes).values({
+          songId,
+          address: userAddress.toLowerCase(),
+        });
+      }
+
+      // Get updated like count
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(likes)
+        .where(eq(likes.songId, songId));
+
+      res.json({ 
+        liked: !existingLike,
+        totalLikes: total
+      });
+    } catch (error) {
+      console.error('Error managing like:', error);
+      res.status(500).json({ message: "Failed to manage like" });
+    }
+  });
+
+  // Add endpoint to get like status and count
+  app.get("/api/songs/:id/likes", async (req, res) => {
+    try {
+      const songId = parseInt(req.params.id);
+      const userAddress = req.headers['x-wallet-address'] as string;
+
+      // Get total likes
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(likes)
+        .where(eq(likes.songId, songId));
+
+      // Check if the user has liked this song
+      let isLiked = false;
+      if (userAddress) {
+        const userLike = await db.query.likes.findFirst({
+          where: and(
+            eq(likes.songId, songId),
+            eq(likes.address, userAddress.toLowerCase())
+          ),
+        });
+        isLiked = !!userLike;
+      }
+
+      res.json({
+        totalLikes: total,
+        isLiked
+      });
+    } catch (error) {
+      console.error('Error getting likes:', error);
+      res.status(500).json({ message: "Failed to get likes" });
+    }
   });
 
   return httpServer;

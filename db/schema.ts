@@ -11,6 +11,14 @@ export const users = pgTable("users", {
   lastSeen: timestamp("last_seen").defaultNow(),
 });
 
+// Add likes table
+export const likes = pgTable("likes", {
+  id: serial("id").primaryKey(),
+  songId: integer("song_id").references(() => songs.id),
+  address: text("address").references(() => users.address),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const followers = pgTable("followers", {
   id: serial("id").primaryKey(),
   followerId: text("follower_id").references(() => users.address),
@@ -76,9 +84,23 @@ export const lumiraMetrics = pgTable("lumira_metrics", {
   metadata: jsonb("metadata").notNull(),
 });
 
+// Add likes relations
+export const likesRelations = relations(likes, ({ one }) => ({
+  song: one(songs, {
+    fields: [likes.songId],
+    references: [songs.id],
+  }),
+  user: one(users, {
+    fields: [likes.address],
+    references: [users.address],
+  }),
+}));
+
+// Update songs relations to include likes
 export const songsRelations = relations(songs, ({ many, one }) => ({
   recentPlays: many(recentlyPlayed),
   playlistSongs: many(playlistSongs),
+  likes: many(likes),
   uploader: one(users, {
     fields: [songs.uploadedBy],
     references: [users.address],
@@ -104,12 +126,14 @@ export const playlistSongsRelations = relations(playlistSongs, ({ one }) => ({
   }),
 }));
 
+// Update users relations to include likes
 export const usersRelations = relations(users, ({ many }) => ({
   followers: many(followers, { relationName: "followers" }),
   following: many(followers, { relationName: "following" }),
   songs: many(songs, { relationName: "uploaded_songs" }),
   playlists: many(playlists, { relationName: "created_playlists" }),
   rewards: many(userRewards),
+  likes: many(likes),
 }));
 
 export const recentlyPlayedRelations = relations(recentlyPlayed, ({ one }) => ({
@@ -131,3 +155,4 @@ export type Song = typeof songs.$inferSelect;
 export type Playlist = typeof playlists.$inferSelect;
 export type UserRewards = typeof userRewards.$inferSelect;
 export type LumiraMetric = typeof lumiraMetrics.$inferSelect;
+export type Like = typeof likes.$inferSelect;
