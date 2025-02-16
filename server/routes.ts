@@ -8,6 +8,7 @@ import { incrementListenCount, getMapData } from './services/music';
 import { getLiveStats, broadcastStats, getClients, setClients } from './services/stats';
 import type { WebSocketMessage, ClientInfo } from './types/websocket';
 import neoStorageRouter from './routes/neo-storage';
+import translationRouter from './routes/translation'; // Add translation router import
 import { 
   getClientStats, 
   updateClient, 
@@ -71,6 +72,9 @@ function getLeaderState(): { songId?: number; timestamp: number; playing: boolea
 
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
+
+  // Add translation routes
+  app.use('/api/translate', translationRouter);
 
   // Add Lumira route
   app.use('/api/lumira', lumiraRouter);
@@ -668,7 +672,6 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Duplicate route removed
 
   // Treasury Management
   app.get("/api/admin/treasury", async (req, res) => {
