@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { URL } from 'url';
+import { IncomingMessage } from 'http';
 
 // ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -79,11 +80,22 @@ const startServer = async (retryCount = 0) => {
       }
     });
 
+    // Generate stats function with access to wss
+    function generateStats() {
+      return {
+        activeListeners: wss.clients.size,
+        geotaggedListeners: 0,
+        anonymousListeners: wss.clients.size,
+        listenersByCountry: {},
+        locations: []
+      };
+    }
+
     // Keep track of handled sockets to prevent duplicate upgrades
     const handledSockets = new WeakSet();
 
     // Handle upgrade manually to prevent conflicts with Vite HMR
-    server.on('upgrade', (request, socket, head) => {
+    server.on('upgrade', (request: IncomingMessage, socket, head) => {
       // Skip if this socket was already handled
       if (handledSockets.has(socket)) {
         return;
@@ -105,9 +117,10 @@ const startServer = async (retryCount = 0) => {
           // Mark this socket as handled
           handledSockets.add(socket);
 
-          wss.handleUpgrade(request, socket, head, (ws: CustomWebSocket) => {
-            ws.isAlive = true;
-            wss.emit('connection', ws);
+          wss.handleUpgrade(request, socket, head, (ws) => {
+            const customWs = ws as CustomWebSocket;
+            customWs.isAlive = true;
+            wss.emit('connection', customWs);
           });
         }
       } catch (error) {
@@ -119,6 +132,16 @@ const startServer = async (retryCount = 0) => {
     // WebSocket connection handling with proper error handling
     wss.on('connection', (ws: CustomWebSocket) => {
       ws.isAlive = true;
+      console.log('New client connected');
+
+      // Send initial stats to the new client
+      const stats = generateStats();
+      console.log('Generated stats:', stats);
+      ws.send(JSON.stringify({
+        type: 'stats_update',
+        data: stats
+      }));
+
       const pingInterval = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.ping();
@@ -134,8 +157,23 @@ const startServer = async (retryCount = 0) => {
         clearInterval(pingInterval);
       });
 
-      ws.on('close', () => {
+      ws.on('close', (code: number) => {
+        console.log('Client disconnected:', code);
         clearInterval(pingInterval);
+
+        // Generate updated stats after client disconnection
+        const updatedStats = generateStats();
+        console.log('Generated stats:', updatedStats);
+
+        // Broadcast updated stats to remaining clients
+        wss.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({
+              type: 'stats_update',
+              data: updatedStats
+            }));
+          }
+        });
       });
     });
 
@@ -150,16 +188,11 @@ const startServer = async (retryCount = 0) => {
     if (app.get("env") === "development") {
       await setupVite(app, server);
     } else {
-      // Production mode - serve static files and handle client routing
       const distPath = path.resolve(__dirname, "..", "dist", "public");
       app.use(express.static(distPath));
-
-      // Handle 404 for non-existent API routes
       app.use('/api/*', (_req, res) => {
         res.status(404).json({ error: 'API endpoint not found' });
       });
-
-      // Serve index.html for all other routes to support client-side routing
       app.get('*', (_req, res) => {
         res.sendFile(path.join(distPath, 'index.html'));
       });
@@ -196,11 +229,12 @@ const startServer = async (retryCount = 0) => {
 
     // Health check interval
     const healthCheckInterval = setInterval(() => {
-      wss.clients.forEach((ws: CustomWebSocket) => {
-        if (!ws.isAlive) {
+      wss.clients.forEach((ws) => {
+        const customWs = ws as CustomWebSocket;
+        if (!customWs.isAlive) {
           return ws.terminate();
         }
-        ws.isAlive = false;
+        customWs.isAlive = false;
         ws.ping();
       });
     }, 30000);
