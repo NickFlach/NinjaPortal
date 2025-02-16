@@ -80,11 +80,19 @@ export function registerRoutes(app: Express) {
     server: httpServer,
     path: '/ws',
     verifyClient: (info, cb) => {
-      if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
+      try {
+        // Reject Vite HMR connections
+        if (info.req.headers['sec-websocket-protocol'] === 'vite-hmr') {
+          cb(false);
+          return;
+        }
+
+        // Allow all other WebSocket connections
+        cb(true);
+      } catch (error) {
+        console.error('Error in verifyClient:', error);
         cb(false);
-        return;
       }
-      cb(true);
     }
   });
 
@@ -92,8 +100,8 @@ export function registerRoutes(app: Express) {
   app.use('/api/neo-storage', neoStorageRouter);
 
   // WebSocket connection handling
-  wss.on('connection', (ws) => {
-    console.log('New client connected');
+  wss.on('connection', (ws, req) => {
+    console.log('New client connected from:', req.socket.remoteAddress);
 
     // Initialize client info with connection timestamp
     const clientInfo: ClientInfo = {
@@ -105,22 +113,32 @@ export function registerRoutes(app: Express) {
     addClient(ws, clientInfo);
     updateLeaderStatus();
 
+    // Send initial stats to the new client
+    try {
+      ws.send(JSON.stringify({
+        type: 'stats_update',
+        data: getClientStats()
+      }));
+    } catch (error) {
+      console.error('Error sending initial stats:', error);
+    }
+
     ws.on('message', async (data) => {
       try {
         const message = JSON.parse(data.toString()) as WebSocketMessage;
+        console.log('Received message type:', message.type);
 
         switch (message.type) {
           case 'auth': {
             if (message.address) {
-              updateClient(ws, { 
-                address: message.address.toLowerCase() 
-              });
+              const normalizedAddress = message.address.toLowerCase();
+              updateClient(ws, { address: normalizedAddress });
               ws.send(JSON.stringify({ type: 'auth_success' }));
               broadcastClientStats();
+              console.log('Client authenticated:', normalizedAddress);
             }
             break;
           }
-
           case 'subscribe': {
             if (message.songId) {
               updateClient(ws, { currentSong: message.songId });
@@ -131,7 +149,6 @@ export function registerRoutes(app: Express) {
             }
             break;
           }
-
           case 'request_sync': {
             // New case to handle sync requests from followers
             const leaderState = getLeaderState();
@@ -143,7 +160,6 @@ export function registerRoutes(app: Express) {
             }
             break;
           }
-
           case 'sync': {
             const { timestamp, playing, songId } = message;
             updateClient(ws, { isPlaying: playing, currentTime: timestamp });
@@ -180,7 +196,6 @@ export function registerRoutes(app: Express) {
             }
             break;
           }
-
           case 'location_update': {
             const { coordinates, countryCode } = message;
             console.log('Received location update:', { coordinates, countryCode });
@@ -204,11 +219,15 @@ export function registerRoutes(app: Express) {
           }
         }
       } catch (error) {
-        console.error('WebSocket message error:', error);
-        ws.send(JSON.stringify({ 
-          type: 'error',
-          message: error instanceof Error ? error.message : 'Unknown error'
-        }));
+        console.error('Error handling WebSocket message:', error);
+        try {
+          ws.send(JSON.stringify({
+            type: 'error',
+            message: error instanceof Error ? error.message : 'Unknown error processing message'
+          }));
+        } catch (sendError) {
+          console.error('Error sending error message:', sendError);
+        }
       }
     });
 
@@ -219,12 +238,33 @@ export function registerRoutes(app: Express) {
       broadcastClientStats();
     });
 
-    ws.on('close', () => {
-      console.log('Client disconnected');
+    ws.on('close', (code, reason) => {
+      console.log('Client disconnected:', code, reason.toString());
       removeClient(ws);
       updateLeaderStatus();
       broadcastClientStats();
     });
+  });
+
+  // Regular cleanup of stale connections and broadcast updates
+  const cleanupInterval = setInterval(() => {
+    let hadStaleConnections = false;
+    // Convert Map iterator to array before forEach to fix type error
+    [...clients.entries()].forEach(([client]) => {
+      if (client.readyState !== WebSocket.OPEN) {
+        removeClient(client);
+        hadStaleConnections = true;
+      }
+    });
+    if (hadStaleConnections) {
+      updateLeaderStatus();
+      broadcastClientStats();
+    }
+  }, 30000);
+
+  // Cleanup interval when server closes
+  httpServer.on('close', () => {
+    clearInterval(cleanupInterval);
   });
 
   // Add REST endpoint for client stats
@@ -628,77 +668,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/users/register", async (req, res) => {
-    try {
-      const { address } = req.body;
-
-      if (!address) {
-        return res.status(400).json({ 
-          success: false,
-          message: "Wallet address is required" 
-        });
-      }
-
-      console.log('Processing registration for address:', address);
-
-      // Check if user exists
-      const existingUser = await db.select()
-        .from(users)
-        .where(eq(users.address, address.toLowerCase()))
-        .limit(1);
-
-      let user;
-
-      if (existingUser.length > 0) {
-        // Update last seen for returning user
-        const [updatedUser] = await db
-          .update(users)
-          .set({ lastSeen: new Date() })
-          .where(eq(users.address, address.toLowerCase()))
-          .returning();
-        user = updatedUser;
-        console.log('Updated existing user:', user);
-      } else {
-        // Create new user
-        const [newUser] = await db.insert(users)
-          .values({ 
-            address: address.toLowerCase(),
-            lastSeen: new Date()
-          })
-          .returning();
-        user = newUser;
-        console.log('Created new user:', user);
-      }
-
-      if (!user) {
-        throw new Error('Failed to create or update user');
-      }
-
-      // Get global recent songs instead of user-specific
-      const recentSongs = await db.query.songs.findMany({
-        orderBy: desc(songs.createdAt),
-        limit: 100,
-      });
-
-      console.log('Retrieved recent songs:', recentSongs.length);
-
-      const response = {
-        success: true,
-        user,
-        recentSongs
-      };
-
-      console.log('Sending response:', response);
-      res.json(response);
-    } catch (error: any) {
-      console.error('Error in user registration:', error);
-      res.status(500).json({ 
-        success: false,
-        message: "Failed to register user", 
-        error: error.message 
-      });
-    }
-  });
+  // Duplicate route removed
 
   // Treasury Management
   app.get("/api/admin/treasury", async (req, res) => {
@@ -826,20 +796,6 @@ export function registerRoutes(app: Express) {
 
     res.json({ success: true });
   });
-
-  // Regular cleanup of stale connections and broadcast updates
-  setInterval(() => {
-    let hadStaleConnections = false;
-    Array.from(clients.keys()).forEach((client) => {
-      if (client.readyState !== WebSocket.OPEN) {
-        removeClient(client);
-        hadStaleConnections = true;
-      }
-    });
-    if (hadStaleConnections) {
-      broadcastClientStats();
-    }
-  }, 30000);
 
   return httpServer;
 }

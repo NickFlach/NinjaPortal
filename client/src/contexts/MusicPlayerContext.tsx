@@ -419,7 +419,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   }, [isPlaying, currentSong, userCoordinates, isLeader, socket]);
 
 
-
+  // Add playback rate validation
   const adjustPlaybackSync = useCallback(() => {
     if (!audioRef.current || !currentSong || isLeader) return;
 
@@ -430,15 +430,20 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     // Compute new playback rate using PID controller
     const newRate = pidControllerRef.current.compute(targetTime, currentTime);
 
-    // Apply the new playback rate
-    audioRef.current.playbackRate = newRate;
+    // Clamp playback rate to valid range (0.25 to 4.0 for most browsers)
+    const clampedRate = Math.max(0.25, Math.min(4.0, newRate));
 
-    console.log('Sync adjustment:', {
-      targetTime,
-      currentTime,
-      newRate,
-      diff: targetTime - currentTime
-    });
+    // Apply the computed playback rate
+    if (audioRef.current) {
+      try {
+        audioRef.current.playbackRate = clampedRate;
+      } catch (error) {
+        console.warn('Failed to set playback rate:', error);
+        // Reset to normal playback on error
+        audioRef.current.playbackRate = 1.0;
+        pidControllerRef.current.reset();
+      }
+    }
   }, [currentSong, isLeader]);
 
   // Initialize sync interval when becoming a follower

@@ -24,12 +24,24 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isConnected, setIsConnected] = useState(false);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const { address } = useAccount();
 
   const connect = () => {
     try {
+      // Clear any existing reconnect timeout
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = undefined;
+      }
+
+      // Close existing socket if any
+      if (socket) {
+        socket.close();
+      }
+
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/music-sync`;
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
       console.log('Connecting to WebSocket:', wsUrl);
 
       const ws = new WebSocket(wsUrl);
@@ -48,6 +60,17 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       };
 
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'error') {
+            console.error('Server error:', data.message);
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
+        }
+      };
+
       ws.onclose = (event) => {
         console.log('WebSocket disconnected:', event.code, event.reason);
         setIsConnected(false);
@@ -57,11 +80,13 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (reconnectAttempts.current < maxReconnectAttempts) {
           const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);
           console.log(`Attempting reconnect in ${timeout}ms (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
-          
-          setTimeout(() => {
+
+          reconnectTimeoutRef.current = setTimeout(() => {
             reconnectAttempts.current++;
             connect();
           }, timeout);
+        } else {
+          console.log('Max reconnection attempts reached');
         }
       };
 
@@ -72,13 +97,19 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setSocket(ws);
     } catch (error) {
       console.error('Error creating WebSocket connection:', error);
+      setSocket(null);
+      setIsConnected(false);
     }
   };
 
   // Initial connection
   useEffect(() => {
     connect();
+
     return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
       if (socket) {
         socket.close();
       }
