@@ -17,8 +17,15 @@ export function getClients() {
 }
 
 export function updateClientStats() {
-  const activeClients = Array.from(clients.values());
-  const geotaggedClients = activeClients.filter(client => client.coordinates && client.countryCode);
+  // Only count clients with open connections
+  const activeClients = Array.from(clients.entries())
+    .filter(([ws]) => ws.readyState === WebSocket.OPEN)
+    .map(([_, info]) => info);
+
+  const geotaggedClients = activeClients.filter(client => 
+    client.coordinates && client.countryCode && client.isPlaying
+  );
+
   const listenersByCountry: Record<string, number> = {};
 
   // Calculate listeners by country
@@ -28,18 +35,24 @@ export function updateClientStats() {
     }
   });
 
+  // Update cache with new stats
   clientStatsCache = {
-    activeListeners: clients.size,
+    activeListeners: activeClients.length,
     geotaggedListeners: geotaggedClients.length,
-    anonymousListeners: clients.size - geotaggedClients.length,
+    anonymousListeners: activeClients.length - geotaggedClients.length,
     listenersByCountry,
   };
+
+  console.log('Generated stats:', {
+    ...clientStatsCache,
+    locations: geotaggedClients.map(client => client.coordinates)
+  });
 
   return clientStatsCache;
 }
 
 export function getClientStats() {
-  return clientStatsCache;
+  return updateClientStats(); // Always return fresh stats
 }
 
 export function addClient(ws: WebSocket, info: ClientInfo) {
@@ -68,13 +81,14 @@ export function broadcastStats() {
     data: stats,
   });
 
-  clients.forEach((_, ws) => {
+  for (const [ws] of clients) {
     if (ws.readyState === WebSocket.OPEN) {
       try {
         ws.send(message);
       } catch (error) {
         console.error('Error broadcasting stats:', error);
+        removeClient(ws);
       }
     }
-  });
+  }
 }
