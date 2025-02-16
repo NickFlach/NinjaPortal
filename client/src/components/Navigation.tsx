@@ -81,9 +81,8 @@ export function Navigation() {
     {
       href: "/lumira",
       label: (
-        <span className="flex items-center gap-2">
+        <span className="flex items-center">
           <BarChart2 className="h-4 w-4" />
-          Lumira Data
         </span>
       ),
       show: true
@@ -113,7 +112,7 @@ export function Navigation() {
         <a
           href="https://app.pitchforks.social"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener noreferrer" 
           className="text-sm transition-colors hover:text-primary flex items-center gap-2"
           title="Visit Pitchforks"
         >

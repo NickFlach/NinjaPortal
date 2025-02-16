@@ -17,8 +17,9 @@ interface LumiraMetric {
 }
 
 export default function LumiraData() {
-  const { data: metrics, isLoading } = useQuery<LumiraMetric[]>({
+  const { data: metrics, isLoading, error } = useQuery<LumiraMetric[]>({
     queryKey: ["/api/lumira/metrics"],
+    refetchInterval: 5000, // Refresh every 5 seconds
   });
 
   if (isLoading) {
@@ -36,31 +37,51 @@ export default function LumiraData() {
     );
   }
 
+  if (error) {
+    return (
+      <Layout>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-destructive">Error loading Lumira data. Please try again later.</div>
+          </CardContent>
+        </Card>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="space-y-8">
         <Card>
           <CardHeader>
-            <CardTitle>Lumira Data Insights</CardTitle>
+            <CardTitle>Network Performance Overview</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={metrics?.[0]?.data || []}>
-                  <CartesianGrid strokeDasharray="3 3" />
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-50" />
                   <XAxis 
                     dataKey="timestamp" 
-                    tickFormatter={(value) => new Date(value).toLocaleDateString()} 
+                    tickFormatter={(value) => new Date(value).toLocaleTimeString()} 
+                    stroke="hsl(var(--muted-foreground))"
                   />
-                  <YAxis />
+                  <YAxis stroke="hsl(var(--muted-foreground))" />
                   <Tooltip 
                     labelFormatter={(value) => new Date(value).toLocaleString()}
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--background))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px'
+                    }}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="value" 
                     stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
                     dot={false}
+                    activeDot={{ r: 6, fill: 'hsl(var(--primary))' }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -78,20 +99,28 @@ export default function LumiraData() {
                 <div className="h-[200px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={metric.data}>
-                      <CartesianGrid strokeDasharray="3 3" />
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-50" />
                       <XAxis 
                         dataKey="timestamp" 
-                        tickFormatter={(value) => new Date(value).toLocaleDateString()} 
+                        tickFormatter={(value) => new Date(value).toLocaleTimeString()} 
+                        stroke="hsl(var(--muted-foreground))"
                       />
-                      <YAxis />
+                      <YAxis stroke="hsl(var(--muted-foreground))" />
                       <Tooltip 
                         labelFormatter={(value) => new Date(value).toLocaleString()}
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--background))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '6px'
+                        }}
                       />
                       <Line 
                         type="monotone" 
                         dataKey="value" 
                         stroke="hsl(var(--primary))" 
+                        strokeWidth={2}
                         dot={false}
+                        activeDot={{ r: 4, fill: 'hsl(var(--primary))' }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
