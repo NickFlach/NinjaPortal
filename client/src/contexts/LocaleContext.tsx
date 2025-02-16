@@ -189,7 +189,10 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'app.network.configuring': 'Configuring Network',
     'app.welcome.back': 'Welcome Back',
     'map.title': 'Listener Map',
-    'map.totalListeners': 'Total Listeners'
+    'map.totalListeners': 'Total Listeners',
+    'nav.map': 'Map',
+    'nav.analytics': 'Analytics',
+    'nav.whitepaper': 'Whitepaper'
   },
   es: {
     'common.loading': 'Cargando...',
@@ -211,7 +214,10 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'app.network.configuring': 'Configurando Red',
     'app.welcome.back': 'Bienvenido de Nuevo',
     'map.title': 'Mapa de Oyentes',
-    'map.totalListeners': 'Total de Oyentes'
+    'map.totalListeners': 'Total de Oyentes',
+    'nav.map': 'Mapa',
+    'nav.analytics': 'Analítica',
+    'nav.whitepaper': 'Documento Técnico'
   },
   fr: {
     'common.loading': 'Chargement...',
@@ -233,7 +239,10 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'app.network.configuring': 'Configuration du Réseau',
     'app.welcome.back': 'Bon Retour',
     'map.title': 'Carte des Auditeurs',
-    'map.totalListeners': 'Nombre Total d\'Auditeurs'
+    'map.totalListeners': 'Nombre Total d\'Auditeurs',
+    'nav.map': 'Carte',
+    'nav.analytics': 'Analytique',
+    'nav.whitepaper': 'Livre Blanc'
   },
   de: {
     'common.loading': 'Laden...',
@@ -255,7 +264,10 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'app.network.configuring': 'Netzwerk wird konfiguriert',
     'app.welcome.back': 'Willkommen zurück',
     'map.title': 'Hörer-Karte',
-    'map.totalListeners': 'Gesamtzahl der Hörer'
+    'map.totalListeners': 'Gesamtzahl der Hörer',
+    'nav.map': 'Karte',
+    'nav.analytics': 'Analytik',
+    'nav.whitepaper': 'Whitepaper'
   },
   it: {
     'common.loading': 'Caricamento...',
@@ -277,7 +289,10 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'app.network.configuring': 'Configurazione della Rete',
     'app.welcome.back': 'Bentornato',
     'map.title': 'Mappa Ascoltatori',
-    'map.totalListeners': 'Totale Ascoltatori'
+    'map.totalListeners': 'Totale Ascoltatori',
+    'nav.map': 'Mappa',
+    'nav.analytics': 'Analisi',
+    'nav.whitepaper': 'Libro Bianco'
   },
   pt: {
     'common.loading': 'Carregando...',
@@ -299,7 +314,10 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'app.network.configuring': 'Configurando Rede',
     'app.welcome.back': 'Bem-vindo de Volta',
     'map.title': 'Mapa de Ouvintes',
-    'map.totalListeners': 'Total de Ouvintes'
+    'map.totalListeners': 'Total de Ouvintes',
+    'nav.map': 'Mapa',
+    'nav.analytics': 'Análise',
+    'nav.whitepaper': 'Documento Técnico'
   },
   ru: {
     'common.loading': 'Загрузка...',
@@ -321,7 +339,10 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'app.network.configuring': 'Настройка Сети',
     'app.welcome.back': 'С Возвращением',
     'map.title': 'Карта Слушателей',
-    'map.totalListeners': 'Всего Слушателей'
+    'map.totalListeners': 'Всего Слушателей',
+    'nav.map': 'Карта',
+    'nav.analytics': 'Аналитика',
+    'nav.whitepaper': 'Техническая документация'
   },
   zh: {
     'common.loading': '加载中...',
@@ -343,7 +364,10 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'app.network.configuring': '配置网络',
     'app.welcome.back': '欢迎回来',
     'map.title': '听众地图',
-    'map.totalListeners': '总听众数'
+    'map.totalListeners': '总听众数',
+    'nav.map': '地图',
+    'nav.analytics': '分析',
+    'nav.whitepaper': '白皮书'
   },
   ja: {
     'common.loading': '読み込み中...',
@@ -365,7 +389,10 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'app.network.configuring': 'ネットワーク構成中',
     'app.welcome.back': 'お帰りなさい',
     'map.title': 'リスナーマップ',
-    'map.totalListeners': '総リスナー数'
+    'map.totalListeners': '総リスナー数',
+    'nav.map': '地図',
+    'nav.analytics': '分析',
+    'nav.whitepaper': '白書'
   },
   ko: {
     'common.loading': '로딩 중...',
@@ -387,6 +414,9 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'app.network.configuring': '네트워크 구성 중',
     'app.welcome.back': '돌아오신 것을 환영합니다',
     'map.title': '리스너 지도',
-    'map.totalListeners': '총 리스너 수'
+    'map.totalListeners': '총 리스너 수',
+    'nav.map': '지도',
+    'nav.analytics': '분석',
+    'nav.whitepaper': '백서'
   }
 };
