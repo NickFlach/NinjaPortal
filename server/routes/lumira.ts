@@ -2,14 +2,21 @@ import { Router } from 'express';
 import { db } from '@db';
 import { sql } from 'drizzle-orm';
 import type { WebSocket } from 'ws';
-import type { LumiraDataPoint, GpsData, PlaybackData, StandardizedData } from '../types/lumira';
+import type { StandardizedData, GpsData, PlaybackData } from '../types/lumira';
 
 const router = Router();
 
-// In-memory store for aggregated metrics only, no personal data
+// In-memory store for aggregated metrics and translation patterns
 const metricsStore = new Map<string, {
   count: number;
   aggregates: Record<string, number>;
+  lastUpdated: Date;
+}>();
+
+const translationStore = new Map<string, {
+  usageCount: number;
+  successRate: number;
+  commonPhrases: { [key: string]: number };
   lastUpdated: Date;
 }>();
 
@@ -22,11 +29,32 @@ function processMetricsPrivately(data: StandardizedData) {
     lastUpdated: new Date()
   };
 
-  // Increment anonymized counters without storing raw data
+  // Process standard metrics
   current.count++;
+  if (data.type === 'translation') {
+    const langKey = `${data.data.sourceLanguage}_${data.data.targetLanguage}`;
+    const translationData = translationStore.get(langKey) || {
+      usageCount: 0,
+      successRate: 1,
+      commonPhrases: {},
+      lastUpdated: new Date()
+    };
 
-  // Aggregate metrics without storing individual values
-  if (data.type === 'gps') {
+    // Update translation metrics without storing actual translations
+    translationData.usageCount++;
+    if (data.data.success === false) {
+      translationData.successRate = 
+        (translationData.successRate * (translationData.usageCount - 1) + 0) / translationData.usageCount;
+    }
+
+    // Store phrase patterns without actual content
+    const phraseLength = data.data.text.split(' ').length;
+    translationData.commonPhrases[phraseLength] = 
+      (translationData.commonPhrases[phraseLength] || 0) + 1;
+
+    translationData.lastUpdated = new Date();
+    translationStore.set(langKey, translationData);
+  } else if (data.type === 'gps') {
     const gpsData = data.data as GpsData;
     current.aggregates.avgAccuracy = updateRunningAverage(
       current.aggregates.avgAccuracy || 0,
@@ -50,7 +78,7 @@ function processMetricsPrivately(data: StandardizedData) {
   current.lastUpdated = new Date();
   metricsStore.set(key, current);
 
-  // Automatically prune old data
+  // Cleanup old data
   pruneOldMetrics();
 
   return current;
@@ -69,6 +97,12 @@ function pruneOldMetrics() {
   for (const [key, value] of metricsStore.entries()) {
     if (value.lastUpdated < thirtyDaysAgo) {
       metricsStore.delete(key);
+    }
+  }
+
+  for (const [key, value] of translationStore.entries()) {
+    if (value.lastUpdated < thirtyDaysAgo) {
+      translationStore.delete(key);
     }
   }
 }
@@ -92,6 +126,27 @@ router.post('/data', async (req, res) => {
     console.error('Error processing data:', error);
     res.status(500).json({ 
       error: 'Failed to process data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get translation analytics without exposing individual translations
+router.get('/translation-analytics', async (req, res) => {
+  try {
+    const analytics = Array.from(translationStore.entries()).map(([key, data]) => ({
+      languagePair: key,
+      usageCount: data.usageCount,
+      successRate: data.successRate,
+      phrasePatterns: data.commonPhrases,
+      lastUpdated: data.lastUpdated
+    }));
+
+    res.json(analytics);
+  } catch (error) {
+    console.error('Error fetching translation analytics:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch translation analytics',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
