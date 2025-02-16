@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { Map, BarChart2 } from "lucide-react";
+import { Map, BarChart2, Heart } from "lucide-react";
 import { useCallback } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAccount } from "wagmi";
@@ -16,13 +16,12 @@ export function Navigation() {
   const { isSynced } = useMusicPlayer();
 
   const requestLocation = useCallback(async (e: React.MouseEvent) => {
-    // Check if we already have location permission
     const hasLocationPermission = localStorage.getItem('location-permission');
     if (hasLocationPermission === 'granted') {
       return;
     }
 
-    e.preventDefault(); // Prevent navigation until we handle location
+    e.preventDefault();
 
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -33,10 +32,8 @@ export function Navigation() {
         });
       });
 
-      // Store permission status
       localStorage.setItem('location-permission', 'granted');
 
-      // Update user geolocation if logged in
       if (address) {
         await apiRequest("POST", "/api/users/register", {
           address,
@@ -47,12 +44,9 @@ export function Navigation() {
         });
       }
 
-      // Continue with navigation
       setLocation('/map');
     } catch (error) {
       console.error('Geolocation error:', error);
-
-      // Store denied status to avoid asking again
       localStorage.setItem('location-permission', 'denied');
 
       toast({
@@ -61,7 +55,6 @@ export function Navigation() {
         variant: "destructive",
       });
 
-      // Still allow navigation to map
       setLocation('/map');
     }
   }, [address, setLocation, toast, intl]);
@@ -90,13 +83,7 @@ export function Navigation() {
       href: "/whitepaper",
       label: (
         <span className="flex items-center gap-2">
-          <svg 
-            className="h-4 w-4 text-red-500 animate-pulse" 
-            fill="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-          </svg>
+          <Heart className="h-4 w-4 text-red-500 animate-pulse" />
         </span>
       ),
       show: location !== '/whitepaper'
@@ -121,7 +108,6 @@ export function Navigation() {
         </Link>
       ))}
 
-      {/* Pirate flag for sync status */}
       {isSynced && (
         <a
           href="https://app.pitchforks.social"
