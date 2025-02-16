@@ -20,21 +20,51 @@ interface CachedTranslation {
   timestamp: number;
 }
 
+// Define supported locales to fix type issues
+type SupportedLocale = 'en' | 'es';
+
 // Minimal static translations for UI elements
-const staticMessages = {
+const staticMessages: Record<SupportedLocale, Record<string, string>> = {
   en: {
     'common.loading': 'Loading...',
     'common.error': 'Error',
     'common.retry': 'Retry',
     'common.translation.error': 'Translation unavailable',
+    'app.songs': 'Songs',
+    'app.upload': 'Upload',
+    'app.discovery': 'Discovery',
+    'app.recent': 'Recent',
+    'app.title': 'Title',
+    'app.disconnect': 'Disconnect',
+    'app.connect': 'Connect',
+    'app.library': 'Library',
+    'storage.title': 'Storage',
+    'storage.upload': 'Upload',
+    'storage.noFiles': 'No files found',
+    'app.network.setup': 'Network Setup',
+    'app.network.configuring': 'Configuring Network',
+    'app.welcome.back': 'Welcome Back'
   },
   es: {
     'common.loading': 'Cargando...',
     'common.error': 'Error',
     'common.retry': 'Reintentar',
     'common.translation.error': 'Traducción no disponible',
-  },
-  // Add other languages as needed
+    'app.songs': 'Canciones',
+    'app.upload': 'Subir',
+    'app.discovery': 'Descubrimiento',
+    'app.recent': 'Reciente',
+    'app.title': 'Título',
+    'app.disconnect': 'Desconectar',
+    'app.connect': 'Conectar',
+    'app.library': 'Biblioteca',
+    'storage.title': 'Almacenamiento',
+    'storage.upload': 'Subir',
+    'storage.noFiles': 'No se encontraron archivos',
+    'app.network.setup': 'Configuración de Red',
+    'app.network.configuring': 'Configurando Red',
+    'app.welcome.back': 'Bienvenido de Nuevo'
+  }
 };
 
 interface LocaleContextType {
@@ -68,17 +98,33 @@ async function translateText(text: string, targetLocale: string): Promise<string
   let attempts = 0;
   while (attempts < MAX_RETRIES) {
     try {
-      // Here we'll make the API call when we have the key
-      // For now, return the original text and log that we need API integration
-      console.log('Translation API call would be made here:', { text, targetLocale });
+      const response = await fetch('https://api.cognitive.microsofttranslator.com/translate', {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': import.meta.env.VITE_TRANSLATION_API_KEY,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify([{
+          text,
+          to: targetLocale
+        }])
+      });
+
+      if (!response.ok) {
+        throw new Error(`Translation API error: ${response.status}`);
+      }
+
+      const data: TranslationResponse[] = await response.json();
+      const translatedText = data[0].translations[0].text;
 
       // Cache the result
       translationCache.set(cacheKey, {
-        text: text, // Replace with actual translation when API is integrated
+        text: translatedText,
         timestamp: Date.now(),
       });
 
-      return text;
+      return translatedText;
     } catch (error) {
       attempts++;
       console.error(`Translation attempt ${attempts} failed:`, error);
@@ -98,12 +144,12 @@ async function translateText(text: string, targetLocale: string): Promise<string
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<LocaleType>('en');
-  const [messages, setMessages] = useState(staticMessages[locale] || staticMessages.en);
+  const [messages, setMessages] = useState(staticMessages[locale as SupportedLocale] || staticMessages.en);
 
   const setLocale = useCallback((newLocale: LocaleType) => {
     setLocaleState(newLocale);
     localStorage.setItem('preferred-locale', newLocale);
-    setMessages(staticMessages[newLocale] || staticMessages.en);
+    setMessages(staticMessages[newLocale as SupportedLocale] || staticMessages.en);
   }, []);
 
   const translate = useCallback(async (text: string) => {
