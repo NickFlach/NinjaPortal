@@ -43,7 +43,9 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'storage.noFiles': 'No files found',
     'app.network.setup': 'Network Setup',
     'app.network.configuring': 'Configuring Network',
-    'app.welcome.back': 'Welcome Back'
+    'app.welcome.back': 'Welcome Back',
+    'map.title': 'Listener Map',
+    'map.totalListeners': 'Total Listeners'
   },
   es: {
     'common.loading': 'Cargando...',
@@ -63,15 +65,11 @@ const staticMessages: Record<SupportedLocale, Record<string, string>> = {
     'storage.noFiles': 'No se encontraron archivos',
     'app.network.setup': 'Configuración de Red',
     'app.network.configuring': 'Configurando Red',
-    'app.welcome.back': 'Bienvenido de Nuevo'
+    'app.welcome.back': 'Bienvenido de Nuevo',
+    'map.title': 'Mapa de Oyentes',
+    'map.totalListeners': 'Total de Oyentes'
   }
 };
-
-interface LocaleContextType {
-  locale: LocaleType;
-  setLocale: (locale: LocaleType) => void;
-  translate: (text: string) => Promise<string>;
-}
 
 const LocaleContext = createContext<LocaleContextType | undefined>(undefined);
 
@@ -140,6 +138,12 @@ async function translateText(text: string, targetLocale: string): Promise<string
   }
 
   return text; // Fallback to original text if all retries fail
+}
+
+interface LocaleContextType {
+  locale: LocaleType;
+  setLocale: (locale: LocaleType) => void;
+  translate: (text: string) => Promise<string>;
 }
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
