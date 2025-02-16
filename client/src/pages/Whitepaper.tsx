@@ -2,18 +2,33 @@ import { Layout } from "@/components/Layout";
 import { useEffect, useState } from 'react';
 import { useLocale } from "@/contexts/LocaleContext";
 
+// Type for translated list items to avoid repetitive translation calls
+interface TranslatedListItems {
+  techServes?: string;
+  economicModels?: string;
+  communityDriven?: string;
+}
+
 export default function Whitepaper() {
   const { translate } = useLocale();
   const [translatedContent, setTranslatedContent] = useState<{
     title?: string;
     lead?: string;
     sections?: Record<string, string>;
+    capabilities?: {
+      dataless?: string;
+      web3?: string;
+      quantum?: string;
+      selfHealing?: string;
+    };
+    listItems?: TranslatedListItems;
   }>({});
 
   useEffect(() => {
     window.scrollTo(0, 0);
 
     async function translateContent() {
+      // Translate main sections
       const translated = {
         title: await translate('The Evolutionary AI-Powered Music & Intelligence Network'),
         lead: await translate('A decentralized revolution in music, intelligence, and community-engineered innovation, seamlessly integrating Web3, data-less AI, statistical physics, and quantum-ready architectures.'),
@@ -26,8 +41,22 @@ export default function Whitepaper() {
           roadmap: await translate('The Development Roadmap: An Evolutionary Pathway'),
           bigPicture: await translate('The Big Picture: Beyond Music, Toward Collective Intelligence'),
           conclusion: await translate('This is More Than Music—This is a Symphony of Intelligence. And you are part of it.')
+        },
+        // Pre-translate capability descriptions
+        capabilities: {
+          dataless: await translate('Learns, adapts, and optimizes in real-time without storing personal data'),
+          web3: await translate('Ensures power stays with the people, not corporate monopolies'),
+          quantum: await translate('Handles paradoxes and solves problems at planetary scale'),
+          selfHealing: await translate('Grows alongside the communities it serves')
+        },
+        // Pre-translate list items
+        listItems: {
+          techServes: await translate('Technology serves human progress, rather than extracting from it'),
+          economicModels: await translate('Economic models regenerate value rather than concentrating wealth'),
+          communityDriven: await translate('Community-driven governance ensures transparency, accountability, and autonomy')
         }
       };
+
       setTranslatedContent(translated);
     }
 
@@ -48,25 +77,25 @@ export default function Whitepaper() {
           {translatedContent.sections?.foundation || 'At its foundation is moral-techno-economics—a framework where:'}
         </p>
         <ul>
-          <li>{translate('Technology serves human progress, rather than extracting from it')}</li>
-          <li>{translate('Economic models regenerate value rather than concentrating wealth')}</li>
-          <li>{translate('Community-driven governance ensures transparency, accountability, and autonomy')}</li>
+          <li>{translatedContent.listItems?.techServes || 'Technology serves human progress, rather than extracting from it'}</li>
+          <li>{translatedContent.listItems?.economicModels || 'Economic models regenerate value rather than concentrating wealth'}</li>
+          <li>{translatedContent.listItems?.communityDriven || 'Community-driven governance ensures transparency, accountability, and autonomy'}</li>
         </ul>
 
         {/* Core System Capabilities */}
         <h3>✨ {translatedContent.sections?.capabilities || 'Core System Capabilities'}</h3>
         <ul>
           <li>
-            <strong>{translate('Data-less Intelligence')}:</strong> {translate('Learns, adapts, and optimizes in real-time without storing personal data')}
+            <strong>Data-less Intelligence:</strong> {translatedContent.capabilities?.dataless || 'Learns, adapts, and optimizes in real-time without storing personal data'}
           </li>
           <li>
-            <strong>{translate('Web3 & Decentralized Governance')}:</strong> {translate('Ensures power stays with the people, not corporate monopolies')}
+            <strong>Web3 & Decentralized Governance:</strong> {translatedContent.capabilities?.web3 || 'Ensures power stays with the people, not corporate monopolies'}
           </li>
           <li>
-            <strong>{translate('Quantum-Ready Architecture')}:</strong> {translate('Handles paradoxes and solves problems at planetary scale')}
+            <strong>Quantum-Ready Architecture:</strong> {translatedContent.capabilities?.quantum || 'Handles paradoxes and solves problems at planetary scale'}
           </li>
           <li>
-            <strong>{translate('Self-Healing Evolution')}:</strong> {translate('Grows alongside the communities it serves')}
+            <strong>Self-Healing Evolution:</strong> {translatedContent.capabilities?.selfHealing || 'Grows alongside the communities it serves'}
           </li>
         </ul>
 
@@ -117,89 +146,6 @@ export default function Whitepaper() {
               <li>Merkle tree verification for proof-of-storage</li>
               <li>Hybrid storage redundancy for resilience</li>
               <li>Geographic data distribution optimization</li>
-            </ul>
-          </li>
-        </ul>
-
-        <h3>Cascade Control System: Synchronizing Music & Intelligence</h3>
-        <p>
-          Our adaptive synchronization system functions like a living organism, continuously adjusting
-          and evolving based on external stimuli.
-        </p>
-
-        <h4>Controller Architecture</h4>
-        <ul>
-          <li>
-            <strong>✅ Inner Loop (Entropy Control)</strong>
-            <ul>
-              <li>🔹 Anti-Windup Mechanisms with adaptive thresholds</li>
-              <li>🔹 Dynamic Gain Scheduling based on network conditions</li>
-              <li>🔹 Low-Pass Filtered Derivative Action</li>
-              <li>🔹 Real-time stability analysis and compensation</li>
-            </ul>
-          </li>
-          <li>
-            <strong>✅ Outer Loop (Free Energy Control)</strong>
-            <ul>
-              <li>🔹 Statistical Physics-Based Network Renormalization</li>
-              <li>🔹 Oscillation Detection & Active Damping</li>
-              <li>🔹 Steady-State Error Compensation</li>
-              <li>🔹 Quantum-Ready Parallel Processing</li>
-            </ul>
-          </li>
-        </ul>
-
-        {/* WebSocket Protocol Details */}
-        <h3>💡 Self-Optimizing, Web3-Native Synchronization Protocol</h3>
-        <ul>
-          <li>
-            <strong>✅ WebSocket Protocol</strong>
-            <ul>
-              <li>🔹 Wallet Signature Verification (DID-based authentication)</li>
-              <li>🔹 Heartbeat Mechanism (30s intervals, 10s grace)</li>
-              <li>🔹 Geographic Node Mapping with latency optimization</li>
-              <li>🔹 Adaptive packet compression based on network conditions</li>
-            </ul>
-          </li>
-          <li>
-            <strong>✅ Dynamic Mesh Networking</strong>
-            <ul>
-              <li>🔹 Redundant connection paths with automatic failover</li>
-              <li>🔹 Byzantine Fault Tolerance (BFT) leader election</li>
-              <li>🔹 Distributed timestamp synchronization</li>
-              <li>🔹 Automatic topology optimization</li>
-            </ul>
-          </li>
-        </ul>
-
-        {/* Bansenshukai Integration */}
-        <h3>🎭 Bansenshukai Integration: The Art of Hidden Intelligence</h3>
-        <p>
-          We integrate Bansenshukai principles into our system's intelligence framework for strategic evolution:
-        </p>
-        <ul>
-          <li>
-            <strong>"The Art of Unseen Influence"</strong>
-            <ul>
-              <li>Federated learning across distributed nodes</li>
-              <li>Zero-Knowledge Proofs (ZKPs) for privacy</li>
-              <li>Homomorphic encryption for secure computation</li>
-            </ul>
-          </li>
-          <li>
-            <strong>"Fluid Adaptation" (Henka & Togakure Principles)</strong>
-            <ul>
-              <li>Self-learning AI systems</li>
-              <li>Dynamic governance models</li>
-              <li>Adaptive security protocols</li>
-            </ul>
-          </li>
-          <li>
-            <strong>"Multi-Layered Tactics"</strong>
-            <ul>
-              <li>Quantum AI for paradox resolution</li>
-              <li>Strategic adaptation mechanisms</li>
-              <li>Nested security architecture</li>
             </ul>
           </li>
         </ul>
