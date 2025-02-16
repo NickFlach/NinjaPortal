@@ -3,6 +3,7 @@ import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface LumiraDataPoint {
@@ -16,9 +17,49 @@ interface LumiraMetric {
   data: LumiraDataPoint[];
 }
 
+// Time range options
+const timeRanges = [
+  { value: '1h', label: 'Last Hour' },
+  { value: '6h', label: 'Last 6 Hours' },
+  { value: '24h', label: 'Last 24 Hours' },
+  { value: '7d', label: 'Last 7 Days' },
+  { value: '30d', label: 'Last 30 Days' }
+];
+
 export default function LumiraData() {
+  const [selectedRange, setSelectedRange] = React.useState('24h');
+
+  // Calculate start time based on selected range
+  const getTimeRange = () => {
+    const end = new Date();
+    const start = new Date();
+
+    switch (selectedRange) {
+      case '1h':
+        start.setHours(end.getHours() - 1);
+        return { start, end, interval: 1 };
+      case '6h':
+        start.setHours(end.getHours() - 6);
+        return { start, end, interval: 5 };
+      case '24h':
+        start.setHours(end.getHours() - 24);
+        return { start, end, interval: 15 };
+      case '7d':
+        start.setDate(end.getDate() - 7);
+        return { start, end, interval: 60 };
+      case '30d':
+        start.setDate(end.getDate() - 30);
+        return { start, end, interval: 240 };
+      default:
+        start.setHours(end.getHours() - 24);
+        return { start, end, interval: 15 };
+    }
+  };
+
+  const { start, end, interval } = getTimeRange();
+
   const { data: metrics, isLoading, error } = useQuery<LumiraMetric[]>({
-    queryKey: ["/api/lumira/metrics"],
+    queryKey: ["/api/lumira/metrics", { start: start.toISOString(), end: end.toISOString(), interval }],
     refetchInterval: 5000, // Refresh every 5 seconds
   });
 
@@ -52,6 +93,20 @@ export default function LumiraData() {
   return (
     <Layout>
       <div className="space-y-8">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Network Performance Overview</h1>
+          <Select value={selectedRange} onValueChange={setSelectedRange}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select time range" />
+            </SelectTrigger>
+            <SelectContent>
+              {timeRanges.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Network Performance Overview</CardTitle>
@@ -90,7 +145,7 @@ export default function LumiraData() {
         </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {metrics?.map((metric) => (
+          {metrics?.slice(1).map((metric) => (
             <Card key={metric.name}>
               <CardHeader>
                 <CardTitle>{metric.name}</CardTitle>
