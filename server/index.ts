@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+import { URL } from 'url';
 
 // ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -60,8 +61,7 @@ const startServer = async (retryCount = 0) => {
 
     // Initialize WebSocket server with a distinct path
     const wss = new WebSocketServer({ 
-      server, 
-      path: '/ws',
+      noServer: true, // Important: Use noServer mode to handle upgrade manually
       perMessageDeflate: {
         zlibDeflateOptions: {
           chunkSize: 1024,
@@ -76,6 +76,43 @@ const startServer = async (retryCount = 0) => {
         serverMaxWindowBits: 10,
         concurrencyLimit: 10,
         threshold: 1024
+      }
+    });
+
+    // Keep track of handled sockets to prevent duplicate upgrades
+    const handledSockets = new WeakSet();
+
+    // Handle upgrade manually to prevent conflicts with Vite HMR
+    server.on('upgrade', (request, socket, head) => {
+      // Skip if this socket was already handled
+      if (handledSockets.has(socket)) {
+        return;
+      }
+
+      try {
+        const pathname = request.url 
+          ? new URL(request.url, `http://${request.headers.host || 'localhost'}`).pathname
+          : '/';
+        const protocol = request.headers['sec-websocket-protocol'];
+
+        // Ignore Vite HMR WebSocket connections
+        if (protocol === 'vite-hmr') {
+          return;
+        }
+
+        // Only handle WebSocket connections to /ws path
+        if (pathname === '/ws') {
+          // Mark this socket as handled
+          handledSockets.add(socket);
+
+          wss.handleUpgrade(request, socket, head, (ws: CustomWebSocket) => {
+            ws.isAlive = true;
+            wss.emit('connection', ws);
+          });
+        }
+      } catch (error) {
+        console.error('WebSocket upgrade error:', error);
+        socket.destroy();
       }
     });
 
