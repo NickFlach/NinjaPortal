@@ -2,6 +2,8 @@ import { motion, useAnimation, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useIntl } from "react-intl";
+import { useLocation } from "wouter";
+import { useAccount } from "wagmi";
 
 interface TourStep {
   message: string;
@@ -9,39 +11,33 @@ interface TourStep {
 }
 
 const wisdomQuotes = [
-  // Original music-focused quotes
   "Music is the harmony of the universe made audible.",
   "The journey of a thousand songs begins with a single note.",
-  // Lao Tzu
   "Music in the heart can be heard by the universe.",
   "Silence is a source of great strength, but music is the voice of the soul.",
-  // Sun Tzu adaptations
   "In music, as in war, victory belongs to those who listen carefully.",
   "The supreme art of creation is to compose without conflict.",
-  // Miyamoto Musashi adaptations
   "Do nothing that is of no use - in music and in life.",
   "Like the way of the sword, the way of music requires dedication to master.",
-  // Einstein
   "I often think in music. I live my daydreams in music.",
   "If I were not a physicist, I would probably be a musician.",
-  // Leonardo da Vinci adaptations
   "Art and music are the windows to one's soul.",
   "Learn to listen as nature listens - in perfect harmony.",
-  // Bansenshukai wisdom
   "Like a ninja in shadows, true music moves silently through hearts.",
   "As the bamboo bends with wind, let your rhythm flow with time.",
-  // Additional ninja-themed quotes
   "In silence, find rhythm. In rhythm, find wisdom.",
-  "Let your heart be like a bamboo flute, hollow and ready to make music.",
+  "Let your heart be like a bamboo flute, hollow and ready to make music."
 ];
 
 export function NinjaTour() {
   const [currentStep, setCurrentStep] = useState(0);
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
   const [currentQuote, setCurrentQuote] = useState(0);
   const controls = useAnimation();
   const { isPlaying, currentSong } = useMusicPlayer();
   const intl = useIntl();
+  const { address } = useAccount();
+  const [location] = useLocation();
   const animationFrameRef = useRef(0);
   const [freqData, setFreqData] = useState<Uint8Array | null>(null);
 
@@ -59,6 +55,33 @@ export function NinjaTour() {
       messageId: "tour.upload"
     }
   ];
+
+  // Check if we should show the tour
+  useEffect(() => {
+    const shouldShowTour = () => {
+      // Only show on home page
+      if (location !== '/') return false;
+
+      // Check if user has dismissed the tour
+      const tourDismissed = localStorage.getItem('ninja-tour-dismissed');
+      const lastWalletAddress = localStorage.getItem('last-wallet-address');
+
+      // Show tour if:
+      // 1. Never dismissed before, or
+      // 2. New wallet connection (different from last address)
+      if (!tourDismissed || (address && lastWalletAddress !== address)) {
+        // Update last wallet address
+        if (address) {
+          localStorage.setItem('last-wallet-address', address);
+        }
+        return true;
+      }
+
+      return false;
+    };
+
+    setIsVisible(shouldShowTour());
+  }, [location, address]);
 
   // Auto-advance tour steps
   useEffect(() => {
@@ -78,6 +101,11 @@ export function NinjaTour() {
 
     return () => clearInterval(quoteInterval);
   }, []);
+
+  const handleDismiss = () => {
+    localStorage.setItem('ninja-tour-dismissed', 'true');
+    setIsVisible(false);
+  };
 
   if (!isVisible) return null;
 
@@ -107,7 +135,6 @@ export function NinjaTour() {
             xmlns="http://www.w3.org/2000/svg"
             className="text-primary"
           >
-            {/* Ninja Head */}
             <motion.path
               d="M60 25c-6 0-11 4-11 9s5 9 11 9 11-4 11-9-5-9-11-9z"
               fill="currentColor"
@@ -120,8 +147,6 @@ export function NinjaTour() {
               }}
               transition={{ type: "tween", duration: 0.1 }}
             />
-
-            {/* Ninja Body */}
             <motion.path
               d="M52 34v36c0 4.4 3.6 8 8 8s8-3.6 8-8V34H52z"
               fill="currentColor"
@@ -134,8 +159,6 @@ export function NinjaTour() {
               }}
               transition={{ type: "tween", duration: 0.1 }}
             />
-
-            {/* Left Leg */}
             <motion.path
               d="M52 70l-3 20"
               stroke="currentColor"
@@ -151,8 +174,6 @@ export function NinjaTour() {
               style={{ transformOrigin: '52px 70px' }}
               transition={{ type: "tween", duration: 0.1 }}
             />
-
-            {/* Right Leg */}
             <motion.path
               d="M68 70l3 20"
               stroke="currentColor"
@@ -168,8 +189,6 @@ export function NinjaTour() {
               style={{ transformOrigin: '68px 70px' }}
               transition={{ type: "tween", duration: 0.1 }}
             />
-
-            {/* Left Arm */}
             <motion.path
               d="M52 34c-4 0-8 4-8 12s4 12 8 12"
               stroke="currentColor"
@@ -185,8 +204,6 @@ export function NinjaTour() {
               style={{ transformOrigin: '52px 34px' }}
               transition={{ type: "tween", duration: 0.1 }}
             />
-
-            {/* Right Arm */}
             <motion.path
               d="M68 34c4 0 8 4 8 12s-4 12-8 12"
               stroke="currentColor"
@@ -202,8 +219,6 @@ export function NinjaTour() {
               style={{ transformOrigin: '68px 34px' }}
               transition={{ type: "tween", duration: 0.1 }}
             />
-
-            {/* Katana */}
             <motion.path
               d="M60 15v-10M60 5l2 3M60 5l-2 3"
               stroke="currentColor"
@@ -237,12 +252,11 @@ export function NinjaTour() {
               {intl.formatMessage({ id: tourSteps[currentStep].messageId })}
             </p>
 
-            {/* Ancient wisdom quote */}
             <motion.p
               className="text-xs italic text-muted-foreground mt-2 border-t border-border pt-2"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              key={currentQuote} // Trigger animation on quote change
+              key={currentQuote}
               transition={{ duration: 0.5 }}
             >
               "{wisdomQuotes[currentQuote]}"
@@ -251,7 +265,7 @@ export function NinjaTour() {
             {currentStep === tourSteps.length - 1 && (
               <motion.button
                 className="mt-2 text-xs text-primary hover:text-primary/80"
-                onClick={() => setIsVisible(false)}
+                onClick={handleDismiss}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
