@@ -6,95 +6,88 @@ import type { LumiraDataPoint, GpsData, PlaybackData, StandardizedData } from '.
 
 const router = Router();
 
-// In-memory store for real-time data
-const dataStore = new Map<string, StandardizedData>();
+// In-memory store for aggregated metrics only, no personal data
+const metricsStore = new Map<string, {
+  count: number;
+  aggregates: Record<string, number>;
+  lastUpdated: Date;
+}>();
 
-// Standardize GPS data
-function standardizeGpsData(data: GpsData): StandardizedData {
-  return {
-    type: 'gps',
-    timestamp: new Date().toISOString(),
-    data: {
-      coordinates: data.coordinates,
-      countryCode: data.countryCode,
-      accuracy: data.accuracy || null,
-      speed: data.speed || null
-    },
-    metadata: {
-      source: data.source || 'user',
-      processed: true
-    }
+// Privacy-preserving data processing
+function processMetricsPrivately(data: StandardizedData) {
+  const key = `${data.type}_${new Date().toISOString().split('T')[0]}`;
+  const current = metricsStore.get(key) || {
+    count: 0,
+    aggregates: {},
+    lastUpdated: new Date()
   };
-}
 
-// Standardize playback data
-function standardizePlaybackData(data: PlaybackData): StandardizedData {
-  return {
-    type: 'playback',
-    timestamp: new Date().toISOString(),
-    data: {
-      songId: data.songId,
-      position: data.position,
-      isPlaying: data.isPlaying,
-      volume: data.volume || 1.0
-    },
-    metadata: {
-      source: data.source || 'music_player',
-      processed: true
-    }
-  };
-}
+  // Increment anonymized counters without storing raw data
+  current.count++;
 
-// Process and store data
-async function processData(data: any): Promise<StandardizedData> {
-  let standardizedData: StandardizedData;
-
-  switch (data.type) {
-    case 'gps':
-      standardizedData = standardizeGpsData(data);
-      break;
-    case 'playback':
-      standardizedData = standardizePlaybackData(data);
-      break;
-    default:
-      throw new Error(`Unsupported data type: ${data.type}`);
+  // Aggregate metrics without storing individual values
+  if (data.type === 'gps') {
+    const gpsData = data.data as GpsData;
+    current.aggregates.avgAccuracy = updateRunningAverage(
+      current.aggregates.avgAccuracy || 0,
+      gpsData.accuracy || 0,
+      current.count
+    );
+    current.aggregates.avgSpeed = updateRunningAverage(
+      current.aggregates.avgSpeed || 0,
+      gpsData.speed || 0,
+      current.count
+    );
+  } else if (data.type === 'playback') {
+    const playbackData = data.data as PlaybackData;
+    current.aggregates.playingPercentage = updateRunningAverage(
+      current.aggregates.playingPercentage || 0,
+      playbackData.isPlaying ? 1 : 0,
+      current.count
+    );
   }
 
-  // Store processed data
-  dataStore.set(standardizedData.timestamp, standardizedData);
+  current.lastUpdated = new Date();
+  metricsStore.set(key, current);
 
-  // Persist to database
-  await persistData(standardizedData);
+  // Automatically prune old data
+  pruneOldMetrics();
 
-  return standardizedData;
+  return current;
 }
 
-// Persist standardized data to database
-async function persistData(data: StandardizedData) {
-  try {
-    await db.execute(sql`
-      INSERT INTO lumira_metrics (
-        timestamp,
-        data_type,
-        data,
-        metadata
-      ) VALUES (
-        ${data.timestamp},
-        ${data.type},
-        ${JSON.stringify(data.data)},
-        ${JSON.stringify(data.metadata)}
-      )
-    `);
-  } catch (error) {
-    console.error('Error persisting data to database:', error);
+// Update running average without storing individual values
+function updateRunningAverage(currentAvg: number, newValue: number, count: number): number {
+  return ((currentAvg * (count - 1)) + newValue) / count;
+}
+
+// Prune metrics older than 30 days
+function pruneOldMetrics() {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  for (const [key, value] of metricsStore.entries()) {
+    if (value.lastUpdated < thirtyDaysAgo) {
+      metricsStore.delete(key);
+    }
   }
 }
 
-// POST /api/lumira/data - Process incoming data
+// Process incoming data without persistence
 router.post('/data', async (req, res) => {
   try {
-    const processedData = await processData(req.body);
-    res.json(processedData);
+    const data: StandardizedData = {
+      type: req.body.type,
+      timestamp: new Date().toISOString(),
+      data: req.body,
+      metadata: {
+        source: req.body.source || 'anonymous',
+        processed: true
+      }
+    };
+
+    const metrics = processMetricsPrivately(data);
+    res.json({ success: true, aggregatedMetrics: metrics });
   } catch (error) {
     console.error('Error processing data:', error);
     res.status(500).json({ 
@@ -104,36 +97,28 @@ router.post('/data', async (req, res) => {
   }
 });
 
-// GET /api/lumira/metrics - Get processed metrics
+// Get aggregated metrics without exposing individual data points
 router.get('/metrics', async (req, res) => {
-  const { start, end, interval = 5 } = req.query;
+  const { start, end } = req.query;
 
   try {
-    // Parse time range parameters with timezone handling
     const startTime = start ? new Date(start as string) : new Date(Date.now() - 24 * 60 * 60 * 1000);
     const endTime = end ? new Date(end as string) : new Date();
 
-    // Use time_bucket with timezone consideration for consistent bucketing
-    const metrics = await db.execute(sql`
-      WITH time_series AS (
-        SELECT time_bucket(${interval} * '1 minute'::interval, timestamp AT TIME ZONE 'UTC') as bucket,
-               data_type,
-               data,
-               metadata
-        FROM lumira_metrics
-        WHERE timestamp BETWEEN ${startTime.toISOString()} AND ${endTime.toISOString()}
-      )
-      SELECT 
-        bucket,
-        data_type,
-        json_agg(data ORDER BY bucket) as data_points,
-        COUNT(*) as point_count
-      FROM time_series
-      GROUP BY bucket, data_type
-      ORDER BY bucket ASC
-    `);
+    // Filter metrics within time range
+    const filteredMetrics = Array.from(metricsStore.entries())
+      .filter(([_, value]) => {
+        const date = value.lastUpdated;
+        return date >= startTime && date <= endTime;
+      })
+      .map(([key, value]) => ({
+        bucket: key.split('_')[1],
+        data_type: key.split('_')[0],
+        aggregates: value.aggregates,
+        count: value.count
+      }));
 
-    res.json(metrics.rows);
+    res.json(filteredMetrics);
   } catch (error) {
     console.error('Error fetching metrics:', error);
     res.status(500).json({ error: 'Failed to fetch metrics' });
@@ -142,7 +127,6 @@ router.get('/metrics', async (req, res) => {
 
 export default router;
 export const lumiraService = {
-  processData,
-  standardizeGpsData,
-  standardizePlaybackData
+  processMetricsPrivately,
+  updateRunningAverage
 };

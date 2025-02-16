@@ -28,20 +28,26 @@ export interface StandardizedData {
   };
 }
 
-export interface LumiraDataPoint {
-  timestamp: string;
-  value: number;
-  metric: string;
+// Updated to support privacy-preserving metrics
+export interface LumiraMetrics {
+  count: number;
+  aggregates: {
+    avgAccuracy?: number;
+    avgSpeed?: number;
+    playingPercentage?: number;
+    [key: string]: number | undefined;
+  };
+  lastUpdated: Date;
 }
 
-export interface LumiraMetric {
-  name: string;
-  data: LumiraDataPoint[];
+export interface AggregatedMetric {
+  bucket: string;
+  data_type: string;
+  aggregates: Record<string, number>;
+  count: number;
 }
 
 export interface ProcessedMetrics {
-  bucket: string;
-  data_type: string;
-  data_points: any[];
-  count: number;
+  success: boolean;
+  aggregatedMetrics: LumiraMetrics;
 }
