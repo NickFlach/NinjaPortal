@@ -181,11 +181,19 @@ export default function Home() {
     }
 
     const file = e.target.files[0];
+    const validAudioTypes = [
+      'audio/mpeg',
+      'audio/wav',
+      'audio/ogg',
+      'audio/aac',
+      'audio/mp4',
+      'audio/x-m4a'
+    ];
 
-    if (file.type !== 'audio/mpeg') {
+    if (!validAudioTypes.includes(file.type)) {
       toast({
         title: "Invalid File Type",
-        description: "Please select an MP3 file. Other audio formats are not supported.",
+        description: "Please select a supported audio file (MP3, WAV, OGG, AAC, M4A).",
         variant: "destructive",
       });
       return;
@@ -230,7 +238,7 @@ export default function Home() {
                     </div>
                     <Input
                       type="file"
-                      accept=".mp3,audio/mpeg"
+                      accept=".mp3,.wav,.ogg,.aac,.m4a,audio/mpeg,audio/wav,audio/ogg,audio/aac,audio/mp4,audio/x-m4a"
                       onChange={handleFileUpload}
                       className="hidden"
                       id="song-upload"

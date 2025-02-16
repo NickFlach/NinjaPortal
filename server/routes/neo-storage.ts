@@ -20,9 +20,17 @@ const upload = multer({
   },
   fileFilter: (_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     // Check file type
-    const validMimeTypes = ['audio/mpeg', 'audio/mp3'];
+    const validMimeTypes = [
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/wav',
+      'audio/ogg',
+      'audio/aac',
+      'audio/mp4',
+      'audio/x-m4a'
+    ];
     if (!validMimeTypes.includes(file.mimetype)) {
-      cb(new Error('Please select an MP3 file. Other audio formats are not supported.'));
+      cb(new Error('Please select a supported audio file (MP3, WAV, OGG, AAC, M4A).'));
       return;
     }
     cb(null, true);

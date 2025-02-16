@@ -107,9 +107,18 @@ export async function uploadToNeoFS(file: File, address: string): Promise<NeoFSF
   }
 
   // Validate file type
-  const validMimeTypes = ['audio/mpeg', 'audio/mp3'];
+  const validMimeTypes = [
+    'audio/mpeg',
+    'audio/mp3',
+    'audio/wav',
+    'audio/ogg',
+    'audio/aac',
+    'audio/mp4',
+    'audio/x-m4a'
+  ];
+
   if (!validMimeTypes.includes(file.type)) {
-    throw new Error('Please select an MP3 file. Other audio formats are not supported.');
+    throw new Error('Please select a supported audio file (MP3, WAV, OGG, AAC, M4A).');
   }
 
   // Calculate required GAS
