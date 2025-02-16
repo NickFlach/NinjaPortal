@@ -60,23 +60,40 @@ export default function LumiraData() {
 
   const { data: metrics, isLoading, error } = useQuery<LumiraMetric[]>({
     queryKey: ["/api/lumira/metrics", { start: start.toISOString(), end: end.toISOString(), interval }],
-    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchInterval: 30000, // Refresh every 30 seconds instead of 5
+    staleTime: 15000, // Consider data fresh for 15 seconds
+    keepPreviousData: true, // Keep showing old data while fetching new data
   });
 
-  if (isLoading) {
-    return (
-      <Layout>
-        <div className="grid gap-4">
-          <Skeleton className="h-[400px] w-full" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-[200px]" />
-            ))}
-          </div>
-        </div>
-      </Layout>
-    );
-  }
+  const renderChart = (data: LumiraDataPoint[] = [], height: number = 400, dotRadius: number = 6) => (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" className="opacity-50" />
+        <XAxis 
+          dataKey="timestamp" 
+          tickFormatter={(value) => new Date(value).toLocaleTimeString()} 
+          stroke="hsl(var(--muted-foreground))"
+        />
+        <YAxis stroke="hsl(var(--muted-foreground))" />
+        <Tooltip 
+          labelFormatter={(value) => new Date(value).toLocaleString()}
+          contentStyle={{
+            backgroundColor: 'hsl(var(--background))',
+            border: '1px solid hsl(var(--border))',
+            borderRadius: '6px'
+          }}
+        />
+        <Line 
+          type="monotone" 
+          dataKey="value" 
+          stroke="hsl(var(--primary))" 
+          strokeWidth={2}
+          dot={false}
+          activeDot={{ r: dotRadius, fill: 'hsl(var(--primary))' }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
 
   if (error) {
     return (
@@ -113,72 +130,32 @@ export default function LumiraData() {
           </CardHeader>
           <CardContent>
             <div className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={metrics?.[0]?.data || []}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-50" />
-                  <XAxis 
-                    dataKey="timestamp" 
-                    tickFormatter={(value) => new Date(value).toLocaleTimeString()} 
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <YAxis stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    labelFormatter={(value) => new Date(value).toLocaleString()}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--background))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '6px'
-                    }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 6, fill: 'hsl(var(--primary))' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {isLoading && !metrics ? (
+                <div className="h-full w-full flex items-center justify-center">
+                  <Skeleton className="h-[90%] w-[95%]" />
+                </div>
+              ) : (
+                renderChart(metrics?.[0]?.data)
+              )}
             </div>
           </CardContent>
         </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {metrics?.slice(1).map((metric) => (
-            <Card key={metric.name}>
+          {(isLoading && !metrics ? Array(2).fill(null) : metrics?.slice(1) || []).map((metric, idx) => (
+            <Card key={metric?.name || idx}>
               <CardHeader>
-                <CardTitle>{metric.name}</CardTitle>
+                <CardTitle>{metric?.name || <Skeleton className="h-6 w-32" />}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-[200px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={metric.data}>
-                      <CartesianGrid strokeDasharray="3 3" className="opacity-50" />
-                      <XAxis 
-                        dataKey="timestamp" 
-                        tickFormatter={(value) => new Date(value).toLocaleTimeString()} 
-                        stroke="hsl(var(--muted-foreground))"
-                      />
-                      <YAxis stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip 
-                        labelFormatter={(value) => new Date(value).toLocaleString()}
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--background))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '6px'
-                        }}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="value" 
-                        stroke="hsl(var(--primary))" 
-                        strokeWidth={2}
-                        dot={false}
-                        activeDot={{ r: 4, fill: 'hsl(var(--primary))' }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {metric ? (
+                    renderChart(metric.data, 200, 4)
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center">
+                      <Skeleton className="h-[90%] w-[95%]" />
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
