@@ -1,55 +1,134 @@
 import { Router } from 'express';
 import { db } from '@db';
 import { sql } from 'drizzle-orm';
+import type { WebSocket } from 'ws';
+import type { LumiraDataPoint, GpsData, PlaybackData, StandardizedData } from '../types/lumira';
 
 const router = Router();
 
-// Helper to generate mock data with proper timestamps
-function generateMockData(days: number = 30, interval: number = 5) {
-  const data = [];
-  const now = Date.now();
-  const intervalMs = interval * 60 * 1000; // Convert minutes to milliseconds
+// In-memory store for real-time data
+const dataStore = new Map<string, StandardizedData>();
 
-  // Generate data points at specified intervals
-  for (let i = days * 24 * 60 / interval; i >= 0; i--) {
-    data.push({
-      timestamp: new Date(now - i * intervalMs).toISOString(),
-      value: Math.random() * 100,
-      metric: 'sample'
-    });
-  }
-
-  return data;
+// Standardize GPS data
+function standardizeGpsData(data: GpsData): StandardizedData {
+  return {
+    type: 'gps',
+    timestamp: new Date().toISOString(),
+    data: {
+      coordinates: data.coordinates,
+      countryCode: data.countryCode,
+      accuracy: data.accuracy || null,
+      speed: data.speed || null
+    },
+    metadata: {
+      source: data.source || 'user',
+      processed: true
+    }
+  };
 }
 
-// GET /api/lumira/metrics
+// Standardize playback data
+function standardizePlaybackData(data: PlaybackData): StandardizedData {
+  return {
+    type: 'playback',
+    timestamp: new Date().toISOString(),
+    data: {
+      songId: data.songId,
+      position: data.position,
+      isPlaying: data.isPlaying,
+      volume: data.volume || 1.0
+    },
+    metadata: {
+      source: data.source || 'music_player',
+      processed: true
+    }
+  };
+}
+
+// Process and store data
+async function processData(data: any): Promise<StandardizedData> {
+  let standardizedData: StandardizedData;
+
+  switch (data.type) {
+    case 'gps':
+      standardizedData = standardizeGpsData(data);
+      break;
+    case 'playback':
+      standardizedData = standardizePlaybackData(data);
+      break;
+    default:
+      throw new Error(`Unsupported data type: ${data.type}`);
+  }
+
+  // Store processed data
+  dataStore.set(standardizedData.timestamp, standardizedData);
+
+  // Persist to database if needed
+  await persistData(standardizedData);
+
+  return standardizedData;
+}
+
+// Persist standardized data to database
+async function persistData(data: StandardizedData) {
+  try {
+    // Store metrics for the data point
+    await db.execute(sql`
+      INSERT INTO lumira_metrics (
+        timestamp,
+        data_type,
+        data,
+        metadata
+      ) VALUES (
+        ${data.timestamp},
+        ${data.type},
+        ${JSON.stringify(data.data)},
+        ${JSON.stringify(data.metadata)}
+      )
+    `);
+  } catch (error) {
+    console.error('Error persisting data to database:', error);
+    // Don't throw - we want to continue even if persistence fails
+  }
+}
+
+// POST /api/lumira/data - Process incoming data
+router.post('/data', async (req, res) => {
+  try {
+    const processedData = await processData(req.body);
+    res.json(processedData);
+  } catch (error) {
+    console.error('Error processing data:', error);
+    res.status(500).json({ 
+      error: 'Failed to process data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// GET /api/lumira/metrics - Get processed metrics
 router.get('/metrics', async (req, res) => {
   const { start, end, interval = 5 } = req.query;
 
   try {
     // Parse time range parameters
-    const startTime = start ? new Date(start as string) : new Date(Date.now() - 24 * 60 * 60 * 1000); // Default to last 24 hours
+    const startTime = start ? new Date(start as string) : new Date(Date.now() - 24 * 60 * 60 * 1000);
     const endTime = end ? new Date(end as string) : new Date();
 
-    // For now, generate mock data based on the time range
-    const daysDiff = Math.ceil((endTime.getTime() - startTime.getTime()) / (24 * 60 * 60 * 1000));
+    // Fetch metrics from database
+    const metrics = await db.execute(sql`
+      SELECT 
+        time_bucket(${interval} * '1 minute'::interval, timestamp) as bucket,
+        data_type,
+        json_agg(data) as data_points,
+        count(*) as count
+      FROM lumira_metrics
+      WHERE timestamp BETWEEN ${startTime.toISOString()} AND ${endTime.toISOString()}
+      GROUP BY bucket, data_type
+      ORDER BY bucket DESC
+    `);
 
-    const metrics = [
-      {
-        name: 'Network Performance',
-        data: generateMockData(daysDiff, Number(interval))
-      },
-      {
-        name: 'Data Synchronization Rate',
-        data: generateMockData(daysDiff, Number(interval))
-      },
-      {
-        name: 'System Load',
-        data: generateMockData(daysDiff, Number(interval))
-      }
-    ];
-
-    res.json(metrics);
+    res.json(metrics.rows);
   } catch (error) {
     console.error('Error fetching metrics:', error);
     res.status(500).json({ error: 'Failed to fetch metrics' });
@@ -57,3 +136,8 @@ router.get('/metrics', async (req, res) => {
 });
 
 export default router;
+export const lumiraService = {
+  processData,
+  standardizeGpsData,
+  standardizePlaybackData
+};

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, boolean, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, boolean, decimal, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 export const users = pgTable("users", {
@@ -68,6 +68,14 @@ export const listeners = pgTable("listeners", {
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
+export const lumiraMetrics = pgTable("lumira_metrics", {
+  id: serial("id").primaryKey(),
+  timestamp: timestamp("timestamp").notNull(),
+  dataType: text("data_type").notNull(),
+  data: jsonb("data").notNull(),
+  metadata: jsonb("metadata").notNull(),
+});
+
 export const songsRelations = relations(songs, ({ many, one }) => ({
   recentPlays: many(recentlyPlayed),
   playlistSongs: many(playlistSongs),
@@ -122,3 +130,4 @@ export type User = typeof users.$inferSelect;
 export type Song = typeof songs.$inferSelect;
 export type Playlist = typeof playlists.$inferSelect;
 export type UserRewards = typeof userRewards.$inferSelect;
+export type LumiraMetric = typeof lumiraMetrics.$inferSelect;
