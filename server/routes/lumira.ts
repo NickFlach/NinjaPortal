@@ -6,22 +6,22 @@ import type { StandardizedData, GpsData, PlaybackData } from '../types/lumira';
 
 const router = Router();
 
-// In-memory stores for metrics, patterns and community feedback
+// In-memory stores for experiential feedback and sentiment analysis
 const metricsStore = new Map<string, {
   count: number;
   aggregates: Record<string, number>;
   lastUpdated: Date;
 }>();
 
-const communityFeedbackStore = new Map<string, {
-  category: string;
-  sentiment: number;
-  impact: number;
-  suggestions: string[];
-  votes: number;
-  status: 'new' | 'reviewing' | 'implemented' | 'declined';
-  lastUpdated: Date;
-}>();
+const experienceStore = new Map<string, {
+  timestamp: Date;
+  type: 'audio' | 'visual' | 'interaction';
+  sentiment: number; // -1 to 1
+  intensity: number; // 0 to 1
+  context: string;
+  location?: string;
+  songId?: number;
+}[]>();
 
 // Process metrics while preserving privacy
 function processMetricsPrivately(data: StandardizedData) {
@@ -35,31 +35,35 @@ function processMetricsPrivately(data: StandardizedData) {
   // Process standard metrics
   current.count++;
 
-  if (data.type === 'feedback') {
-    const feedbackData = data.data;
-    const feedbackKey = `${feedbackData.category}_${new Date().toISOString()}`;
+  if (data.type === 'experience') {
+    const exp = data.data;
+    const timeKey = new Date().toISOString();
 
-    communityFeedbackStore.set(feedbackKey, {
-      category: feedbackData.category,
-      sentiment: feedbackData.sentiment,
-      impact: feedbackData.impact,
-      suggestions: feedbackData.suggestions,
-      votes: 1,
-      status: 'new',
-      lastUpdated: new Date()
+    const experiences = experienceStore.get(timeKey) || [];
+    experiences.push({
+      timestamp: new Date(),
+      type: exp.type,
+      sentiment: exp.sentiment,
+      intensity: exp.intensity,
+      context: exp.context,
+      location: exp.location,
+      songId: exp.songId
     });
 
-    // Update aggregates for feedback metrics
-    current.aggregates.avgSentiment = updateRunningAverage(
-      current.aggregates.avgSentiment || 0,
-      feedbackData.sentiment,
+    // Update running averages for the experience type
+    current.aggregates[`${exp.type}_sentiment`] = updateRunningAverage(
+      current.aggregates[`${exp.type}_sentiment`] || 0,
+      exp.sentiment,
       current.count
     );
-    current.aggregates.avgImpact = updateRunningAverage(
-      current.aggregates.avgImpact || 0,
-      feedbackData.impact,
+
+    current.aggregates[`${exp.type}_intensity`] = updateRunningAverage(
+      current.aggregates[`${exp.type}_intensity`] || 0,
+      exp.intensity,
       current.count
     );
+
+    experienceStore.set(timeKey, experiences);
   } else if (data.type === 'gps') {
     const gpsData = data.data as GpsData;
     current.aggregates.avgAccuracy = updateRunningAverage(
@@ -138,8 +142,11 @@ function updateRunningAverage(currentAvg: number, newValue: number, count: numbe
   return ((currentAvg * (count - 1)) + newValue) / count;
 }
 
-// Prune metrics older than 30 days
+// Prune metrics older than 24 hours for experience data, 30 days for aggregates
 function pruneOldMetrics() {
+  const oneDayAgo = new Date();
+  oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -149,6 +156,12 @@ function pruneOldMetrics() {
     }
   }
 
+  for (const [key, _] of experienceStore.entries()) {
+    const timestamp = new Date(key);
+    if (timestamp < oneDayAgo) {
+      experienceStore.delete(key);
+    }
+  }
   for (const [key, value] of communityFeedbackStore.entries()) {
     if (value.lastUpdated < thirtyDaysAgo && value.status === 'implemented') {
       communityFeedbackStore.delete(key);
@@ -167,29 +180,78 @@ function pruneOldMetrics() {
   }
 }
 
-// Process incoming feedback and data
-router.post('/feedback', async (req, res) => {
+// Record user experience feedback
+router.post('/experience', async (req, res) => {
   try {
-    const feedbackData = {
-      type: 'feedback',
+    const experienceData = {
+      type: 'experience',
       timestamp: new Date().toISOString(),
       data: req.body,
       metadata: {
-        source: req.body.source || 'community',
+        source: 'user-experience',
         processed: true
       }
     };
 
-    const metrics = processMetricsPrivately(feedbackData);
+    const metrics = processMetricsPrivately(experienceData);
     res.json({ success: true, metrics });
   } catch (error) {
-    console.error('Error processing feedback:', error);
+    console.error('Error processing experience:', error);
     res.status(500).json({
-      error: 'Failed to process feedback',
+      error: 'Failed to process experience',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
+
+// Get experience insights
+router.get('/experience-insights', async (req, res) => {
+  try {
+    const now = new Date();
+    const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+    // Aggregate recent experiences
+    const recentExperiences = Array.from(experienceStore.entries())
+      .filter(([key, _]) => new Date(key) >= hourAgo)
+      .flatMap(([_, experiences]) => experiences);
+
+    // Calculate insights
+    const insights = {
+      currentMood: {
+        audio: calculateAverageSentiment(recentExperiences, 'audio'),
+        visual: calculateAverageSentiment(recentExperiences, 'visual'),
+        interaction: calculateAverageSentiment(recentExperiences, 'interaction')
+      },
+      engagementLevels: {
+        audio: calculateAverageIntensity(recentExperiences, 'audio'),
+        visual: calculateAverageIntensity(recentExperiences, 'visual'),
+        interaction: calculateAverageIntensity(recentExperiences, 'interaction')
+      },
+      totalExperiences: recentExperiences.length,
+      timestamp: now.toISOString()
+    };
+
+    res.json(insights);
+  } catch (error) {
+    console.error('Error fetching experience insights:', error);
+    res.status(500).json({
+      error: 'Failed to fetch experience insights',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+function calculateAverageSentiment(experiences: any[], type: string): number {
+  const typeExperiences = experiences.filter(exp => exp.type === type);
+  if (typeExperiences.length === 0) return 0;
+  return typeExperiences.reduce((sum, exp) => sum + exp.sentiment, 0) / typeExperiences.length;
+}
+
+function calculateAverageIntensity(experiences: any[], type: string): number {
+  const typeExperiences = experiences.filter(exp => exp.type === type);
+  if (typeExperiences.length === 0) return 0;
+  return typeExperiences.reduce((sum, exp) => sum + exp.intensity, 0) / typeExperiences.length;
+}
 
 // Get community insights and action items
 router.get('/community-insights', async (req, res) => {
