@@ -52,7 +52,7 @@ export async function prepareNeoContainer(metadata: SongMetadata): Promise<strin
 export async function storeInNeoFS(
   fileData: Buffer,
   metadata: SongMetadata
-): Promise<{ containerId: string; objectId: string; dimensions: Map<number, number> }> {
+): Promise<{ containerId: string; objectId: string; dimensions: { [key: number]: number } }> {
   try {
     const gas = calculateRequiredGas(fileData.length, 24); // 24 hours storage
     const fileEnergy = calculateFileEnergy(fileData);

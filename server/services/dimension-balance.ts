@@ -31,11 +31,9 @@ class DimensionalBalancer extends EventEmitter {
 
   /**
    * Creates a digital twin across dimensions
-   * @param sourceId Unique identifier for the source object
-   * @param initialState Initial energy state
    */
-  public createReflection(sourceId: string, initialState: number): Map<number, number> {
-    const reflections = new Map<number, number>();
+  public createReflection(sourceId: string, initialState: number): { [key: number]: number } {
+    const reflections: { [key: number]: number } = {};
 
     // Create reflections across all dimensions using Array.from for compatibility
     Array.from(this.dimensions.entries()).forEach(([dimId, dimension]) => {
@@ -45,7 +43,7 @@ class DimensionalBalancer extends EventEmitter {
       );
 
       dimension.reflections.set(sourceId, reflectedEnergy);
-      reflections.set(dimId, reflectedEnergy);
+      reflections[dimId] = reflectedEnergy;
 
       // Update dimension's equilibrium
       this.updateEquilibrium(dimension);
@@ -98,7 +96,7 @@ class DimensionalBalancer extends EventEmitter {
 
     this.dimensions.set(newDimension.dimension, newDimension);
 
-    // Emit dimension creation event
+    // Emit dimension creation event with JSON-safe data
     this.emit('dimensionCreated', {
       dimensionId: newDimension.dimension,
       energy: newDimension.energy,
