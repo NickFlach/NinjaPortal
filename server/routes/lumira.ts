@@ -63,7 +63,7 @@ async function processData(data: any): Promise<StandardizedData> {
   // Store processed data
   dataStore.set(standardizedData.timestamp, standardizedData);
 
-  // Persist to database if needed
+  // Persist to database
   await persistData(standardizedData);
 
   return standardizedData;
@@ -72,7 +72,6 @@ async function processData(data: any): Promise<StandardizedData> {
 // Persist standardized data to database
 async function persistData(data: StandardizedData) {
   try {
-    // Store metrics for the data point
     await db.execute(sql`
       INSERT INTO lumira_metrics (
         timestamp,
@@ -88,7 +87,6 @@ async function persistData(data: StandardizedData) {
     `);
   } catch (error) {
     console.error('Error persisting data to database:', error);
-    // Don't throw - we want to continue even if persistence fails
   }
 }
 
@@ -111,21 +109,28 @@ router.get('/metrics', async (req, res) => {
   const { start, end, interval = 5 } = req.query;
 
   try {
-    // Parse time range parameters
+    // Parse time range parameters with timezone handling
     const startTime = start ? new Date(start as string) : new Date(Date.now() - 24 * 60 * 60 * 1000);
     const endTime = end ? new Date(end as string) : new Date();
 
-    // Fetch metrics from database
+    // Use time_bucket with timezone consideration for consistent bucketing
     const metrics = await db.execute(sql`
+      WITH time_series AS (
+        SELECT time_bucket(${interval} * '1 minute'::interval, timestamp AT TIME ZONE 'UTC') as bucket,
+               data_type,
+               data,
+               metadata
+        FROM lumira_metrics
+        WHERE timestamp BETWEEN ${startTime.toISOString()} AND ${endTime.toISOString()}
+      )
       SELECT 
-        time_bucket(${interval} * '1 minute'::interval, timestamp) as bucket,
+        bucket,
         data_type,
-        json_agg(data) as data_points,
-        count(*) as count
-      FROM lumira_metrics
-      WHERE timestamp BETWEEN ${startTime.toISOString()} AND ${endTime.toISOString()}
+        json_agg(data ORDER BY bucket) as data_points,
+        COUNT(*) as point_count
+      FROM time_series
       GROUP BY bucket, data_type
-      ORDER BY bucket DESC
+      ORDER BY bucket ASC
     `);
 
     res.json(metrics.rows);

@@ -17,6 +17,42 @@ interface LumiraMetric {
   data: LumiraDataPoint[];
 }
 
+// Process raw database metrics into chart-friendly format
+function processMetrics(rawMetrics: any[]): LumiraMetric[] {
+  if (!rawMetrics?.length) return [];
+
+  // Group by data_type
+  const metricsByType = new Map<string, LumiraDataPoint[]>();
+
+  rawMetrics.forEach(row => {
+    const { bucket, data_type, data_points } = row;
+    if (!metricsByType.has(data_type)) {
+      metricsByType.set(data_type, []);
+    }
+
+    // Calculate average value from data points
+    const value = data_points.reduce((sum: number, point: any) => {
+      // Extract numeric value based on data type
+      const pointValue = data_type === 'playback' ? 
+        (point.isPlaying ? 1 : 0) : // For playback, use playing state
+        (point.speed || point.accuracy || 0); // For GPS, use speed or accuracy
+      return sum + pointValue;
+    }, 0) / data_points.length;
+
+    metricsByType.get(data_type)!.push({
+      timestamp: bucket,
+      value,
+      metric: data_type
+    });
+  });
+
+  // Convert to array of metrics
+  return Array.from(metricsByType.entries()).map(([type, data]) => ({
+    name: type.charAt(0).toUpperCase() + type.slice(1),
+    data: data.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  }));
+}
+
 // Time range options
 const timeRanges = [
   { value: '1h', label: 'Last Hour' },
@@ -58,13 +94,15 @@ export default function LumiraData() {
 
   const { start, end, interval } = getTimeRange();
 
-  const { data: metrics, isLoading } = useQuery<LumiraMetric[]>({
+  const { data: rawMetrics, isLoading } = useQuery({
     queryKey: ["/api/lumira/metrics", { start: start.toISOString(), end: end.toISOString(), interval }],
-    refetchInterval: 30000, // Refresh every 30 seconds instead of 5
+    select: processMetrics,
+    refetchInterval: 30000, // Refresh every 30 seconds
     staleTime: 15000, // Consider data fresh for 15 seconds
   });
 
-  if (isLoading && !metrics) {
+  // Don't show loading state if we have data
+  if (isLoading && !rawMetrics?.length) {
     return (
       <Layout>
         <div className="space-y-8">
@@ -82,20 +120,6 @@ export default function LumiraData() {
               </div>
             </CardContent>
           </Card>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array(2).fill(null).map((_, idx) => (
-              <Card key={idx}>
-                <CardHeader>
-                  <CardTitle><Skeleton className="h-6 w-32" /></CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[200px] w-full flex items-center justify-center">
-                    <Skeleton className="h-[90%] w-[95%]" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
         </div>
       </Layout>
     );
@@ -118,57 +142,25 @@ export default function LumiraData() {
           </Select>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Network Performance Overview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={metrics?.[0]?.data ?? []}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-50" />
-                  <XAxis 
-                    dataKey="timestamp" 
-                    tickFormatter={(value) => new Date(value).toLocaleTimeString()} 
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <YAxis stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    labelFormatter={(value) => new Date(value).toLocaleString()}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--background))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '6px'
-                    }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 6, fill: 'hsl(var(--primary))' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(metrics?.slice(1) ?? []).map((metric) => (
+        <div className="grid grid-cols-1 gap-4">
+          {(rawMetrics || []).map((metric) => (
             <Card key={metric.name}>
               <CardHeader>
-                <CardTitle>{metric.name}</CardTitle>
+                <CardTitle>{metric.name} Metrics</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-[200px]">
+                <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={metric.data}>
                       <CartesianGrid strokeDasharray="3 3" className="opacity-50" />
                       <XAxis 
                         dataKey="timestamp" 
-                        tickFormatter={(value) => new Date(value).toLocaleTimeString()} 
+                        tickFormatter={(value) => {
+                          const date = new Date(value);
+                          return selectedRange === '1h' ? 
+                            date.toLocaleTimeString() : 
+                            date.toLocaleString();
+                        }}
                         stroke="hsl(var(--muted-foreground))"
                       />
                       <YAxis stroke="hsl(var(--muted-foreground))" />
