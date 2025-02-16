@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { Map } from "lucide-react";
+import { Map, BarChart2 } from "lucide-react";
 import { useCallback } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAccount } from "wagmi";
@@ -75,14 +75,24 @@ export function Navigation() {
           Map
         </span>
       ),
-      onClick: requestLocation
+      onClick: requestLocation,
+      show: location !== '/map'
+    },
+    {
+      href: "/lumira",
+      label: (
+        <span className="flex items-center gap-2">
+          <BarChart2 className="h-4 w-4" />
+          Lumira Data
+        </span>
+      ),
+      show: true
     }
   ];
 
   return (
     <nav className="flex items-center gap-6 ml-8">
-      {/* Only show map link if we're not on the map page */}
-      {location !== '/map' && links.map(({ href, label, onClick }) => (
+      {links.filter(link => link.show).map(({ href, label, onClick }) => (
         <Link
           key={href}
           href={href}
