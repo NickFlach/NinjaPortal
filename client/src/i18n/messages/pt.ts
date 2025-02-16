@@ -33,6 +33,9 @@ export default {
   'tour.connect': 'Conecte sua carteira para explorar músicas.',
   'tour.upload': 'Envie suas músicas favoritas e compartilhe com o mundo!',
   'tour.gotIt': 'Entendi!',
+  'nav.map': 'Mapa',
+  'nav.analytics': 'Análise',
+  'nav.whitepaper': 'Documento Técnico',
   // Whitepaper related translations
   'whitepaper.title': 'Whitepaper',
   'whitepaper.summary': 'Plataforma Descentralizada de Streaming de Música',

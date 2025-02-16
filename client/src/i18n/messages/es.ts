@@ -1,5 +1,8 @@
 // Spanish translations
 export default {
+  'nav.map': 'Mapa',
+  'nav.analytics': 'Analítica',
+  'nav.whitepaper': 'Documento Técnico',
   'app.title': 'Ninja-Portal',
   'app.connect': 'Conectar Billetera',
   'app.disconnect': 'Desconectar',

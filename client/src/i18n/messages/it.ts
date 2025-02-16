@@ -81,4 +81,7 @@ export default {
   'whitepaper.network.description': 'Controllo a cascata e fisica statistica',
   'whitepaper.future.title': 'Sviluppo Futuro',
   'whitepaper.future.description': 'IA, bridge cross-chain e governance',
+  'nav.map': 'Mappa',
+  'nav.analytics': 'Analisi',
+  'nav.whitepaper': 'Libro Bianco'
 } as const;

@@ -134,5 +134,8 @@ export default {
   'whitepaper.roadmap.storage.improvements.costs': 'Réduire les coûts de stockage de 50% via la compression intelligente',
   'whitepaper.roadmap.storage.improvements.bitrate': 'Implémenter le streaming à débit adaptatif',
   'whitepaper.roadmap.storage.improvements.edge': 'Ajouter la diffusion de contenu mise en cache en périphérie',
-  'whitepaper.roadmap.future.title': 'Développement Futur'
+  'whitepaper.roadmap.future.title': 'Développement Futur',
+  'nav.map': 'Carte',
+  'nav.analytics': 'Analytique',
+  'nav.whitepaper': 'Livre Blanc'
 } as const;

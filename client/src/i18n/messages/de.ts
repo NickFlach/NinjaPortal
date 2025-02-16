@@ -174,5 +174,8 @@ export default {
   'whitepaper.roadmap.storage.improvements.costs': 'Speicherkosten um 50% durch intelligente Komprimierung reduzieren',
   'whitepaper.roadmap.storage.improvements.bitrate': 'Adaptives Bitrate-Streaming implementieren',
   'whitepaper.roadmap.storage.improvements.edge': 'Edge-Cached Content-Delivery hinzufügen',
-  'whitepaper.roadmap.future.title': 'Zukünftige Entwicklung'
+  'whitepaper.roadmap.future.title': 'Zukünftige Entwicklung',
+  'nav.map': 'Karte',
+  'nav.analytics': 'Analytik',
+  'nav.whitepaper': 'Whitepaper'
 } as const;

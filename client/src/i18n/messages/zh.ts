@@ -25,4 +25,7 @@ export default {
   'app.network.warning': '网络警告',
   'app.network.switch': '请在Opera钱包中批准网络切换',
   'app.network.connect': '请确保你已连接到NEO X网络',
+  'nav.map': '地图',
+  'nav.analytics': '分析',
+  'nav.whitepaper': '白皮书',
 } as const;
