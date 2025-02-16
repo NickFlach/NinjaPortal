@@ -88,7 +88,7 @@ export default function Whitepaper() {
         <ul>
           <li><strong>Configuration</strong>
             <ul>
-              <li>Chain ID: {process.env.VITE_CHAIN_ID}</li>
+              <li>Chain ID: {import.meta.env.VITE_CHAIN_ID}</li>
               <li>Native Currency: GAS</li>
               <li>RPC Integration: Managed endpoints</li>
             </ul>
