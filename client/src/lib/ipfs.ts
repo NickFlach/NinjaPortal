@@ -1,9 +1,9 @@
 import { Buffer } from 'buffer';
 
 const pinataJWT = import.meta.env.VITE_PINATA_JWT;
-const PINATA_GATEWAY = 'https://blush-adjacent-octopus-823.mypinata.cloud/ipfs';
 const PINATA_API = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
 const PINATA_METADATA_API = 'https://api.pinata.cloud/pinning/hashMetadata';
+const IPFS_GATEWAY = 'https://ipfs.io/ipfs';
 
 if (!pinataJWT) {
   throw new Error('Pinata JWT not found. Please check your environment variables.');
@@ -109,21 +109,13 @@ export async function getFromIPFS(hash: string): Promise<ArrayBuffer> {
 
   while (retries > 0) {
     try {
-      console.log('Fetching from IPFS gateway:', {
+      console.log('Fetching from IPFS:', {
         hash,
         attempt: 4 - retries,
         timestamp: new Date().toISOString()
       });
 
-      const response = await fetch(`${PINATA_GATEWAY}/${hash}`, {
-        headers: {
-          'Accept': '*/*',
-          'Cache-Control': 'no-cache',
-          'Origin': window.location.origin
-        },
-        mode: 'cors',
-        credentials: 'omit'
-      });
+      const response = await fetch(`${IPFS_GATEWAY}/${hash}`);
 
       if (!response.ok) {
         console.error('IPFS Gateway error:', {
@@ -158,13 +150,7 @@ export async function getFromIPFS(hash: string): Promise<ArrayBuffer> {
 // Add function to check IPFS connection
 export async function checkIPFSConnection(): Promise<boolean> {
   try {
-    const response = await fetch(PINATA_API.replace('/pinFileToIPFS', '/data/testAuthentication'), {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${pinataJWT}`,
-      }
-    });
-
+    const response = await fetch(IPFS_GATEWAY);
     return response.ok;
   } catch (error) {
     console.error('IPFS connection check failed:', error);
