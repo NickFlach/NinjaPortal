@@ -1,11 +1,11 @@
 import { motion, useAnimation, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
-import { useIntl } from "react-intl";
 import { useLocation } from "wouter";
 import { useAccount } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
-import { Code2, ThumbsUp, MessageSquare, Sparkles } from "lucide-react";
+import { Code2, ThumbsUp, MessageSquare, Sparkles, CheckCircle2 } from "lucide-react";
+import { useDimensionalTranslation } from "@/contexts/LocaleContext";
 
 interface TourStep {
   message: string;
@@ -36,7 +36,7 @@ export function NinjaTour() {
   const [feedbackCategory, setFeedbackCategory] = useState('feature');
   const controls = useAnimation();
   const { isPlaying, currentSong } = useMusicPlayer();
-  const intl = useIntl();
+  const { t } = useDimensionalTranslation();
   const { address } = useAccount();
   const [location] = useLocation();
   const animationFrameRef = useRef(0);
@@ -75,15 +75,15 @@ export function NinjaTour() {
 
   const tourSteps: TourStep[] = [
     {
-      message: "Welcome to Ninja-Portal! I'll be your guide.",
+      message: t('tour.welcome'),
       messageId: "tour.welcome"
     },
     {
-      message: "Connect your wallet to start exploring music.",
+      message: t('tour.connect'),
       messageId: "tour.connect"
     },
     {
-      message: "Upload your favorite tunes and share them with the world!",
+      message: t('tour.upload'),
       messageId: "tour.upload"
     }
   ];
@@ -376,13 +376,13 @@ export function NinjaTour() {
             transition={{ delay: 0.2 }}
           >
             <p className="text-sm mb-2">
-              {intl.formatMessage({ id: tourSteps[currentStep].messageId })}
+              {t(tourSteps[currentStep].messageId)}
             </p>
 
             {suggestions.length > 0 && (
               <div className="mt-4 border-t border-border pt-2">
                 <p className="text-xs font-medium mb-2">
-                  {intl.formatMessage({ id: 'ninja.suggestions' })}
+                  {t('ninja.suggestions')}
                 </p>
                 <div className="space-y-2">
                   {suggestions.map((suggestion, index) => (
@@ -429,7 +429,7 @@ export function NinjaTour() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                {intl.formatMessage({ id: 'tour.gotIt' })}
+                {t('tour.gotIt')}
               </motion.button>
             )}
           </motion.div>
@@ -454,7 +454,7 @@ export function NinjaTour() {
               style={{ width: '300px' }}
             >
               <h3 className="text-sm font-medium mb-2">
-                {intl.formatMessage({ id: 'community.feedback' })}
+                {t('community.feedback')}
               </h3>
 
               <div className="space-y-4">
@@ -463,15 +463,15 @@ export function NinjaTour() {
                   onChange={(e) => setFeedbackCategory(e.target.value)}
                   className="w-full text-sm rounded-md border border-input bg-transparent px-3 py-2"
                 >
-                  <option value="feature">Feature Request</option>
-                  <option value="bug">Bug Report</option>
-                  <option value="improvement">Improvement</option>
+                  <option value="feature">{t('community.feedback.feature')}</option>
+                  <option value="bug">{t('community.feedback.bug')}</option>
+                  <option value="improvement">{t('community.feedback.improvement')}</option>
                 </select>
 
                 <textarea
                   value={feedbackInput}
                   onChange={(e) => setFeedbackInput(e.target.value)}
-                  placeholder={intl.formatMessage({ id: 'community.feedback.placeholder' })}
+                  placeholder={t('community.feedback.placeholder')}
                   className="w-full text-sm rounded-md border border-input bg-transparent px-3 py-2 min-h-[100px]"
                 />
 
@@ -482,14 +482,14 @@ export function NinjaTour() {
                   onClick={handleFeedbackSubmit}
                   disabled={!feedbackInput.trim()}
                 >
-                  {intl.formatMessage({ id: 'community.feedback.submit' })}
+                  {t('community.feedback.submit')}
                 </motion.button>
               </div>
 
               {communityInsights && communityInsights.length > 0 && (
                 <div className="mt-4 border-t border-border pt-4">
                   <h4 className="text-xs font-medium mb-2">
-                    {intl.formatMessage({ id: 'community.insights' })}
+                    {t('community.insights')}
                   </h4>
 
                   <div className="space-y-2 max-h-[200px] overflow-y-auto">
@@ -509,7 +509,7 @@ export function NinjaTour() {
                             {insight.actionable && (
                               <span className="flex items-center gap-1 text-yellow-500">
                                 <Sparkles className="h-3 w-3" />
-                                {intl.formatMessage({ id: 'community.actionable' })}
+                                {t('community.actionable')}
                               </span>
                             )}
                           </div>

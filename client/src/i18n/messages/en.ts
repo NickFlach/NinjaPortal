@@ -98,6 +98,17 @@ const translations = {
   'app.disconnect.success': 'Wallet disconnected successfully!',
   'app.disconnect.error': 'Failed to disconnect wallet',
 
+  // Community feedback translations
+  'community.feedback': 'Community Feedback',
+  'community.feedback.feature': 'Feature Request',
+  'community.feedback.bug': 'Bug Report',
+  'community.feedback.improvement': 'Improvement',
+  'community.feedback.placeholder': 'Share your thoughts, ideas, or suggestions...',
+  'community.feedback.submit': 'Submit Feedback',
+  'community.insights': 'Community Insights',
+  'community.actionable': 'Actionable',
+  'ninja.suggestions': 'Suggested Actions',
+
   // Import whitepaper translations
   ...whitepaper
 } as const;
