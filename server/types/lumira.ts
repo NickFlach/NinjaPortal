@@ -17,26 +17,66 @@ export interface PlaybackData {
   source?: string;
 }
 
+export interface DimensionalReflectionData {
+  sourceId: string;
+  energy: number;
+  dimensionId: number;
+  dimensionalEnergy: number;
+  equilibrium: number;
+}
+
+export interface DimensionalEvolutionData {
+  dimensionId: number;
+  energy: number;
+  equilibrium: number;
+  pressure: number;
+  reflectionCount: number;
+}
+
+export interface ExperienceData {
+  type: 'audio' | 'visual' | 'interaction';
+  sentiment: number;
+  intensity: number;
+  context: string;
+  location?: string;
+  songId?: number;
+}
+
+export interface CodePatternData {
+  pattern: string;
+  context: string;
+  success: boolean;
+  impact: number;
+}
+
+export interface TranslationMetricData {
+  sourceLanguage: string;
+  targetLanguage: string;
+  success: boolean;
+  text: string;
+}
+
 export interface StandardizedData {
-  type: 'gps' | 'playback';
+  type: 'gps' | 'playback' | 'reflection' | 'evolution' | 'experience' | 'code' | 'translation';
   timestamp: string;
-  data: Record<string, any>;
+  data: GpsData | PlaybackData | DimensionalReflectionData | DimensionalEvolutionData | 
+        ExperienceData | CodePatternData | TranslationMetricData;
   metadata: {
     source: string;
     processed: boolean;
+    quantumState?: number;
+    dimensionalContext?: {
+      currentDimensions: number;
+      totalEnergy: number;
+      systemEquilibrium: number;
+    };
     [key: string]: any;
   };
 }
 
-// Updated to support privacy-preserving metrics
 export interface LumiraMetrics {
   count: number;
-  aggregates: {
-    avgAccuracy?: number;
-    avgSpeed?: number;
-    playingPercentage?: number;
-    [key: string]: number | undefined;
-  };
+  aggregates: Record<string, number>;
   lastUpdated: Date;
 }
 
@@ -49,5 +89,9 @@ export interface AggregatedMetric {
 
 export interface ProcessedMetrics {
   success: boolean;
-  aggregatedMetrics: LumiraMetrics;
+  aggregatedMetrics: {
+    count: number;
+    aggregates: Record<string, number>;
+    lastUpdated: Date;
+  };
 }

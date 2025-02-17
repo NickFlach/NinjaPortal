@@ -5,11 +5,15 @@ import type {
   DimensionCreatedEvent,
   DimensionalReflection 
 } from '../types/dimension';
+import { lumiraService } from '../routes/lumira';
 
 class DimensionalBalancer extends EventEmitter {
   private dimensions: Map<number, DimensionalState> = new Map();
   private equilibriumThreshold: number = 0.001;
   private baseEnergy: number = 1.0;
+  private evolutionRate: number = 0.1;
+  private evolutionThreshold: number = 0.5; //Added evolution threshold
+
 
   constructor() {
     super();
@@ -20,6 +24,9 @@ class DimensionalBalancer extends EventEmitter {
       equilibrium: 1.0,
       reflections: new Map()
     });
+
+    // Set up evolution cycle
+    setInterval(() => this.evolve(), 1000 * 60); // Every minute
   }
 
   /**
@@ -28,12 +35,14 @@ class DimensionalBalancer extends EventEmitter {
   public createReflection(sourceId: string, initialState: number): DimensionalReflection {
     try {
       const reflections: DimensionalReflection = {};
+      const quantumState = Math.random(); // Quantum uncertainty factor
 
       // Create reflections across all dimensions using Array.from for compatibility
       Array.from(this.dimensions.entries()).forEach(([dimId, dimension]) => {
         const reflectedEnergy = this.calculateReflectedEnergy(
           initialState,
-          dimension.energy
+          dimension.energy,
+          quantumState
         );
 
         dimension.reflections.set(sourceId, reflectedEnergy);
@@ -41,6 +50,9 @@ class DimensionalBalancer extends EventEmitter {
 
         // Update dimension's equilibrium
         this.updateEquilibrium(dimension);
+
+        // Process through Lumira for interpretation
+        this.processReflectionMetrics(sourceId, reflectedEnergy, dimension);
       });
 
       return reflections;
@@ -51,16 +63,117 @@ class DimensionalBalancer extends EventEmitter {
   }
 
   /**
-   * Calculates reflected energy in a dimension
+   * Calculates reflected energy in a dimension with quantum effects
    */
-  private calculateReflectedEnergy(sourceEnergy: number, dimensionalEnergy: number): number {
+  private calculateReflectedEnergy(
+    sourceEnergy: number, 
+    dimensionalEnergy: number,
+    quantumState: number
+  ): number {
     try {
-      // Using quantum interference pattern simulation
-      const phaseShift = Math.sin(sourceEnergy * dimensionalEnergy);
-      return sourceEnergy * (1 + phaseShift) / 2;
+      // Enhanced quantum interference pattern simulation
+      const phaseShift = Math.sin(sourceEnergy * dimensionalEnergy * quantumState);
+      const interference = Math.cos(sourceEnergy * Math.PI * quantumState);
+      return sourceEnergy * (1 + phaseShift * interference) / 2;
     } catch (error) {
       console.error('Error calculating reflected energy:', error);
       throw new Error('Failed to calculate reflected energy');
+    }
+  }
+
+  /**
+   * Self-evolution mechanism
+   */
+  private async evolve() {
+    try {
+      const dimensions = Array.from(this.dimensions.values());
+
+      for (const dimension of dimensions) {
+        // Calculate evolutionary pressure
+        const pressure = this.calculateEvolutionaryPressure(dimension);
+
+        // Apply evolution if pressure exceeds threshold
+        if (pressure > this.evolutionThreshold) {
+          // Process metrics through Lumira before evolution
+          await this.processEvolutionMetrics(dimension, pressure);
+
+          // Update dimension properties based on pressure
+          dimension.energy *= (1 + this.evolutionRate * pressure);
+          this.updateEquilibrium(dimension);
+        }
+      }
+    } catch (error) {
+      console.error('Error in evolution cycle:', error);
+    }
+  }
+
+  /**
+   * Calculate evolutionary pressure on a dimension
+   */
+  private calculateEvolutionaryPressure(dimension: DimensionalState): number {
+    const reflectionEntropy = Array.from(dimension.reflections.values())
+      .reduce((entropy, energy) => {
+        const p = energy / dimension.energy;
+        return entropy - (p * Math.log(p));
+      }, 0);
+
+    return reflectionEntropy / Math.log(dimension.reflections.size || 1);
+  }
+
+  /**
+   * Process reflection metrics through Lumira
+   */
+  private async processReflectionMetrics(
+    sourceId: string, 
+    energy: number, 
+    dimension: DimensionalState
+  ) {
+    try {
+      await lumiraService.processMetricsPrivately({
+        type: 'reflection',
+        timestamp: new Date().toISOString(),
+        data: {
+          sourceId,
+          energy,
+          dimensionId: dimension.dimension,
+          dimensionalEnergy: dimension.energy,
+          equilibrium: dimension.equilibrium
+        },
+        metadata: {
+          source: 'dimensional-reflection',
+          processed: true
+        }
+      });
+    } catch (error) {
+      console.error('Error processing reflection metrics:', error);
+    }
+  }
+
+  /**
+   * Process evolution metrics through Lumira
+   */
+  private async processEvolutionMetrics(
+    dimension: DimensionalState, 
+    pressure: number
+  ) {
+    try {
+      await lumiraService.processMetricsPrivately({
+        type: 'evolution',
+        timestamp: new Date().toISOString(),
+        data: {
+          dimensionId: dimension.dimension,
+          energy: dimension.energy,
+          equilibrium: dimension.equilibrium,
+          pressure,
+          reflectionCount: dimension.reflections.size
+        },
+        metadata: {
+          source: 'dimensional-evolution',
+          processed: true
+        }
+      });
+    } catch (error) {
+      console.error('Error processing evolution metrics:', error);
     }
   }
 

@@ -3,6 +3,7 @@ import { db } from '@db';
 import { sql } from 'drizzle-orm';
 import type { WebSocket } from 'ws';
 import type { StandardizedData, GpsData, PlaybackData } from '../types/lumira';
+import { aiInterpreter } from '../services/ai-interpreter';
 
 const router = Router();
 
@@ -23,8 +24,33 @@ const experienceStore = new Map<string, {
   songId?: number;
 }[]>();
 
+const translationStore = new Map<string, {
+  usageCount: number;
+  successRate: number;
+  commonPhrases: Record<number, number>;
+  lastUpdated: Date;
+}>();
+
+const communityFeedbackStore = new Map<string, {
+  category: string;
+  sentiment: number;
+  impact: number;
+  suggestions: string[];
+  votes: number;
+  status: 'new' | 'reviewing' | 'implemented' | 'declined';
+  lastUpdated: Date;
+}>();
+
+const codePatternStore = new Map<string, {
+  frequency: number;
+  context: string;
+  success: boolean;
+  impact: number;
+  lastUpdated: Date;
+}>();
+
 // Process metrics while preserving privacy
-function processMetricsPrivately(data: StandardizedData) {
+async function processMetricsPrivately(data: StandardizedData) {
   const key = `${data.type}_${new Date().toISOString().split('T')[0]}`;
   const current = metricsStore.get(key) || {
     count: 0,
@@ -35,7 +61,34 @@ function processMetricsPrivately(data: StandardizedData) {
   // Process standard metrics
   current.count++;
 
-  if (data.type === 'experience') {
+  if (data.type === 'gps') {
+    const gpsData = data.data as GpsData;
+    current.aggregates.avgAccuracy = updateRunningAverage(
+      current.aggregates.avgAccuracy || 0,
+      gpsData.accuracy || 0,
+      current.count
+    );
+    current.aggregates.avgSpeed = updateRunningAverage(
+      current.aggregates.avgSpeed || 0,
+      gpsData.speed || 0,
+      current.count
+    );
+  } else if (data.type === 'playback') {
+    const playbackData = data.data as PlaybackData;
+    current.aggregates.playingPercentage = updateRunningAverage(
+      current.aggregates.playingPercentage || 0,
+      playbackData.isPlaying ? 1 : 0,
+      current.count
+    );
+  } else if (data.type === 'reflection' || data.type === 'evolution') {
+    // Process through AI interpreter
+    try {
+      const interpretedMetrics = await aiInterpreter.interpretMetrics(data);
+      Object.assign(current.aggregates, interpretedMetrics.aggregates);
+    } catch (error) {
+      console.error('Error processing metrics through AI:', error);
+    }
+  } else if (data.type === 'experience') {
     const exp = data.data;
     const timeKey = new Date().toISOString();
 
@@ -64,25 +117,6 @@ function processMetricsPrivately(data: StandardizedData) {
     );
 
     experienceStore.set(timeKey, experiences);
-  } else if (data.type === 'gps') {
-    const gpsData = data.data as GpsData;
-    current.aggregates.avgAccuracy = updateRunningAverage(
-      current.aggregates.avgAccuracy || 0,
-      gpsData.accuracy || 0,
-      current.count
-    );
-    current.aggregates.avgSpeed = updateRunningAverage(
-      current.aggregates.avgSpeed || 0,
-      gpsData.speed || 0,
-      current.count
-    );
-  } else if (data.type === 'playback') {
-    const playbackData = data.data as PlaybackData;
-    current.aggregates.playingPercentage = updateRunningAverage(
-      current.aggregates.playingPercentage || 0,
-      playbackData.isPlaying ? 1 : 0,
-      current.count
-    );
   } else if (data.type === 'translation') {
     const langKey = `${data.data.sourceLanguage}_${data.data.targetLanguage}`;
     const translationData = translationStore.get(langKey) || {
@@ -150,34 +184,36 @@ function pruneOldMetrics() {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  for (const [key, value] of metricsStore.entries()) {
+  metricsStore.forEach((value, key) => {
     if (value.lastUpdated < thirtyDaysAgo) {
       metricsStore.delete(key);
     }
-  }
+  });
 
-  for (const [key, _] of experienceStore.entries()) {
+  experienceStore.forEach((_, key) => {
     const timestamp = new Date(key);
     if (timestamp < oneDayAgo) {
       experienceStore.delete(key);
     }
-  }
-  for (const [key, value] of communityFeedbackStore.entries()) {
+  });
+
+  communityFeedbackStore.forEach((value, key) => {
     if (value.lastUpdated < thirtyDaysAgo && value.status === 'implemented') {
       communityFeedbackStore.delete(key);
     }
-  }
-  for (const [key, value] of translationStore.entries()) {
+  });
+
+  translationStore.forEach((value, key) => {
     if (value.lastUpdated < thirtyDaysAgo) {
       translationStore.delete(key);
     }
-  }
+  });
 
-  for (const [key, value] of codePatternStore.entries()) {
+  codePatternStore.forEach((value, key) => {
     if (value.lastUpdated < thirtyDaysAgo) {
       codePatternStore.delete(key);
     }
-  }
+  });
 }
 
 // Record user experience feedback
@@ -193,7 +229,7 @@ router.post('/experience', async (req, res) => {
       }
     };
 
-    const metrics = processMetricsPrivately(experienceData);
+    const metrics = await processMetricsPrivately(experienceData); //await added here
     res.json({ success: true, metrics });
   } catch (error) {
     console.error('Error processing experience:', error);

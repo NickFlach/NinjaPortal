@@ -1,12 +1,18 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
 import path from "path";
 import { fileURLToPath } from 'url';
-import { createServer } from 'http';
+import { setupVite, serveStatic, log } from "./vite";
 import { WebSocketServer, WebSocket } from 'ws';
 import { URL } from 'url';
 import { IncomingMessage } from 'http';
+import { createServer } from 'http';
+import musicRouter from './routes/music';
+import playlistRouter from './routes/playlists';
+import userRouter from './routes/users';
+import adminRouter from './routes/admin';
+import neoStorageRouter from './routes/neo-storage';
+import translationRouter from './routes/translation';
+import lumiraRouter from './routes/lumira';
 
 // ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -52,13 +58,22 @@ app.use((req, res, next) => {
   next();
 });
 
+// Register API routes
+app.use('/api/music', musicRouter);
+app.use('/api/playlists', playlistRouter);
+app.use('/api/users', userRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/translate', translationRouter);
+app.use('/api/lumira', lumiraRouter);
+app.use('/api/neo-storage', neoStorageRouter);
+
 const startServer = async (retryCount = 0) => {
   const maxRetries = 3;
   const basePort = 5000;
   const port = basePort + (retryCount * 100);
 
   try {
-    const server = registerRoutes(app);
+    const server = createServer(app);
 
     // Initialize WebSocket server with a distinct path
     const wss = new WebSocketServer({ 
