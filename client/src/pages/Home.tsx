@@ -45,11 +45,11 @@ export default function Home() {
 
   // Update library query to include wallet address in headers
   const { data: librarySongs, isLoading: libraryLoading, error: libraryError } = useQuery<Song[]>({
-    queryKey: ["/api/songs/library"],
+    queryKey: ["/api/music/library"],
     queryFn: async () => {
       if (!address) return [];
 
-      const response = await fetch("/api/songs/library", {
+      const response = await fetch("/api/music/library", {
         headers: {
           'Content-Type': 'application/json',
           'X-Wallet-Address': address
@@ -76,27 +76,38 @@ export default function Home() {
       }
 
       try {
-        const registerResponse = await apiRequest("POST", "/api/users/register", {
-          address,
-          geolocation: null 
+        // Try to play the song first
+        //await playSong(song, context); // This line is causing error because 'song' and 'context' are not in scope here.
+
+        // Then record the play
+        const response = await fetch(`/api/music/play/${songId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Wallet-Address': address
+          }
         });
 
-        if (!registerResponse.ok) {
-          throw new Error("Failed to register user");
+        if (!response.ok) {
+          throw new Error(`Failed to record play: ${response.statusText}`);
         }
 
-        const registerData = await registerResponse.json();
-        console.log('Registration successful before play:', registerData);
-
-        await apiRequest("POST", `/api/songs/play/${songId}`);
+        return await response.json();
       } catch (error) {
         console.error('Play mutation error:', error);
         throw error instanceof Error ? error : new Error('Unknown error during play');
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/songs/recent"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/music/recent"] });
     },
+    onError: (error: Error) => {
+      toast({
+        title: "Error Playing Song",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   });
 
   const handlePlaySong = async (song: Song, context: 'library' | 'feed' = 'feed') => {
@@ -110,13 +121,16 @@ export default function Home() {
     }
 
     try {
-      playSong(song, context);
+      // First try to play the song
+      await playSong(song, context);
+
+      // Then record the play if successful
       await playMutation.mutate(song.id);
     } catch (error) {
       console.error('Error playing song:', error);
       toast({
         title: "Error",
-        description: t('app.errors.play'),
+        description: error instanceof Error ? error.message : 'Failed to play song',
         variant: "destructive",
       });
     }
