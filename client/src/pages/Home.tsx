@@ -43,9 +43,30 @@ export default function Home() {
     window.location.href = redirectUrl;
   };
 
-  const { data: librarySongs, isLoading: libraryLoading } = useQuery<Song[]>({
+  // Update library query to include wallet address in headers
+  const { data: librarySongs, isLoading: libraryLoading, error: libraryError } = useQuery<Song[]>({
     queryKey: ["/api/songs/library"],
+    queryFn: async () => {
+      if (!address) return [];
+
+      const response = await fetch("/api/songs/library", {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Wallet-Address': address
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch library: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Library songs loaded:', data.length, 'songs');
+      return data;
+    },
     enabled: !!address,
+    retry: 3,
+    retryDelay: 1000,
   });
 
   const playMutation = useMutation({
@@ -266,7 +287,14 @@ export default function Home() {
 
                 <div className="space-y-2">
                   {libraryLoading ? (
-                    <p className="text-muted-foreground">{t('app.loading')}</p>
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <p className="text-muted-foreground">{t('app.loading')}</p>
+                    </div>
+                  ) : libraryError ? (
+                    <div className="text-destructive">
+                      <p>Error loading library: {libraryError instanceof Error ? libraryError.message : 'Unknown error'}</p>
+                    </div>
                   ) : librarySongs?.length === 0 ? (
                     <p className="text-muted-foreground">{t('app.noSongs')}</p>
                   ) : (

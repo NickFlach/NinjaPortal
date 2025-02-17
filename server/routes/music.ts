@@ -60,13 +60,24 @@ router.get("/library", async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
+    const normalizedAddress = userAddress.toLowerCase();
+    console.log('Fetching library for wallet:', normalizedAddress);
+
+    // First ensure user exists
+    await db.insert(users).values({
+      address: normalizedAddress,
+    }).onConflictDoNothing();
+
+    // Fetch songs with case-insensitive comparison
     const userSongs = await db.query.songs.findMany({
-      where: eq(songs.uploadedBy, userAddress.toLowerCase()),
+      where: eq(songs.uploadedBy, normalizedAddress),
       orderBy: desc(songs.createdAt),
       with: {
         loves: true,
       },
     });
+
+    console.log('Found songs:', userSongs.length);
 
     const songsWithLoves = await Promise.all(userSongs.map(async (song) => {
       const [{ total }] = await db
@@ -77,7 +88,7 @@ router.get("/library", async (req, res) => {
       const userLove = await db.query.loves.findFirst({
         where: and(
           eq(loves.songId, song.id),
-          eq(loves.address, userAddress.toLowerCase())
+          eq(loves.address, normalizedAddress)
         ),
       });
 
@@ -89,6 +100,7 @@ router.get("/library", async (req, res) => {
       };
     }));
 
+    console.log('Sending songs with loves:', songsWithLoves.length);
     res.json(songsWithLoves);
   } catch (error) {
     console.error('Error fetching user library:', error);
