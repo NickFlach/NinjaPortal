@@ -353,20 +353,45 @@ export function registerRoutes(app: Express) {
     try {
       console.log('Map data request received');
       const mapData = await getMapData();
+      const targetLanguage = req.headers['accept-language']?.split(',')[0] || 'en';
 
       if (!mapData) {
         console.error('Map data is null or undefined');
         return res.status(500).json({ error: 'Failed to fetch map data - no data returned' });
       }
 
-      // Add real-time stats and location data
+      // Process through Lumira translation if language is not English
+      let processedData = mapData;
+      if (targetLanguage !== 'en') {
+        try {
+          const translationResponse = await fetch('/api/translate/map-data', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              mapData,
+              targetLanguage
+            })
+          });
+
+          if (translationResponse.ok) {
+            const { translatedData } = await translationResponse.json();
+            processedData = translatedData;
+          }
+        } catch (translationError) {
+          console.warn('Failed to translate map data:', translationError);
+          // Continue with untranslated data
+        }
+      }
+
+      // Add real-time stats
       const stats = getLiveStats();
-      mapData.totalListeners = stats.activeListeners;
+      processedData.totalListeners = stats.activeListeners;
 
       // Update locations with real-time data for each country
-      Object.keys(mapData.countries).forEach(countryCode => {
-        // Get active locations for this country
-        const activeLocations = Array.from(clients.values())
+      Object.keys(processedData.countries).forEach(countryCode => {
+        const activeLocations = Array.from(getClients().values())
           .filter(client => 
             client.isPlaying && 
             client.countryCode === countryCode && 
@@ -376,28 +401,20 @@ export function registerRoutes(app: Express) {
 
         console.log(`Active locations for ${countryCode}:`, activeLocations);
 
-        // Set locations directly for each country including all known coordinates
-        mapData.countries[countryCode].locations = activeLocations;
-
-        // Update listener counts
-        const countryListeners = stats.listenersByCountry[countryCode] || 0;
-        mapData.countries[countryCode].listenerCount = countryListeners;
-        mapData.countries[countryCode].anonCount = countryListeners - activeLocations.length;
+        processedData.countries[countryCode].locations = activeLocations;
+        processedData.countries[countryCode].listenerCount = stats.listenersByCountry[countryCode] || 0;
+        processedData.countries[countryCode].anonCount = 
+          (stats.listenersByCountry[countryCode] || 0) - activeLocations.length;
       });
 
-      // Add all locations regardless of country for heatmap
-      const allLocations = Array.from(clients.values())
+      // Add all locations for heatmap
+      const allLocations = Array.from(getClients().values())
         .filter(client => client.isPlaying && client.coordinates)
         .map(client => [client.coordinates!.lat, client.coordinates!.lng] as [number, number]);
 
-      mapData.allLocations = allLocations;
+      processedData.allLocations = allLocations;
 
-      console.log('Map data response:', {
-        ...mapData,
-        totalLocations: allLocations.length
-      });
-
-      res.json(mapData);
+      res.json(processedData);
     } catch (error) {
       console.error('Error fetching map data:', error);
       res.status(500).json({ 

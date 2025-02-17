@@ -21,8 +21,8 @@ router.post('/translate', async (req, res) => {
 
     // Send anonymized translation data to Lumira for analysis
     try {
-      await lumiraService.processMetrics({
-        type: 'playback',
+      await lumiraService.processMetricsPrivately({
+        type: 'translation',
         timestamp: new Date().toISOString(),
         data: {
           sourceLanguage: 'en',
@@ -50,8 +50,8 @@ router.post('/translate', async (req, res) => {
 
     // Log failed translation attempt for analysis
     try {
-      await lumiraService.processMetrics({
-        type: 'playback',
+      await lumiraService.processMetricsPrivately({
+        type: 'translation',
         timestamp: new Date().toISOString(),
         data: {
           sourceLanguage: 'en',
@@ -71,6 +71,45 @@ router.post('/translate', async (req, res) => {
 
     res.status(500).json({ 
       error: 'Translation failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Add map data translation endpoint
+router.post('/translate/map-data', async (req, res) => {
+  try {
+    const { mapData, targetLanguage } = req.body;
+
+    if (!mapData || !targetLanguage) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    // Process through Lumira for enhanced translation
+    const translatedData = await lumiraService.processMetricsPrivately({
+      type: 'map_translation',
+      timestamp: new Date().toISOString(),
+      data: {
+        sourceLanguage: 'en',
+        targetLanguage,
+        mapData,
+        success: true
+      },
+      metadata: {
+        source: 'map-translation-api',
+        processed: true
+      }
+    });
+
+    res.json({
+      translatedData,
+      sourceLanguage: 'en',
+      targetLanguage
+    });
+  } catch (error) {
+    console.error('Map data translation error:', error);
+    res.status(500).json({
+      error: 'Map data translation failed',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
