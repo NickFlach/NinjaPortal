@@ -38,7 +38,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [currentSong, setCurrentSong] = useState<Song>();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentContext, setCurrentContext] = useState<PlaylistContext>('landing');
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { address: userAddress } = useAccount();
   const defaultWallet = "REDACTED_WALLET_ADDRESS";
@@ -47,11 +47,12 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const audioContextRef = useRef<AudioContext>();
   const { currentDimension, dimensionalState, syncWithDimension } = useDimensionalMusic();
   const lastFetchRef = useRef<number>(0);
+  const initializedRef = useRef(false);
 
   // Initialize audio element
   useEffect(() => {
-    try {
-      if (!audioRef.current) {
+    if (!initializedRef.current) {
+      try {
         const audio = new Audio();
         audio.preload = 'auto';
         audioRef.current = audio;
@@ -61,34 +62,26 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           console.error('Audio element error:', e);
           setIsPlaying(false);
         });
+
+        // Initialize AudioContext
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioContext();
+          console.log('AudioContext initialized successfully');
+        }
+
+        initializedRef.current = true;
+      } catch (error) {
+        console.error('Error in audio initialization:', error);
       }
-
-      // Initialize or resume AudioContext on user interaction
-      const initAudioContext = () => {
-        try {
-          const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-          if (!audioContextRef.current) {
-            audioContextRef.current = new AudioContext();
-            console.log('AudioContext initialized successfully');
-          } else if (audioContextRef.current.state === 'suspended') {
-            audioContextRef.current.resume().catch(console.error);
-          }
-        } catch (error) {
-          console.error('Failed to initialize AudioContext:', error);
-        }
-      };
-
-      document.addEventListener('click', initAudioContext, { once: true });
-
-      return () => {
-        document.removeEventListener('click', initAudioContext);
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
-      };
-    } catch (error) {
-      console.error('Error in audio initialization:', error);
     }
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        URL.revokeObjectURL(audioRef.current.src);
+      }
+    };
   }, []);
 
   // Monitor and cleanup AudioContext
@@ -311,14 +304,20 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     let mounted = true;
 
     async function initializeMusic() {
-      if (!recentSongs?.length || audioRef.current?.src || !mounted) return;
+      if (!recentSongs?.length || !mounted || !initializedRef.current) return;
 
       try {
         const firstSong = recentSongs[0];
-        console.log('Initializing music with:', firstSong.title);
+        console.log('Initializing landing page music with:', firstSong.title);
+
+        // Ensure audio context is ready
+        if (audioContextRef.current?.state === 'suspended') {
+          await audioContextRef.current.resume();
+        }
+
         await playSong(firstSong, 'landing');
       } catch (error) {
-        console.error('Error initializing music:', error);
+        console.error('Error initializing landing page music:', error);
         setIsPlaying(false);
       }
     }
@@ -330,7 +329,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     return () => {
       mounted = false;
     };
-  }, [recentSongs, isLandingPage]);
+  }, [recentSongs, isLandingPage, initializedRef.current]);
 
   // Reset context when wallet disconnects
   useEffect(() => {
