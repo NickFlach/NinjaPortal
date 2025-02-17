@@ -61,7 +61,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
   // Fetch recent songs
   const { data: recentSongs } = useQuery<Song[]>({
-    queryKey: ["/api/songs/recent"],
+    queryKey: ["/api/music/recent"],
     queryFn: async () => {
       try {
         const headers: Record<string, string> = {
@@ -73,7 +73,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           headers['X-Wallet-Address'] = landingAddress;
         }
 
-        const response = await fetch("/api/songs/recent", { headers });
+        const response = await fetch("/api/music/recent", { headers });
 
         if (!response.ok) {
           throw new Error(`Failed to fetch recent songs: ${response.statusText}`);
