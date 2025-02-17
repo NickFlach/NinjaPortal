@@ -38,7 +38,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [currentSong, setCurrentSong] = useState<Song>();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentContext, setCurrentContext] = useState<PlaylistContext>('landing');
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { address: userAddress } = useAccount();
   const defaultWallet = "REDACTED_WALLET_ADDRESS";
@@ -57,9 +57,26 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         audio.preload = 'auto';
         audioRef.current = audio;
 
+        console.log('Audio element initialized');
+
         // Add error handling for audio element
         audio.addEventListener('error', (e) => {
           console.error('Audio element error:', e);
+          setIsPlaying(false);
+        });
+
+        audio.addEventListener('play', () => {
+          console.log('Audio started playing');
+          setIsPlaying(true);
+        });
+
+        audio.addEventListener('pause', () => {
+          console.log('Audio paused');
+          setIsPlaying(false);
+        });
+
+        audio.addEventListener('ended', () => {
+          console.log('Audio playback ended');
           setIsPlaying(false);
         });
 
@@ -80,27 +97,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       if (audioRef.current) {
         audioRef.current.pause();
         URL.revokeObjectURL(audioRef.current.src);
-      }
-    };
-  }, []);
-
-  // Monitor and cleanup AudioContext
-  useEffect(() => {
-    try {
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
-        console.log('AudioContext initialized successfully');
-      }
-    } catch (error) {
-      console.error('Failed to initialize AudioContext:', error);
-    }
-
-    return () => {
-      try {
-        audioContextRef.current?.close().catch(console.error);
-      } catch (error) {
-        console.error('Error closing AudioContext:', error);
       }
     };
   }, []);
@@ -164,7 +160,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
   const fetchFromIPFS = async (hash: string, attempt = 1): Promise<ArrayBuffer> => {
     try {
-      console.log('Fetching from IPFS gateway:', { hash, attempt, timestamp: new Date().toISOString() });
+      console.log('Fetching from IPFS:', { hash, attempt, timestamp: new Date().toISOString() });
       const audioData = await getFromIPFS(hash);
       return audioData;
     } catch (error) {
@@ -179,6 +175,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
   const playSong = async (song: Song, context?: PlaylistContext) => {
     try {
+      console.log('Starting to play song:', song.title);
+
       // Cancel any existing fetch request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -192,18 +190,14 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         setCurrentContext(context);
       }
 
-      // Sync with current dimension before playing
-      try {
-        await syncWithDimension(currentDimension);
-      } catch (error) {
-        console.error('Dimensional sync error:', error);
-        // Continue playback even if sync fails
-      }
+      // Update state first to show UI changes
+      setCurrentSong(song);
 
       // Get IPFS data with retries
-      console.log('Fetching from IPFS gateway:', song.ipfsHash);
+      console.log('Fetching from IPFS:', song.ipfsHash);
       try {
         const audioData = await fetchFromIPFS(song.ipfsHash);
+        console.log('Successfully fetched audio data');
 
         // Create blob and URL
         const blob = new Blob([audioData], { type: 'audio/mp3' });
@@ -239,31 +233,18 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           }
         }
 
-        // Update state
-        setCurrentSong(song);
-
-        // Apply dimensional adjustments
-        if (audioRef.current && dimensionalState.harmonicAlignment !== 1) {
-          audioRef.current.playbackRate = dimensionalState.harmonicAlignment;
-        }
-
         // Try to play
         if (audioRef.current) {
+          console.log('Attempting to play audio');
           const playPromise = audioRef.current.play();
           if (playPromise !== undefined) {
-            try {
-              await playPromise;
-              setIsPlaying(true);
-              console.log('IPFS fetch and playback successful');
-            } catch (error) {
-              console.error('Playback prevented:', error);
-              setIsPlaying(false);
-              throw new Error('Playback was prevented by the browser');
-            }
+            await playPromise;
+            console.log('Playback started successfully');
           }
         }
       } catch (error) {
         console.error('Error fetching from IPFS:', error);
+        setIsPlaying(false);
         throw new Error('Failed to load audio from IPFS');
       }
     } catch (error) {
@@ -280,17 +261,29 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   };
 
   const togglePlay = async () => {
-    if (!audioRef.current) return;
+    console.log('Toggle play called, current state:', { isPlaying, currentSong: currentSong?.title });
+
+    if (!audioRef.current) {
+      console.log('No audio element available');
+      return;
+    }
 
     try {
       if (isPlaying) {
+        console.log('Pausing playback');
         audioRef.current.pause();
-        setIsPlaying(false);
       } else {
+        // If there's no current song, try to play the first song from recent songs
+        if (!currentSong && recentSongs?.length) {
+          console.log('No current song, playing first song from recent songs');
+          await playSong(recentSongs[0], currentContext);
+          return;
+        }
+
+        console.log('Resuming playback');
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           await playPromise;
-          setIsPlaying(true);
         }
       }
     } catch (error) {
@@ -304,7 +297,14 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     let mounted = true;
 
     async function initializeMusic() {
-      if (!recentSongs?.length || !mounted || !initializedRef.current) return;
+      if (!recentSongs?.length || !mounted || !initializedRef.current) {
+        console.log('Skipping music initialization:', {
+          hasRecentSongs: !!recentSongs?.length,
+          mounted,
+          initialized: initializedRef.current
+        });
+        return;
+      }
 
       try {
         const firstSong = recentSongs[0];
@@ -323,6 +323,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
 
     if (isLandingPage) {
+      console.log('On landing page, initializing music');
       initializeMusic();
     }
 
