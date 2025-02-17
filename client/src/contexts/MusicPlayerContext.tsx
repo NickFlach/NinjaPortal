@@ -36,7 +36,7 @@ interface MusicPlayerContextType {
   isSynced: boolean;
   toggleBluetoothSync: () => Promise<void>;
   isBluetoothEnabled: boolean;
-  isLeader: boolean; // Add leader status
+  isLeader: boolean;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -49,7 +49,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [activeListeners, setActiveListeners] = useState(0);
   const [isSynced, setIsSynced] = useState(false);
   const [isBluetoothEnabled, setIsBluetoothEnabled] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { address: userAddress } = useAccount();
   const defaultWallet = "REDACTED_WALLET_ADDRESS";
@@ -62,18 +62,14 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const pidControllerRef = useRef<PIDController>(new PIDController());
   const syncIntervalRef = useRef<NodeJS.Timeout>();
   const socket = useWebSocket();
-  const [syncExperience, setSyncExperience] = useState<{
-    audio: number;
-    visual: number;
-    interaction: number;
-  }>({ audio: 0, visual: 0, interaction: 0 });
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Initialize audio element
   useEffect(() => {
     if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.preload = 'auto';
+      const audio = new Audio();
+      audio.preload = 'auto';
+      audioRef.current = audio;
     }
     return () => {
       if (audioRef.current) {
@@ -149,49 +145,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     refetchInterval: isLandingPage ? 30000 : false,
   });
 
-  // Function to get next song in the current context
-  const getNextSong = (currentSongId: number): Song | undefined => {
-    if (!recentSongs?.length) return undefined;
-
-    const currentIndex = recentSongs.findIndex(song => song.id === currentSongId);
-    if (currentIndex === -1) return recentSongs[0];
-
-    return recentSongs[(currentIndex + 1) % recentSongs.length];
-  };
-
-  // Reset to landing context when wallet disconnects
-  useEffect(() => {
-    if (!userAddress) {
-      setCurrentContext('landing');
-    }
-  }, [userAddress]);
-
-  // Initialize audio context with better error handling
-  useEffect(() => {
-    try {
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
-        console.log('AudioContext initialized successfully');
-      }
-    } catch (error) {
-      console.error('Failed to initialize AudioContext:', error);
-    }
-
-    return () => {
-      try {
-        audioContextRef.current?.close().catch(console.error);
-      } catch (error) {
-        console.error('Error closing AudioContext:', error);
-      }
-    };
-  }, []);
-
   const playSong = async (song: Song, context?: PlaylistContext) => {
     try {
-      // Request geolocation if not already asked
-      await requestGeolocation();
-
       // Cancel any existing fetch request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -217,8 +172,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         audioRef.current.src = url;
         await new Promise((resolve, reject) => {
           if (audioRef.current) {
-            audioRef.current.addEventListener('loadeddata', resolve);
-            audioRef.current.addEventListener('error', reject);
+            audioRef.current.addEventListener('loadeddata', resolve, { once: true });
+            audioRef.current.addEventListener('error', reject, { once: true });
             audioRef.current.load();
           }
         });
@@ -394,9 +349,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           case 'error':
             console.error('WebSocket error message:', data.message);
             break;
-          case 'pong':
-            // Handle pong response for connection quality monitoring
-            break;
           default:
             console.log('Received websocket message:', data);
         }
@@ -405,58 +357,106 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       }
     };
 
-    const handleClose = () => {
-      console.log('WebSocket connection closed, attempting to reconnect...');
-      setIsSynced(false);
-
-      // Clear any existing reconnect timeout
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-
-      // Attempt to reconnect after a delay
-      reconnectTimeoutRef.current = setTimeout(() => {
-        if (socket?.readyState === WebSocket.CLOSED) {
-          console.log('Attempting to reconnect WebSocket...');
-          // The WebSocketContext will handle the reconnection
-        }
-      }, 5000);
-    };
-
-    const handleError = (error: Event) => {
-      console.error('WebSocket error:', error);
-      setIsSynced(false);
-    };
-
     socket.addEventListener('message', handleMessage);
-    socket.addEventListener('close', handleClose);
-    socket.addEventListener('error', handleError);
     setIsSynced(socket.readyState === WebSocket.OPEN);
-
-    // Ping for connection quality monitoring
-    const pingInterval = setInterval(() => {
-      if (socket.readyState === WebSocket.OPEN) {
-        try {
-          socket.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-        } catch (error) {
-          console.error('Error sending ping:', error);
-          setIsSynced(false);
-        }
-      }
-    }, 5000);
 
     return () => {
       socket.removeEventListener('message', handleMessage);
-      socket.removeEventListener('close', handleClose);
-      socket.removeEventListener('error', handleError);
-      clearInterval(pingInterval);
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
+    };
+  }, [socket, currentSong, isPlaying, isLeader, togglePlay]);
+
+  // Add playback rate validation
+  const adjustPlaybackSync = useCallback(() => {
+    if (!audioRef.current || !currentSong || isLeader) return;
+
+    // Get the target time from the leader's last sync message
+    const targetTime = lastSyncRef.current?.timestamp || 0;
+    const currentTime = audioRef.current.currentTime;
+
+    // Compute new playback rate using PID controller
+    const newRate = pidControllerRef.current.compute(targetTime, currentTime);
+
+    // Clamp playback rate to valid range (0.25 to 4.0 for most browsers)
+    const clampedRate = Math.max(0.25, Math.min(4.0, newRate));
+
+    // Apply the computed playback rate
+    if (audioRef.current) {
+      try {
+        audioRef.current.playbackRate = clampedRate;
+      } catch (error) {
+        console.warn('Failed to set playback rate:', error);
+        // Reset to normal playback on error
+        audioRef.current.playbackRate = 1.0;
+        pidControllerRef.current.reset();
+      }
+    }
+  }, [currentSong, isLeader]);
+
+  const toggleBluetoothSync = useCallback(async () => {
+    if (isBluetoothEnabled) {
+      setIsBluetoothEnabled(false);
+      return;
+    }
+
+    try {
+      if ('geolocation' in navigator) {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
+          });
+        });
+
+        setUserCoordinates({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+
+        setIsBluetoothEnabled(true);
+      }
+    } catch (error) {
+      console.error('Location sync error:', error);
+      // Even if we get an error, we'll still enable the feature
+      setIsBluetoothEnabled(true);
+    }
+  }, [isBluetoothEnabled]);
+
+  const getNextSong = (currentSongId: number): Song | undefined => {
+    if (!recentSongs?.length) return undefined;
+
+    const currentIndex = recentSongs.findIndex(song => song.id === currentSongId);
+    if (currentIndex === -1) return recentSongs[0];
+
+    return recentSongs[(currentIndex + 1) % recentSongs.length];
+  };
+
+  useEffect(() => {
+    if (!userAddress) {
+      setCurrentContext('landing');
+    }
+  }, [userAddress]);
+
+  useEffect(() => {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+        console.log('AudioContext initialized successfully');
+      }
+    } catch (error) {
+      console.error('Failed to initialize AudioContext:', error);
+    }
+
+    return () => {
+      try {
+        audioContextRef.current?.close().catch(console.error);
+      } catch (error) {
+        console.error('Error closing AudioContext:', error);
       }
     };
-  }, [socket, currentSong, isPlaying, isLeader]);
+  }, []);
 
-  // Update sync state when we're the leader
   useEffect(() => {
     if (socket?.readyState === WebSocket.OPEN && currentSong && isLeader) {
       try {
@@ -481,42 +481,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [isPlaying, currentSong, userCoordinates, isLeader, socket]);
 
-  // Add playback rate validation
-  const adjustPlaybackSync = useCallback(() => {
-    if (!audioRef.current || !currentSong || isLeader) return;
-
-    // Get the target time from the leader's last sync message
-    const targetTime = lastSyncRef.current?.timestamp || 0;
-    const currentTime = audioRef.current.currentTime;
-
-    // Compute new playback rate using PID controller
-    const newRate = pidControllerRef.current.compute(targetTime, currentTime);
-
-    // Clamp playback rate to valid range (0.25 to 4.0 for most browsers)
-    const clampedRate = Math.max(0.25, Math.min(4.0, newRate));
-
-    // Apply the computed playback rate
-    if (audioRef.current) {
-      try {
-        audioRef.current.playbackRate = clampedRate;
-
-        // Update sync experience based on how well we're maintaining sync
-        const timeDiff = Math.abs(targetTime - currentTime);
-        const syncQuality = Math.max(0, 1 - (timeDiff / 2));
-        setSyncExperience(prev => ({
-          ...prev,
-          audio: syncQuality
-        }));
-      } catch (error) {
-        console.warn('Failed to set playback rate:', error);
-        // Reset to normal playback on error
-        audioRef.current.playbackRate = 1.0;
-        pidControllerRef.current.reset();
-      }
-    }
-  }, [currentSong, isLeader]);
-
-  // Initialize sync interval when becoming a follower
   useEffect(() => {
     if (!isLeader && isBluetoothEnabled) {
       // Reset PID controller when starting sync
@@ -571,51 +535,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       };
     }
   }, [isLeader, isBluetoothEnabled, currentSong, isPlaying]);
-
-
-
-  const toggleBluetoothSync = useCallback(async () => {
-    if (isBluetoothEnabled) {
-      setIsBluetoothEnabled(false);
-      return;
-    }
-
-    try {
-      if ('geolocation' in navigator) {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0
-          });
-        });
-
-        setUserCoordinates({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
-
-        // If we're not the leader, try to capture current stream
-        if (!isLeader && currentSong) {
-          // Reset PID controller
-          pidControllerRef.current.reset();
-
-          // Request current playback state from leader
-          socket?.send(JSON.stringify({
-            type: 'request_sync',
-            songId: currentSong.id
-          }));
-        }
-
-        setIsBluetoothEnabled(true);
-      }
-    } catch (error) {
-      console.error('Location sync error:', error);
-      // Even if we get an error, we'll still enable the feature
-      // This is our "innovative" approach - always staying in sync!
-      setIsBluetoothEnabled(true);
-    }
-  }, [isBluetoothEnabled, currentSong, isLeader, socket]);
 
   return (
     <MusicPlayerContext.Provider value={{
