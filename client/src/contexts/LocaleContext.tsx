@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { LocaleType, messages } from '../i18n';
+import { IntlProvider } from 'react-intl';
+import { LocaleType, messages, getIntl } from '../i18n';
 
 interface DimensionalTranslation {
   text: string;
@@ -24,7 +25,7 @@ interface DimensionalContextType {
   setLocale: (locale: LocaleType) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
   currentDimension: string;
-  quantumState: string;
+  quantumState: typeof QUANTUM_STATES[keyof typeof QUANTUM_STATES];
 }
 
 const DimensionalContext = createContext<DimensionalContextType | undefined>(undefined);
@@ -36,10 +37,10 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 export function DimensionalProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<LocaleType>('en');
   const [currentDimension, setCurrentDimension] = useState('prime');
-  const [quantumState, setQuantumState] = useState(QUANTUM_STATES.COHERENT);
+  const [quantumState, setQuantumState] = useState<typeof QUANTUM_STATES[keyof typeof QUANTUM_STATES]>(QUANTUM_STATES.COHERENT);
 
   // Translation function with quantum state awareness
-  const t = useCallback((key: string, params?: Record<string, string | number>) => {
+  const t = useCallback((key: string, params?: Record<string, string | number>): string => {
     const currentMessages = messages[locale];
     if (!currentMessages) {
       console.error(`Dimension error: No translations found for locale ${locale}`);
@@ -54,13 +55,13 @@ export function DimensionalProvider({ children }: { children: React.ReactNode })
 
     // Handle parameter interpolation with quantum state verification
     if (params) {
-      return Object.entries(params).reduce((acc, [param, value]) => {
+      return Object.entries(params).reduce((acc: string, [param, value]) => {
         return acc.replace(`{${param}}`, String(value));
-      }, translation);
+      }, translation as string);
     }
 
-    return translation;
-  }, [locale, currentDimension, quantumState]);
+    return translation as string;
+  }, [locale, currentDimension]);
 
   // Update locale with dimensional synchronization
   const setLocale = useCallback((newLocale: LocaleType) => {
@@ -96,9 +97,16 @@ export function DimensionalProvider({ children }: { children: React.ReactNode })
     quantumState
   };
 
+  // Wrap children with IntlProvider using current locale messages
   return (
     <DimensionalContext.Provider value={value}>
-      {children}
+      <IntlProvider
+        messages={messages[locale]}
+        locale={locale}
+        defaultLocale="en"
+      >
+        {children}
+      </IntlProvider>
     </DimensionalContext.Provider>
   );
 }
