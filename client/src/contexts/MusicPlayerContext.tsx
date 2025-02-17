@@ -37,7 +37,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const audioRef = useRef<HTMLAudioElement>(null);
   const { address: userAddress } = useAccount();
   const defaultWallet = "REDACTED_WALLET_ADDRESS";
-  const landingAddress = userAddress || defaultWallet;
   const isLandingPage = !userAddress;
   const audioContextRef = useRef<AudioContext>();
   const { dimensionalState } = useDimensionalMusic();
@@ -47,37 +46,24 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   // Initialize audio element
   useEffect(() => {
     if (!audioRef.current) {
-      try {
-        const audio = new Audio();
-        audio.preload = 'auto';
-        audioRef.current = audio;
+      const audio = new Audio();
+      audio.preload = 'auto';
 
-        // Add audio event listeners
-        audio.addEventListener('error', (e) => {
-          console.error('Audio element error:', e);
-          setIsPlaying(false);
-        });
+      // Add audio event listeners
+      audio.addEventListener('error', (e) => {
+        console.error('Audio element error:', e);
+        setIsPlaying(false);
+      });
 
-        audio.addEventListener('play', () => {
-          setIsPlaying(true);
-        });
+      audio.addEventListener('play', () => setIsPlaying(true));
+      audio.addEventListener('pause', () => setIsPlaying(false));
+      audio.addEventListener('ended', () => setIsPlaying(false));
 
-        audio.addEventListener('pause', () => {
-          setIsPlaying(false);
-        });
+      audioRef.current = audio;
 
-        audio.addEventListener('ended', () => {
-          setIsPlaying(false);
-        });
-
-        // Initialize AudioContext
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (!audioContextRef.current) {
-          audioContextRef.current = new AudioContext();
-        }
-      } catch (error) {
-        console.error('Error in audio initialization:', error);
-      }
+      // Initialize AudioContext
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      audioContextRef.current = new AudioContext();
     }
 
     return () => {
@@ -90,20 +76,10 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
   // Fetch recent songs
   const { data: recentSongs = [] } = useQuery<Song[]>({
-    queryKey: ["/api/music/recent", landingAddress],
+    queryKey: ["/api/music/recent"],
     queryFn: async () => {
       try {
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json'
-        };
-
-        if (landingAddress) {
-          headers['X-Wallet-Address'] = landingAddress;
-        }
-
-        console.log('Fetching recent songs');
-        const response = await fetch("/api/music/recent", { headers });
-
+        const response = await fetch("/api/music/recent");
         if (!response.ok) {
           throw new Error(`Failed to fetch recent songs: ${response.statusText}`);
         }
@@ -122,53 +98,18 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           typeof song.ipfsHash === 'string'
         );
 
-        console.log('Recent songs loaded:', validSongs.length);
         return validSongs;
       } catch (error) {
         console.error('Error fetching recent songs:', error);
         return [];
       }
     },
-    refetchInterval: false,
     staleTime: 30000 // Consider data fresh for 30 seconds
   });
-
-  // WebSocket subscription for real-time updates
-  useEffect(() => {
-    if (!socket) {
-      console.log('WebSocket not available, skipping subscription');
-      return;
-    }
-
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'songUpdate') {
-          console.log('Received song update:', data);
-          // Update cache with new song data
-          queryClient.setQueryData<Song[]>(["/api/music/recent", landingAddress], (oldData = []) => {
-            if (data.action === 'add') {
-              return [data.song, ...oldData];
-            }
-            return oldData;
-          });
-        }
-      } catch (error) {
-        console.error('Error handling WebSocket message:', error);
-      }
-    };
-
-    socket.addEventListener('message', handleMessage);
-
-    return () => {
-      socket.removeEventListener('message', handleMessage);
-    };
-  }, [socket, landingAddress, queryClient]);
 
   const playSong = async (song: Song, context?: PlaylistContext) => {
     try {
       console.log('Starting to play song:', song.title);
-
       setCurrentSong(song);
       if (context) setCurrentContext(context);
 
@@ -187,6 +128,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       audioRef.current.src = url;
       await audioRef.current.load();
 
+      // Apply dimensional adjustments if needed
       if (dimensionalState.harmonicAlignment !== 1) {
         audioRef.current.playbackRate = dimensionalState.harmonicAlignment;
       }
@@ -195,15 +137,11 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     } catch (error) {
       console.error('Error playing song:', error);
       setIsPlaying(false);
-      throw error;
     }
   };
 
   const togglePlay = async () => {
-    if (!audioRef.current) {
-      console.log('No audio element available');
-      return;
-    }
+    if (!audioRef.current) return;
 
     try {
       if (isPlaying) {
@@ -226,14 +164,13 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     let mounted = true;
 
     async function initializeMusic() {
-      if (!recentSongs.length || !mounted || !audioRef.current) {
-        return;
-      }
+      if (!recentSongs.length || !mounted || !audioRef.current) return;
 
       try {
-        if (isLandingPage && !currentSong) {
+        // Always initialize music on landing page if no current song is playing
+        if (!currentSong) {
           const firstSong = recentSongs[0];
-          console.log('Initializing landing page music with:', firstSong.title);
+          console.log('Initializing music with:', firstSong.title);
 
           if (audioContextRef.current?.state === 'suspended') {
             await audioContextRef.current.resume();
@@ -242,7 +179,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           await playSong(firstSong, 'landing');
         }
       } catch (error) {
-        console.error('Error initializing landing page music:', error);
+        console.error('Error initializing music:', error);
         setIsPlaying(false);
       }
     }
@@ -252,7 +189,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     return () => {
       mounted = false;
     };
-  }, [recentSongs, isLandingPage, currentSong]);
+  }, [recentSongs, currentSong]);
 
   return (
     <MusicPlayerContext.Provider value={{
