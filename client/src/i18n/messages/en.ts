@@ -26,11 +26,13 @@ const translations = {
   'app.errors.filetype': 'Please select an MP3 file. Other audio formats are not supported.',
   'app.errors.dimension': 'Dimensional sync error. Please reconnect to the current timestream.',
   'app.errors.quantum': 'Quantum state verification failed. Retrying with fallback encryption.',
+  'app.errors.play': 'Failed to play song. Please try again.',
 
   // Upload states
   'app.upload.started': 'Upload Started',
   'app.upload.progress': 'Uploading your song to IPFS...',
   'app.upload.success': 'Song uploaded successfully!',
+  'app.upload.error': 'Upload Failed',
 
   // Network setup
   'app.network.setup': 'Network Setup',
@@ -39,37 +41,37 @@ const translations = {
   'app.network.warning': 'Network Warning',
   'app.network.switch': 'Please approve the network switch in Opera Wallet',
   'app.network.connect': 'Please make sure you\'re connected to the NEO X network',
+  'app.network.install': 'Please install a Web3 wallet to continue',
 
-  // Dimensional physics
-  'physics.dimension.current': 'Current Dimension: {dimension}',
-  'physics.dimension.sync': 'Dimensional Sync Status: {status}',
-  'physics.quantum.state': 'Quantum State: {state}',
-  'physics.entropy.level': 'System Entropy: {level}',
-  'physics.cascade.inner': 'Inner Loop Stability: {stability}%',
-  'physics.cascade.outer': 'Outer Loop Coherence: {coherence}%',
+  // Song related
+  'song.loved': 'Loved',
+  'song.unloved': 'Unloved',
+  'song.loved.message': 'Song added to your loves',
+  'song.unloved.message': 'Song removed from your loves',
+  'song.love.error': 'Error',
+  'song.edit.details': 'Edit Details',
+  'song.delete.library': 'Delete from Library',
+  'song.delete.confirm': 'Are you sure you want to delete this song?',
+  'song.delete.success': 'Success',
+  'song.delete.success.message': 'Song deleted from library',
+  'song.delete.error': 'Error',
 
-  // System states
-  'system.cascade.title': 'Cascade Control System',
-  'system.cascade.sync': 'Synchronization Status',
-  'system.cascade.entropy': 'Entropy Management',
-  'system.cascade.quantum': 'Quantum Resilience',
-  'system.cascade.dimension': 'Dimensional Stability',
+  // Playlist related
+  'playlist.create.first': 'Create a playlist first',
+  'playlist.add.to': 'Add to {name}',
+  'playlist.add.success': 'Success',
+  'playlist.add.song.success': 'Song added to playlist',
+  'playlist.add.error': 'Error',
 
-  // Sync messages
-  'sync.status.stable': 'Dimensional stability achieved',
-  'sync.status.unstable': 'Dimensional drift detected',
-  'sync.status.critical': 'Critical phase misalignment',
-  'sync.action.stabilize': 'Initiating phase stabilization',
-  'sync.action.realign': 'Realigning quantum matrices',
-
-  // Storage messages
-  'storage.title': 'Neo FS Storage',
-  'storage.upload': 'Upload to Neo FS',
-  'storage.uploading': 'Uploading...',
-  'storage.noFiles': 'No files stored in Neo FS yet',
-  'storage.success': 'File uploaded successfully to Neo FS',
-  'storage.error': 'Failed to upload file',
-  'storage.download.error': 'Failed to download file',
+  // NFT related
+  'nft.mint': 'Mint as NFT',
+  'nft.mint.confirm': 'Minting an NFT costs 1 GAS. Continue?',
+  'nft.mint.success': 'Success',
+  'nft.mint.success.message': 'NFT minting initiated. Please wait for the transaction to be mined.',
+  'nft.mint.error': 'Error',
+  'nft.mint.error.contract': 'Contract write not ready',
+  'nft.mint.error.wallet': 'Wallet not connected',
+  'nft.mint.error.generic': 'Failed to mint NFT',
 
   // Navigation
   'nav.map': 'Map',
@@ -77,37 +79,20 @@ const translations = {
   'nav.whitepaper': 'Whitepaper',
   'nav.dimensions': 'Dimension Control',
 
-  // Cascade Control System specific translations
-  'cascade.control.title': 'Cascade Control System',
-  'cascade.control.description': 'Advanced quantum-aware music synchronization',
-  'cascade.inner.loop': 'Inner Loop (Entropy Control)',
-  'cascade.outer.loop': 'Outer Loop (Free Energy Control)',
-  'cascade.quantum.state': 'Quantum State Verification',
-  'cascade.dimension.sync': 'Dimensional Synchronization',
-
-  // Status messages
-  'status.syncing': 'Synchronizing dimensional states...',
-  'status.ready': 'All systems nominal',
-  'status.error': 'Dimensional integrity compromised',
-  'status.recovering': 'Initiating quantum recovery sequence',
-
-  // Tour messages
-  'tour.welcome': 'Welcome to Ninja-Portal! I\'ll be your guide.',
-  'tour.connect': 'Connect your wallet to start exploring music.',
-  'tour.upload': 'Upload your favorite tunes and share them with the world!',
-  'tour.gotIt': 'Got it!',
-
   // Map messages
   'map.title': 'Global Listener Map',
   'map.noActivity': 'No Activity',
   'map.noData': 'No listener data available yet. Play some music to see activity on the map!',
   'map.totalListeners': '{count} Active Listeners Worldwide',
   'map.error': 'Error loading map data: {error}',
-  'map.tooltipDetail': '{country}: {total} {total, plural, one {Listener} other {Listeners}} ({percentage}%) - {geotagged} geotagged, {anonymous} anonymous',
-
-  // Map location messages
   'map.location.error.title': 'Location Access',
   'map.location.error.description': 'Unable to access your location. You can still use the map, but your plays won\'t be geotagged.',
+
+  // Tour messages
+  'tour.welcome': 'Welcome to Ninja-Portal! I\'ll be your guide.',
+  'tour.connect': 'Connect your wallet to start exploring music.',
+  'tour.upload': 'Upload your favorite tunes and share them with the world!',
+  'tour.gotIt': 'Got it!',
 
   // Wallet disconnect messages
   'app.disconnect.success': 'Wallet disconnected successfully!',

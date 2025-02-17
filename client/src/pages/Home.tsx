@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Upload, Library, Loader2 } from "lucide-react";
 import { uploadToIPFS } from "@/lib/ipfs";
 import { EditSongDialog } from "@/components/EditSongDialog";
-import { useIntl } from 'react-intl';
+import { useDimensionalTranslation } from '@/contexts/LocaleContext';
 import { NeoStorage } from "@/components/NeoStorage";
 
 interface Song {
@@ -27,7 +27,7 @@ interface Song {
 }
 
 export default function Home() {
-  const intl = useIntl();
+  const { t } = useDimensionalTranslation();
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [pendingUpload, setPendingUpload] = useState<File>();
   const { toast } = useToast();
@@ -81,8 +81,8 @@ export default function Home() {
   const handlePlaySong = async (song: Song, context: 'library' | 'feed' = 'feed') => {
     if (!address) {
       toast({
-        title: "Connect Wallet",
-        description: "Please connect your wallet to play songs",
+        title: t('app.errors.wallet'),
+        description: t('app.errors.wallet'),
         variant: "destructive",
       });
       return;
@@ -95,7 +95,7 @@ export default function Home() {
       console.error('Error playing song:', error);
       toast({
         title: "Error",
-        description: "Failed to play song. Please try again.",
+        description: t('app.errors.play'),
         variant: "destructive",
       });
     }
@@ -104,7 +104,7 @@ export default function Home() {
   const uploadMutation = useMutation({
     mutationFn: async ({ file, title, artist }: { file: File; title: string; artist: string }) => {
       if (!address) {
-        throw new Error(intl.formatMessage({ id: 'app.errors.wallet' }));
+        throw new Error(t('app.errors.wallet'));
       }
 
       try {
@@ -121,8 +121,8 @@ export default function Home() {
         console.log('Registration successful:', registerData);
 
         toast({
-          title: intl.formatMessage({ id: 'app.upload.started' }),
-          description: intl.formatMessage({ id: 'app.upload.progress' }),
+          title: t('app.upload.started'),
+          description: t('app.upload.progress'),
         });
 
         try {
@@ -154,8 +154,8 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ["/api/songs/library"] });
       queryClient.invalidateQueries({ queryKey: ["/api/songs/recent"] });
       toast({
-        title: intl.formatMessage({ id: 'app.upload.success' }),
-        description: intl.formatMessage({ id: 'app.upload.success' }),
+        title: t('app.upload.success'),
+        description: t('app.upload.success'),
       });
       setPendingUpload(undefined);
       setUploadDialogOpen(false);
@@ -163,7 +163,7 @@ export default function Home() {
     onError: (error: Error) => {
       console.error('Upload mutation error:', error);
       toast({
-        title: "Upload Failed",
+        title: t('app.upload.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -229,12 +229,12 @@ export default function Home() {
               <section className="px-4">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-2xl font-semibold">
-                    {intl.formatMessage({ id: 'app.library' })}
+                    {t('app.library')}
                   </h2>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center text-muted-foreground">
                       <Library className="mr-2 h-4 w-4" />
-                      {librarySongs?.length || 0} {intl.formatMessage({ id: 'app.songs' })}
+                      {librarySongs?.length || 0} {t('app.songs')}
                     </div>
                     <Input
                       type="file"
@@ -250,12 +250,12 @@ export default function Home() {
                           {uploadMutation.isPending ? (
                             <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              {intl.formatMessage({ id: 'app.upload.progress' })}
+                              {t('app.upload.progress')}
                             </>
                           ) : (
                             <>
                               <Upload className="mr-2 h-4 w-4" />
-                              {intl.formatMessage({ id: 'app.upload' })}
+                              {t('app.upload')}
                             </>
                           )}
                         </span>
@@ -266,9 +266,9 @@ export default function Home() {
 
                 <div className="space-y-2">
                   {libraryLoading ? (
-                    <p className="text-muted-foreground">Loading your library...</p>
+                    <p className="text-muted-foreground">{t('app.loading')}</p>
                   ) : librarySongs?.length === 0 ? (
-                    <p className="text-muted-foreground">No songs in your library yet</p>
+                    <p className="text-muted-foreground">{t('app.noSongs')}</p>
                   ) : (
                     librarySongs?.map((song) => (
                       <SongCard
@@ -288,17 +288,17 @@ export default function Home() {
           <section className="px-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-semibold">
-                {intl.formatMessage({ id: 'app.discovery' })}
+                {t('app.discovery')}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {intl.formatMessage({ id: 'app.recent' })}
+                {t('app.recent')}
               </p>
             </div>
 
             <div className="grid gap-2">
               {recentSongs?.length === 0 ? (
                 <p className="text-muted-foreground">
-                  {intl.formatMessage({ id: 'app.noRecentSongs' })}
+                  {t('app.noRecentSongs')}
                 </p>
               ) : (
                 recentSongs?.map((song) => (

@@ -2,8 +2,7 @@ import { WalletConnect } from "@/components/WalletConnect";
 import { Navigation } from "@/components/Navigation";
 import { Link } from "wouter";
 import { MusicPlayer } from "@/components/MusicPlayer";
-import { useIntl } from "react-intl";
-import { useLocale } from "@/contexts/LocaleContext";
+import { useDimensionalTranslation } from "@/contexts/LocaleContext";
 import { Button } from "@/components/ui/button";
 import { Globe, Menu, X } from "lucide-react";
 import { messages, languageNames } from "@/i18n";
@@ -29,8 +28,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const intl = useIntl();
-  const { locale, setLocale } = useLocale();
+  const { t, locale, setLocale, currentDimension, quantumState } = useDimensionalTranslation();
   const { isMobile, isTablet } = useDevice();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
@@ -47,7 +45,7 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center gap-2">
             <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-                {intl.formatMessage({ id: 'app.title' })}
+                {t('app.title')}
               </h1>
             </Link>
             {!isCompactView && <Navigation />}
@@ -94,7 +92,7 @@ export function Layout({ children }: LayoutProps) {
                 </SheetTrigger>
                 <SheetContent side="right" className="w-[85vw] sm:w-[400px]">
                   <SheetHeader>
-                    <SheetTitle>{intl.formatMessage({ id: 'app.title' })}</SheetTitle>
+                    <SheetTitle>{t('app.title')}</SheetTitle>
                   </SheetHeader>
                   <div className="mt-6 space-y-6">
                     <Navigation />
@@ -129,6 +127,17 @@ export function Layout({ children }: LayoutProps) {
               </Sheet>
             )}
           </div>
+        </div>
+
+        {/* Dimensional Status Indicator */}
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary via-purple-500 to-primary">
+          <div 
+            className="absolute inset-0 opacity-75"
+            style={{
+              background: quantumState === 'coherent' ? 'linear-gradient(90deg, var(--primary) 0%, purple 50%, var(--primary) 100%)' : 'none',
+              animation: quantumState === 'superposed' ? 'quantum-shift 2s infinite' : 'none'
+            }}
+          />
         </div>
       </header>
 

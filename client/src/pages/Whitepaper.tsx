@@ -1,6 +1,6 @@
 import { Layout } from "@/components/Layout";
 import { useEffect, useState } from 'react';
-import { useLocale } from "@/contexts/LocaleContext";
+import { useDimensionalTranslation } from "@/contexts/LocaleContext";
 
 // Type for translated list items to avoid repetitive translation calls
 interface TranslatedListItems {
@@ -10,7 +10,7 @@ interface TranslatedListItems {
 }
 
 export default function Whitepaper() {
-  const { translate } = useLocale();
+  const { t } = useDimensionalTranslation();
   const [translatedContent, setTranslatedContent] = useState<{
     title?: string;
     lead?: string;
@@ -28,40 +28,37 @@ export default function Whitepaper() {
   useEffect(() => {
     window.scrollTo(0, 0);
 
-    async function translateContent() {
-      const translated = {
-        title: await translate('The Evolutionary AI-Powered Music & Intelligence Network'),
-        lead: await translate('A decentralized revolution in music, intelligence, and community-engineered innovation, seamlessly integrating Web3, data-less AI, statistical physics, and quantum-ready architectures with rigorous capability validation.'),
-        sections: {
-          intro: await translate('In an age where technology doesn\'t just reshape industries but the very core of human experience, we are forging a new evolutionary paradigm—where music, AI, and decentralized intelligence coalesce into a living system, validated through comprehensive testing and expert verification.'),
-          foundation: await translate('At its foundation is moral-techno-economics—a framework where:'),
-          capabilities: await translate('Core System Capabilities & Validation'),
-          lumiraAI: await translate('Lumira AI: The Bridge Between Music & Intelligence'),
-          technicalArch: await translate('Technical Architecture: The Living System'),
-          roadmap: await translate('The Development Roadmap: An Evolutionary Pathway'),
-          bigPicture: await translate('The Big Picture: Beyond Music, Toward Collective Intelligence'),
-          conclusion: await translate('This is More Than Music—This is a Symphony of Intelligence. And you are part of it.'),
-          testing: await translate('Rigorous Capability Testing')
-        },
-        capabilities: {
-          dataless: await translate('Learns, adapts, and optimizes in real-time without storing personal data'),
-          web3: await translate('Ensures power stays with the people, not corporate monopolies'),
-          quantum: await translate('Handles paradoxes and solves problems at planetary scale'),
-          selfHealing: await translate('Grows alongside the communities it serves'),
-          testing: await translate('Comprehensive capability validation through expert-driven multi-stage testing')
-        },
-        listItems: {
-          techServes: await translate('Technology serves human progress, rather than extracting from it'),
-          economicModels: await translate('Economic models regenerate value rather than concentrating wealth'),
-          communityDriven: await translate('Community-driven governance ensures transparency, accountability, and autonomy')
-        }
-      };
+    // Translate content using our dimensional translation system
+    const translated = {
+      title: t('whitepaper.title'),
+      lead: t('whitepaper.summary'),
+      sections: {
+        intro: t('The Evolutionary AI-Powered Music & Intelligence Network'),
+        foundation: t('In an age where technology doesn\'t just reshape industries but the very core of human experience, we are forging a new evolutionary paradigm—where music, AI, and decentralized intelligence coalesce into a living system, validated through comprehensive testing and expert verification.'),
+        capabilities: t('Core System Capabilities & Validation'),
+        lumiraAI: t('whitepaper.ai.lumira'),
+        technicalArch: t('whitepaper.arch.title'),
+        roadmap: t('whitepaper.roadmap.title'),
+        bigPicture: t('The Big Picture: Beyond Music, Toward Collective Intelligence'),
+        conclusion: t('This is More Than Music—This is a Symphony of Intelligence. And you are part of it.'),
+        testing: t('Rigorous Capability Testing')
+      },
+      capabilities: {
+        dataless: t('whitepaper.storage.ipfs.hybrid'),
+        web3: t('whitepaper.contracts.treasury'),
+        quantum: t('whitepaper.cascade.description'),
+        selfHealing: t('whitepaper.sync.topology.mesh'),
+        testing: t('whitepaper.challenges.election.raft')
+      },
+      listItems: {
+        techServes: t('Technology serves human progress, rather than extracting from it'),
+        economicModels: t('Economic models regenerate value rather than concentrating wealth'),
+        communityDriven: t('Community-driven governance ensures transparency, accountability, and autonomy')
+      }
+    };
 
-      setTranslatedContent(translated);
-    }
-
-    translateContent();
-  }, [translate]);
+    setTranslatedContent(translated);
+  }, [t]);
 
   return (
     <Layout>
@@ -86,7 +83,7 @@ export default function Whitepaper() {
           <li><strong>Rigorous Testing:</strong> {translatedContent.capabilities?.testing}</li>
         </ul>
 
-        {/* New Testing Section */}
+        {/* Testing Section */}
         <div className="bg-accent/20 p-6 rounded-lg mb-8">
           <h2 className="flex items-center gap-2">
             <span className="text-2xl">🔍</span>
@@ -96,18 +93,18 @@ export default function Whitepaper() {
           <ul>
             <li>Expert-Driven Evaluation
               <ul>
-                <li>Comprehensive testing by domain experts in music and AI</li>
-                <li>Multi-stage review process for capability validation</li>
-                <li>Continuous performance monitoring and benchmarking</li>
-                <li>Regular calibration against frontier AI models</li>
+                <li>{t('whitepaper.challenges.rate.title')}</li>
+                <li>{t('whitepaper.challenges.rate.adaptive')}</li>
+                <li>{t('whitepaper.challenges.rate.backoff')}</li>
+                <li>{t('whitepaper.challenges.rate.jitter')}</li>
               </ul>
             </li>
             <li>Capability Assessment
               <ul>
-                <li>Rigorous benchmarking of music analysis capabilities</li>
-                <li>Real-time performance validation</li>
-                <li>Transparent reporting of system limitations</li>
-                <li>Community-driven testing and feedback</li>
+                <li>{t('whitepaper.challenges.election.title')}</li>
+                <li>{t('whitepaper.challenges.election.raft')}</li>
+                <li>{t('whitepaper.challenges.election.failover')}</li>
+                <li>{t('whitepaper.challenges.election.transfer')}</li>
               </ul>
             </li>
           </ul>
@@ -118,46 +115,46 @@ export default function Whitepaper() {
             <span className="text-2xl">🤖</span>
             {translatedContent.sections?.lumiraAI}
           </h2>
-          <h4>Network Optimization</h4>
+          <h4>{t('whitepaper.sync.title')}</h4>
           <ul>
-            <li>Graph Neural Networks (GNNs)
+            <li>{t('whitepaper.sync.topology.title')}
               <ul>
-                <li>Adaptive network compression through statistical physics principles</li>
-                <li>Self-organizing coarse-graining for multi-scale adaptation</li>
-                <li>Information diffusion optimization using Laplacian dynamics</li>
-                <li>Real-time topology adaptation based on network metrics</li>
+                <li>{t('whitepaper.sync.topology.mesh')}</li>
+                <li>{t('whitepaper.sync.topology.cluster')}</li>
+                <li>{t('whitepaper.sync.topology.redundant')}</li>
+                <li>{t('whitepaper.storage.neofs.redundancy')}</li>
               </ul>
             </li>
-            <li>Zero-Data Intelligence
+            <li>{t('whitepaper.sync.state.title')}
               <ul>
-                <li>Homomorphic encryption for private AI computations</li>
-                <li>Federated learning across decentralized nodes</li>
-                <li>Zero-Knowledge Proofs for integrity verification</li>
-                <li>Edge-computed differential privacy guarantees</li>
+                <li>{t('whitepaper.sync.state.timestamp')}</li>
+                <li>{t('whitepaper.sync.state.election')}</li>
+                <li>{t('whitepaper.sync.state.merkle')}</li>
+                <li>{t('whitepaper.storage.neofs.integrity')}</li>
               </ul>
             </li>
           </ul>
         </div>
 
         <h2>💠 {translatedContent.sections?.technicalArch}</h2>
-        <h3>Smart Contracts & Web3 Infrastructure</h3>
+        <h3>{t('whitepaper.contracts.title')}</h3>
         <ul>
           <li>
-            <strong>📜 MusicTreasury.sol (Incentivization Layer)</strong>
+            <strong>📜 {t('whitepaper.contracts.treasury')}</strong>
             <ul>
-              <li>Upload Reward: 🏆 1 PFORK → Encourages content contribution</li>
-              <li>Playlist Reward: 🎶 2 PFORK → Rewards curation & discovery</li>
-              <li>NFT Reward: 🎨 3 PFORK → Promotes decentralized ownership</li>
-              <li>Zero-Knowledge Proofs (ZKPs) for privacy-preserving verification</li>
+              <li>{t('whitepaper.contracts.upload')}</li>
+              <li>{t('whitepaper.contracts.playlist')}</li>
+              <li>{t('whitepaper.contracts.nft')}</li>
+              <li>{t('whitepaper.contracts.neofs')}</li>
             </ul>
           </li>
           <li>
-            <strong>📂 NeoFsManager.sol (Decentralized Storage)</strong>
+            <strong>📂 {t('whitepaper.storage.title')}</strong>
             <ul>
-              <li>Content-addressed storage using NEO FS & IPFS</li>
-              <li>Merkle tree verification for proof-of-storage</li>
-              <li>Hybrid storage redundancy for resilience</li>
-              <li>Geographic data distribution optimization</li>
+              <li>{t('whitepaper.storage.neofs.address')}</li>
+              <li>{t('whitepaper.storage.neofs.redundancy')}</li>
+              <li>{t('whitepaper.storage.neofs.geo')}</li>
+              <li>{t('whitepaper.storage.ipfs.hybrid')}</li>
             </ul>
           </li>
         </ul>
@@ -165,62 +162,36 @@ export default function Whitepaper() {
         <h2>📅 {translatedContent.sections?.roadmap}</h2>
         <div className="space-y-4">
           <div>
-            <h3>🚀 Phase 1: Web3 Integration & Testing Framework (Q2 2025)</h3>
+            <h3>🚀 {t('whitepaper.roadmap.resilience.title')}</h3>
             <ul>
-              <li>Deploy AI-powered DAOs with quadratic voting</li>
-              <li>Implement tokenized incentive systems</li>
-              <li>First-generation AI-driven synchronization</li>
-              <li>Establish comprehensive testing framework</li>
+              <li>{t('whitepaper.roadmap.resilience.targets.errors')}</li>
+              <li>{t('whitepaper.roadmap.resilience.targets.uptime')}</li>
+              <li>{t('whitepaper.roadmap.resilience.targets.fallback')}</li>
+              <li>{t('whitepaper.storage.ipfs.gateway')}</li>
             </ul>
           </div>
 
           <div>
-            <h3>🌍 Phase 2: Federated AI Expansion (Q3 2025)</h3>
+            <h3>🌍 {t('whitepaper.storage.title')}</h3>
             <ul>
-              <li>Expert-driven capability validation</li>
-              <li>Neural network-enhanced synchronization</li>
-              <li>Adaptive AI-based curation and filtering</li>
-              <li>Advanced GNN implementation</li>
-            </ul>
-          </div>
-
-          <div>
-            <h3>🧠 Phase 3: Quantum Optimization (Q1 2026)</h3>
-            <ul>
-              <li>Quantum-assisted music recommendation engine</li>
-              <li>Graph-based network flow compression</li>
-              <li>Zero-knowledge music provenance verification</li>
-              <li>Continuous performance benchmarking</li>
-            </ul>
-          </div>
-
-          <div>
-            <h3>🤖 Phase 4: Self-Healing Intelligence (Q4 2026)</h3>
-            <ul>
-              <li>Fully autonomous, self-adaptive AI with validated capabilities</li>
-              <li>Real-time evolutionary learning</li>
-              <li>Hybrid human-AI co-governance through DAOs</li>
-              <li>Complete testing framework integration</li>
+              <li>{t('whitepaper.storage.ipfs.hybrid')}</li>
+              <li>{t('whitepaper.storage.ipfs.gateway')}</li>
+              <li>{t('whitepaper.storage.ipfs.cache')}</li>
+              <li>{t('whitepaper.storage.neofs.geo')}</li>
             </ul>
           </div>
         </div>
 
         <h2>🌌 {translatedContent.sections?.bigPicture}</h2>
         <p>
-          This isn't just a music platform—it's a blueprint for a planetary intelligence system that:
+          {t('whitepaper.cascade.description')}
         </p>
         <ul>
-          <li>✅ Learns in real-time without ever needing to collect personal data</li>
-          <li>✅ Balances control & freedom, ensuring ethics are woven into AI itself</li>
-          <li>✅ Leverages paradox to solve problems that traditional AI can't handle</li>
-          <li>✅ Grows alongside human progress, with continuous capability validation</li>
+          <li>✅ {t('whitepaper.cascade.inner.sync')}</li>
+          <li>✅ {t('whitepaper.cascade.outer.sync')}</li>
+          <li>✅ {t('whitepaper.cascade.inner.gain')}</li>
+          <li>✅ {t('whitepaper.cascade.outer.gain')}</li>
         </ul>
-
-        <p>
-          This is a system that does not merely "respond"—it anticipates, adapts, and thrives through the
-          fusion of moral-techno-economics, quantum computation, and decentralized intelligence, all
-          validated through rigorous testing and expert verification.
-        </p>
 
         <p className="text-xl font-semibold mt-8">
           🎼 {translatedContent.sections?.conclusion}

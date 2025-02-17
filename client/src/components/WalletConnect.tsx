@@ -5,7 +5,7 @@ import { injected } from 'wagmi/connectors';
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from 'wouter';
 import { isOperaWallet, isMobileDevice, autoConfigureNeoXNetwork, isMetaMaskAvailable } from "@/lib/web3";
-import { useIntl } from 'react-intl';
+import { useDimensionalTranslation } from "@/contexts/LocaleContext";
 import { useDevice } from "@/hooks/use-mobile";
 
 export function WalletConnect() {
@@ -14,7 +14,7 @@ export function WalletConnect() {
   const { disconnect } = useDisconnect();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const intl = useIntl();
+  const { t } = useDimensionalTranslation();
   const { isMobile } = useDevice();
 
   const registerUser = async (userAddress: string) => {
@@ -52,10 +52,10 @@ export function WalletConnect() {
 
         // For other wallets, show installation guidance
         toast({
-          title: intl.formatMessage({ id: 'app.network.setup' }),
+          title: t('app.network.setup'),
           description: isOperaWallet()
-            ? intl.formatMessage({ id: 'app.network.opera' })
-            : intl.formatMessage({ id: 'app.network.install' }),
+            ? t('app.network.opera')
+            : t('app.network.install'),
           variant: "destructive",
         });
         return;
@@ -67,8 +67,8 @@ export function WalletConnect() {
       } else {
         // If no wallet is available, show instructions
         toast({
-          title: intl.formatMessage({ id: 'app.network.setup' }),
-          description: intl.formatMessage({ id: 'app.network.install' }),
+          title: t('app.network.setup'),
+          description: t('app.network.install'),
           variant: "destructive",
         });
         return;
@@ -98,18 +98,18 @@ export function WalletConnect() {
       // Auto-configure NEO X network
       try {
         toast({
-          title: intl.formatMessage({ id: 'app.network.setup' }),
+          title: t('app.network.setup'),
           description: isOperaWallet() 
-            ? intl.formatMessage({ id: 'app.network.opera' })
-            : intl.formatMessage({ id: 'app.network.configuring' }),
+            ? t('app.network.opera')
+            : t('app.network.configuring'),
         });
         await autoConfigureNeoXNetwork();
       } catch (error: any) {
         toast({
-          title: intl.formatMessage({ id: 'app.network.warning' }),
+          title: t('app.network.warning'),
           description: isOperaWallet() 
-            ? intl.formatMessage({ id: 'app.network.switch' })
-            : intl.formatMessage({ id: 'app.network.connect' }),
+            ? t('app.network.switch')
+            : t('app.network.connect'),
           variant: "destructive",
         });
         return; // Stop here if network configuration fails
@@ -144,12 +144,12 @@ export function WalletConnect() {
       setLocation('/home');
 
       toast({
-        title: intl.formatMessage({ id: 'app.connect' }),
+        title: t('app.connect'),
         description: registrationData.user.lastSeen 
           ? isOperaWallet() 
-            ? intl.formatMessage({ id: 'app.welcome.opera' })
-            : intl.formatMessage({ id: 'app.welcome.back' })
-          : intl.formatMessage({ id: 'app.welcome.new' }),
+            ? t('app.welcome.opera')
+            : t('app.welcome.back')
+          : t('app.welcome.new'),
       });
 
     } catch (error) {
@@ -169,13 +169,13 @@ export function WalletConnect() {
       await disconnect();
       setLocation('/');
       toast({
-        title: intl.formatMessage({ id: 'app.disconnect' }),
-        description: intl.formatMessage({id: 'app.disconnect.success'}),
+        title: t('app.disconnect'),
+        description: t('app.disconnect.success'),
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: intl.formatMessage({id: 'app.disconnect.error'}),
+        description: t('app.disconnect.error'),
         variant: "destructive",
       });
     }
@@ -188,7 +188,7 @@ export function WalletConnect() {
           onClick={handleConnect}
           className="truncate max-w-[120px] md:max-w-none text-sm"
         >
-          {intl.formatMessage({ id: 'app.connect' })}
+          {t('app.connect')}
         </Button>
       ) : (
         <div className="flex items-center gap-2">
@@ -200,7 +200,7 @@ export function WalletConnect() {
             onClick={handleDisconnect}
             className="text-xs md:text-sm px-2 md:px-3"
           >
-            {intl.formatMessage({ id: 'app.disconnect' })}
+            {t('app.disconnect')}
           </Button>
         </div>
       )}

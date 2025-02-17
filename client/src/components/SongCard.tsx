@@ -15,6 +15,7 @@ import { PLAYLIST_NFT_ADDRESS, PLAYLIST_NFT_ABI } from "@/lib/contracts";
 import { EditSongDialog } from "./EditSongDialog";
 import { useState } from "react";
 import { parseEther } from "viem";
+import { useDimensionalTranslation } from "@/contexts/LocaleContext";
 
 interface Song {
   id: number;
@@ -33,13 +34,15 @@ interface SongCardProps {
   onClick: () => void;
   variant?: "ghost" | "default";
   showDelete?: boolean;
+  isPlaying?: boolean;
 }
 
-export function SongCard({ song, onClick, variant = "ghost", showDelete = false }: SongCardProps) {
+export function SongCard({ song, onClick, variant = "ghost", showDelete = false, isPlaying = false }: SongCardProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { address } = useAccount();
+  const { t } = useDimensionalTranslation();
 
   // Love mutation
   const loveMutation = useMutation({
@@ -51,13 +54,13 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
       queryClient.invalidateQueries({ queryKey: ["/api/songs/library"] });
       queryClient.invalidateQueries({ queryKey: ["/api/songs/recent"] });
       toast({
-        title: song.isLoved ? "Unloved" : "Loved",
-        description: song.isLoved ? "Song removed from your loves" : "Song added to your loves",
+        title: song.isLoved ? t('song.unloved') : t('song.loved'),
+        description: song.isLoved ? t('song.unloved.message') : t('song.loved.message'),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('song.love.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -82,13 +85,13 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/playlists"] });
       toast({
-        title: "Success",
-        description: "Song added to playlist",
+        title: t('playlist.add.success'),
+        description: t('playlist.add.song.success'),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('playlist.add.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -97,8 +100,8 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
 
   const mintNFTMutation = useMutation({
     mutationFn: async () => {
-      if (!mintSongNFT) throw new Error("Contract write not ready");
-      if (!address) throw new Error("Wallet not connected");
+      if (!mintSongNFT) throw new Error(t('nft.mint.error.contract'));
+      if (!address) throw new Error(t('nft.mint.error.wallet'));
 
       const metadataUri = `ipfs://${song.ipfsHash}`;
 
@@ -114,21 +117,20 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
           value: parseEther("1"), // 1 GAS
         });
 
-        // Wait for transaction confirmation
         await tx.wait();
       } catch (error: any) {
-        throw new Error(error.message || "Failed to mint NFT");
+        throw new Error(error.message || t('nft.mint.error.generic'));
       }
     },
     onSuccess: () => {
       toast({
-        title: "Success",
-        description: "NFT minting initiated. Please wait for the transaction to be mined.",
+        title: t('nft.mint.success'),
+        description: t('nft.mint.success.message'),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('nft.mint.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -142,13 +144,13 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/songs/library"] });
       toast({
-        title: "Success",
-        description: "Song deleted from library",
+        title: t('song.delete.success'),
+        description: t('song.delete.success.message'),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t('song.delete.error'),
         description: error.message,
         variant: "destructive",
       });
@@ -160,7 +162,7 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
       <div className="flex items-center justify-between group">
         <Button
           variant={variant}
-          className="flex-1 justify-start"
+          className={`flex-1 justify-start ${isPlaying ? 'bg-accent' : ''}`}
           onClick={onClick}
         >
           <span className="truncate">{song.title}</span>
@@ -194,14 +196,14 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
               {showDelete && (
                 <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit Details
+                  {t('song.edit.details')}
                 </DropdownMenuItem>
               )}
 
               {!playlists?.length ? (
                 <DropdownMenuItem className="text-muted-foreground" disabled>
                   <ListMusic className="mr-2 h-4 w-4" />
-                  Create a playlist first
+                  {t('playlist.create.first')}
                 </DropdownMenuItem>
               ) : (
                 playlists.map((playlist) => (
@@ -215,7 +217,7 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
                     }}
                   >
                     <Plus className="mr-2 h-4 w-4" />
-                    Add to {playlist.name}
+                    {t('playlist.add.to', { name: playlist.name })}
                   </DropdownMenuItem>
                 ))
               )}
@@ -224,14 +226,14 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
 
               <DropdownMenuItem
                 onClick={() => {
-                  if (window.confirm("Minting an NFT costs 1 GAS. Continue?")) {
+                  if (window.confirm(t('nft.mint.confirm'))) {
                     mintNFTMutation.mutate();
                   }
                 }}
                 disabled={mintNFTMutation.isPending || !address}
               >
                 <Coins className="mr-2 h-4 w-4" />
-                Mint as NFT
+                {t('nft.mint')}
               </DropdownMenuItem>
 
               {showDelete && (
@@ -240,13 +242,13 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false 
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
                     onClick={() => {
-                      if (window.confirm("Are you sure you want to delete this song?")) {
+                      if (window.confirm(t('song.delete.confirm'))) {
                         deleteSongMutation.mutate(song.id);
                       }
                     }}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Delete from Library
+                    {t('song.delete.library')}
                   </DropdownMenuItem>
                 </>
               )}

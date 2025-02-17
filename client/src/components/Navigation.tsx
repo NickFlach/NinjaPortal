@@ -5,14 +5,14 @@ import { useCallback } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAccount } from "wagmi";
 import { useToast } from "@/hooks/use-toast";
-import { useIntl } from "react-intl";
+import { useDimensionalTranslation } from "@/contexts/LocaleContext";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 
 export function Navigation() {
   const [location, setLocation] = useLocation();
   const { address } = useAccount();
   const { toast } = useToast();
-  const intl = useIntl();
+  const { t } = useDimensionalTranslation();
   const { isSynced } = useMusicPlayer();
 
   const requestLocation = useCallback(async (e: React.MouseEvent) => {
@@ -50,14 +50,14 @@ export function Navigation() {
       localStorage.setItem('location-permission', 'denied');
 
       toast({
-        title: intl.formatMessage({ id: 'map.location.error.title' }),
-        description: intl.formatMessage({ id: 'map.location.error.description' }),
+        title: t('map.location.error.title'),
+        description: t('map.location.error.description'),
         variant: "destructive",
       });
 
       setLocation('/map');
     }
-  }, [address, setLocation, toast, intl]);
+  }, [address, setLocation, toast, t]);
 
   const links = [
     {
@@ -65,7 +65,7 @@ export function Navigation() {
       label: (
         <span className="flex items-center gap-2">
           <Map className="h-4 w-4" />
-          {intl.formatMessage({ id: 'nav.map' })}
+          {t('nav.map')}
         </span>
       ),
       onClick: requestLocation,
@@ -76,7 +76,7 @@ export function Navigation() {
       label: (
         <span className="flex items-center gap-2">
           <BarChart2 className="h-4 w-4" />
-          {intl.formatMessage({ id: 'nav.analytics' })}
+          {t('nav.analytics')}
         </span>
       ),
       show: location !== '/lumira'
@@ -86,7 +86,7 @@ export function Navigation() {
       label: (
         <span className="flex items-center gap-2">
           <Heart className="h-4 w-4 text-red-500 animate-pulse" />
-          {intl.formatMessage({ id: 'nav.whitepaper' })}
+          {t('nav.whitepaper')}
         </span>
       ),
       show: location !== '/whitepaper'
