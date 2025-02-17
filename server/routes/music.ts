@@ -21,13 +21,18 @@ router.get("/recent", async (req, res) => {
     });
 
     // Map to return only unique songs in order of most recently played
-    // Ensure we only send serializable data
     const uniqueSongs = Array.from(
-      new Map(recentSongs.map(item => [item.songId, {
-        ...item.song,
-        createdAt: item.song.createdAt.toISOString(), // Convert Date to string
-        updatedAt: item.song.updatedAt?.toISOString() || null // Handle optional dates
-      }])).values()
+      new Map(recentSongs
+        .filter(item => item.song !== null) // Filter out null songs
+        .map(item => [item.songId, {
+          id: item.song!.id,
+          title: item.song!.title,
+          artist: item.song!.artist,
+          ipfsHash: item.song!.ipfsHash,
+          uploadedBy: item.song!.uploadedBy,
+          createdAt: item.song!.createdAt?.toISOString() ?? null,
+          votes: item.song!.votes
+        }])).values()
     );
 
     console.log('Sending recent songs:', uniqueSongs.length);
@@ -43,41 +48,50 @@ router.get("/recent", async (req, res) => {
 
 // Get user's song library
 router.get("/library", async (req, res) => {
-  const userAddress = req.headers['x-wallet-address'] as string;
+  try {
+    const userAddress = req.headers['x-wallet-address'] as string;
 
-  if (!userAddress) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
+    if (!userAddress) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-  const userSongs = await db.query.songs.findMany({
-    where: eq(songs.uploadedBy, userAddress.toLowerCase()),
-    orderBy: desc(songs.createdAt),
-    with: {
-      loves: true,
-    },
-  });
-
-  const songsWithLoves = await Promise.all(userSongs.map(async (song) => {
-    const [{ total }] = await db
-      .select({ total: count() })
-      .from(loves)
-      .where(eq(loves.songId, song.id));
-
-    const userLove = await db.query.loves.findFirst({
-      where: and(
-        eq(loves.songId, song.id),
-        eq(loves.address, userAddress.toLowerCase())
-      ),
+    const userSongs = await db.query.songs.findMany({
+      where: eq(songs.uploadedBy, userAddress.toLowerCase()),
+      orderBy: desc(songs.createdAt),
+      with: {
+        loves: true,
+      },
     });
 
-    return {
-      ...song,
-      loves: total,
-      isLoved: !!userLove
-    };
-  }));
+    const songsWithLoves = await Promise.all(userSongs.map(async (song) => {
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(loves)
+        .where(eq(loves.songId, song.id));
 
-  res.json(songsWithLoves);
+      const userLove = await db.query.loves.findFirst({
+        where: and(
+          eq(loves.songId, song.id),
+          eq(loves.address, userAddress.toLowerCase())
+        ),
+      });
+
+      return {
+        ...song,
+        createdAt: song.createdAt?.toISOString() ?? null,
+        loves: total,
+        isLoved: !!userLove
+      };
+    }));
+
+    res.json(songsWithLoves);
+  } catch (error) {
+    console.error('Error fetching user library:', error);
+    res.status(500).json({
+      error: 'Failed to fetch user library',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 });
 
 // Record song play
