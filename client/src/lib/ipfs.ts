@@ -1,7 +1,7 @@
 import { Buffer } from 'buffer';
 
 const pinataJWT = import.meta.env.VITE_PINATA_JWT;
-const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs';
+const PINATA_GATEWAY = 'https://violet-organic-snake-772.mypinata.cloud/ipfs';
 const PINATA_API = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
 const PINATA_METADATA_API = 'https://api.pinata.cloud/pinning/hashMetadata';
 
@@ -91,16 +91,6 @@ export async function uploadToIPFS(file: File): Promise<string> {
       size: file.size
     });
 
-    // Verify the upload by checking if the file is accessible
-    try {
-      const verifyRes = await fetch(`${PINATA_GATEWAY}/${data.IpfsHash}`);
-      if (!verifyRes.ok) {
-        console.warn('Upload verification warning: File not immediately available on gateway');
-      }
-    } catch (verifyError) {
-      console.warn('Upload verification warning:', verifyError);
-    }
-
     return data.IpfsHash;
   } catch (error) {
     console.error('Error uploading to Pinata:', error);
@@ -114,7 +104,7 @@ export async function uploadToIPFS(file: File): Promise<string> {
   }
 }
 
-export async function getFromIPFS(hash: string): Promise<Uint8Array> {
+export async function getFromIPFS(hash: string): Promise<ArrayBuffer> {
   let retries = 3;
   let lastError: Error | null = null;
 
@@ -128,7 +118,7 @@ export async function getFromIPFS(hash: string): Promise<Uint8Array> {
 
       const response = await fetch(`${PINATA_GATEWAY}/${hash}`, {
         headers: {
-          'Accept': 'audio/*',
+          'Accept': '*/*',
           'Cache-Control': 'no-cache'
         }
       });
@@ -149,7 +139,7 @@ export async function getFromIPFS(hash: string): Promise<Uint8Array> {
         timestamp: new Date().toISOString()
       });
 
-      return new Uint8Array(buffer);
+      return buffer;
     } catch (error) {
       console.error(`IPFS fetch attempt ${4 - retries} failed:`, error);
       lastError = error instanceof Error ? error : new Error('Unknown error during IPFS fetch');
