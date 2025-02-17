@@ -148,11 +148,11 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         }
 
         // Validate song data
-        const validSongs = data.filter(song => 
-          song && 
-          typeof song.id === 'number' && 
-          typeof song.title === 'string' && 
-          typeof song.artist === 'string' && 
+        const validSongs = data.filter(song =>
+          song &&
+          typeof song.id === 'number' &&
+          typeof song.title === 'string' &&
+          typeof song.artist === 'string' &&
           typeof song.ipfsHash === 'string'
         );
 
@@ -209,63 +209,69 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
       // Get IPFS data with retries
       console.log('Fetching from IPFS gateway:', song.ipfsHash);
-      const audioData = await fetchFromIPFS(song.ipfsHash);
+      try {
+        const audioData = await fetchFromIPFS(song.ipfsHash);
 
-      // Create blob and URL
-      const blob = new Blob([audioData], { type: 'audio/mp3' });
-      const url = URL.createObjectURL(blob);
+        // Create blob and URL
+        const blob = new Blob([audioData], { type: 'audio/mp3' });
+        const url = URL.createObjectURL(blob);
 
-      // Set source and load
-      if (audioRef.current) {
-        const previousUrl = audioRef.current.src;
-        audioRef.current.src = url;
+        // Set source and load
+        if (audioRef.current) {
+          const previousUrl = audioRef.current.src;
+          audioRef.current.src = url;
 
-        // Wait for audio to load
-        await new Promise((resolve, reject) => {
-          if (audioRef.current) {
-            const onLoad = () => {
-              audioRef.current?.removeEventListener('loadeddata', onLoad);
-              audioRef.current?.removeEventListener('error', onError);
-              resolve(undefined);
-            };
-            const onError = (error: Event) => {
-              audioRef.current?.removeEventListener('loadeddata', onLoad);
-              audioRef.current?.removeEventListener('error', onError);
-              reject(error);
-            };
-            audioRef.current.addEventListener('loadeddata', onLoad, { once: true });
-            audioRef.current.addEventListener('error', onError, { once: true });
-            audioRef.current.load();
-          }
-        });
+          // Wait for audio to load
+          await new Promise((resolve, reject) => {
+            if (audioRef.current) {
+              const onLoad = () => {
+                audioRef.current?.removeEventListener('loadeddata', onLoad);
+                audioRef.current?.removeEventListener('error', onError);
+                resolve(undefined);
+              };
+              const onError = (error: Event) => {
+                audioRef.current?.removeEventListener('loadeddata', onLoad);
+                audioRef.current?.removeEventListener('error', onError);
+                reject(new Error('Failed to load audio data'));
+              };
+              audioRef.current.addEventListener('loadeddata', onLoad, { once: true });
+              audioRef.current.addEventListener('error', onError, { once: true });
+              audioRef.current.load();
+            }
+          });
 
-        // Clean up previous URL
-        if (previousUrl) {
-          URL.revokeObjectURL(previousUrl);
-        }
-      }
-
-      // Update state
-      setCurrentSong(song);
-
-      // Apply dimensional adjustments
-      if (audioRef.current && dimensionalState.harmonicAlignment !== 1) {
-        audioRef.current.playbackRate = dimensionalState.harmonicAlignment;
-      }
-
-      // Try to play
-      if (audioRef.current) {
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          try {
-            await playPromise;
-            setIsPlaying(true);
-            console.log('IPFS fetch and playback successful');
-          } catch (error) {
-            console.error('Playback prevented:', error);
-            setIsPlaying(false);
+          // Clean up previous URL
+          if (previousUrl) {
+            URL.revokeObjectURL(previousUrl);
           }
         }
+
+        // Update state
+        setCurrentSong(song);
+
+        // Apply dimensional adjustments
+        if (audioRef.current && dimensionalState.harmonicAlignment !== 1) {
+          audioRef.current.playbackRate = dimensionalState.harmonicAlignment;
+        }
+
+        // Try to play
+        if (audioRef.current) {
+          const playPromise = audioRef.current.play();
+          if (playPromise !== undefined) {
+            try {
+              await playPromise;
+              setIsPlaying(true);
+              console.log('IPFS fetch and playback successful');
+            } catch (error) {
+              console.error('Playback prevented:', error);
+              setIsPlaying(false);
+              throw new Error('Playback was prevented by the browser');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching from IPFS:', error);
+        throw new Error('Failed to load audio from IPFS');
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {

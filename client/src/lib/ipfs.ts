@@ -1,7 +1,7 @@
 import { Buffer } from 'buffer';
 
 const pinataJWT = import.meta.env.VITE_PINATA_JWT;
-const PINATA_GATEWAY = 'https://violet-organic-snake-772.mypinata.cloud/ipfs';
+const PINATA_GATEWAY = 'https://blush-adjacent-octopus-823.mypinata.cloud/ipfs';
 const PINATA_API = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
 const PINATA_METADATA_API = 'https://api.pinata.cloud/pinning/hashMetadata';
 
@@ -9,7 +9,6 @@ if (!pinataJWT) {
   throw new Error('Pinata JWT not found. Please check your environment variables.');
 }
 
-// Add more detailed logging and error handling
 export async function uploadToIPFS(file: File): Promise<string> {
   try {
     console.log('Starting Pinata upload...', {
@@ -119,8 +118,11 @@ export async function getFromIPFS(hash: string): Promise<ArrayBuffer> {
       const response = await fetch(`${PINATA_GATEWAY}/${hash}`, {
         headers: {
           'Accept': '*/*',
-          'Cache-Control': 'no-cache'
-        }
+          'Cache-Control': 'no-cache',
+          'Origin': window.location.origin
+        },
+        mode: 'cors',
+        credentials: 'omit'
       });
 
       if (!response.ok) {
