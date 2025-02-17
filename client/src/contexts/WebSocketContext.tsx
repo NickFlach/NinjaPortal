@@ -18,7 +18,7 @@ export const useWebSocket = () => {
   if (!context) {
     throw new Error('useWebSocket must be used within a WebSocketProvider');
   }
-  return context.socket;
+  return context;
 };
 
 export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

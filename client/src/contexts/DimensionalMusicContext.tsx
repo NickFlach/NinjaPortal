@@ -30,33 +30,36 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
   });
   const [isDimensionallyAligned, setIsDimensionallyAligned] = useState(true);
   const [dimensionalErrors, setDimensionalErrors] = useState<string[]>([]);
-  
-  const socket = useWebSocket();
+
+  const { socket, isConnected } = useWebSocket();
   const { t } = useDimensionalTranslation();
   const { address } = useAccount();
   const dimensionalSyncRef = useRef<number>(0);
 
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !isConnected) {
+      console.log('WebSocket not connected, skipping dimensional sync setup');
+      return;
+    }
 
-    const handleMessage = async (event: MessageEvent) => {
+    const handleMessage = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
         switch (data.type) {
           case 'dimensional_sync':
             setDimensionalState({
-              entropy: data.entropy || 0,
-              harmonicAlignment: data.harmonicAlignment || 1,
-              dimensionalShift: data.dimensionalShift || 0,
-              quantumState: data.quantumState || 'aligned'
+              entropy: data.entropy ?? 0,
+              harmonicAlignment: data.harmonicAlignment ?? 1,
+              dimensionalShift: data.dimensionalShift ?? 0,
+              quantumState: data.quantumState ?? 'aligned'
             });
-            setIsDimensionallyAligned(data.isAligned || true);
+            setIsDimensionallyAligned(data.isAligned ?? true);
             break;
           case 'dimensional_error':
             setDimensionalErrors(prev => [...prev, data.message]);
             break;
           default:
-            // Handle other message types
+            // Ignore other message types
             break;
         }
       } catch (error) {
@@ -65,15 +68,18 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
       }
     };
 
+    console.log('Setting up dimensional sync WebSocket listener');
     socket.addEventListener('message', handleMessage);
+
     return () => {
+      console.log('Cleaning up dimensional sync WebSocket listener');
       socket.removeEventListener('message', handleMessage);
     };
-  }, [socket, t]);
+  }, [socket, isConnected, t]);
 
   const syncWithDimension = async (dimension: string) => {
     try {
-      if (!socket || socket.readyState !== WebSocket.OPEN) {
+      if (!socket || !isConnected) {
         throw new Error('Dimensional sync connection not available');
       }
 
