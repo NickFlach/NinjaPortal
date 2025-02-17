@@ -11,7 +11,6 @@ import { Layout } from "@/components/Layout";
 import { useIntl } from "react-intl";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { GpsVisualizationToolkit, MarkerLayer, PathLayer, HeatmapLayer } from "@/components/GpsVisualizationToolkit";
-import { NetworkSyncVisualization } from "@/components/NetworkSyncVisualization";
 
 interface MapData {
   countries: {
@@ -35,7 +34,7 @@ interface VisualizationOptions {
 
 const MapPage: FC = () => {
   const { address } = useAccount();
-  const { activeListeners, userCoordinates, isSynced } = useMusicPlayer();
+  const { isSynced } = useMusicPlayer();
   const intl = useIntl();
   const [mapError, setMapError] = useState<string | null>(null);
   const [visualizationOptions, setVisualizationOptions] = useState<VisualizationOptions>({
@@ -46,20 +45,19 @@ const MapPage: FC = () => {
     pathColor: "#3b82f6"
   });
 
+  // Fetch map data with polling
   const { data: mapData, isLoading, error } = useQuery<MapData>({
     queryKey: ['/api/music/map'],
-    refetchInterval: 15000,
+    refetchInterval: 15000, // Poll every 15 seconds
     queryFn: async () => {
       const headers: Record<string, string> = address
         ? { 'x-wallet-address': address }
         : { 'x-internal-token': 'landing-page' };
 
       const response = await fetch('/api/music/map', { headers });
-
       if (!response.ok) {
         throw new Error(`Failed to fetch map data: ${response.statusText}`);
       }
-
       return response.json();
     }
   });
@@ -67,11 +65,10 @@ const MapPage: FC = () => {
   // Process locations for heatmap and markers
   const locationData = useMemo(() => {
     if (!mapData?.allLocations || !isSynced) return [];
-    console.log('Processing location data, total locations:', mapData.allLocations.length);
     return mapData.allLocations;
   }, [mapData, isSynced]);
 
-  const hasNoData = !isLoading && (!mapData || activeListeners === 0);
+  const hasNoData = !isLoading && (!mapData || mapData.totalListeners === 0);
 
   // Check for leaflet.heat availability
   useEffect(() => {
@@ -82,7 +79,6 @@ const MapPage: FC = () => {
   }, []);
 
   const handleVisualizationOptionsChange = (newOptions: VisualizationOptions) => {
-    console.log('Updating visualization options:', newOptions);
     setVisualizationOptions(newOptions);
   };
 
@@ -108,7 +104,7 @@ const MapPage: FC = () => {
           ) : (
             intl.formatMessage(
               { id: 'map.totalListeners' },
-              { count: activeListeners }
+              { count: mapData.totalListeners }
             )
           )}
         </div>
@@ -131,11 +127,10 @@ const MapPage: FC = () => {
                 maxZoom={7}
                 maxBounds={[[-90, -180], [90, 180]]}
                 className="z-0"
-                zoomControl={false} // Disable default zoom control
+                zoomControl={false}
               >
                 <div className="absolute top-2 right-2 z-[1000]">
                   <div className="bg-background/95 backdrop-blur-sm rounded-lg shadow-lg">
-                    {/* Custom zoom controls */}
                     <div className="leaflet-control-zoom leaflet-bar">
                       <button 
                         className="leaflet-control-zoom-in"
@@ -169,7 +164,7 @@ const MapPage: FC = () => {
                   className="dark-tiles"
                 />
 
-                {isSynced && (
+                {isSynced && locationData.length > 0 && (
                   <>
                     {visualizationOptions.showHeatmap && (
                       <HeatmapLayer data={locationData} />
@@ -182,16 +177,15 @@ const MapPage: FC = () => {
                       />
                     )}
 
-                    {visualizationOptions.showPaths && userCoordinates && (
+                    {visualizationOptions.showPaths && (
                       <PathLayer 
-                        coordinates={[userCoordinates]} 
+                        coordinates={locationData} 
                         options={visualizationOptions}
                       />
                     )}
 
                     <GpsVisualizationToolkit
                       data={locationData}
-                      userPath={userCoordinates ? [userCoordinates] : undefined}
                       onOptionChange={handleVisualizationOptionsChange}
                     />
                   </>
@@ -200,8 +194,6 @@ const MapPage: FC = () => {
             )}
           </div>
         </Card>
-
-        <NetworkSyncVisualization />
       </div>
     </Layout>
   );
