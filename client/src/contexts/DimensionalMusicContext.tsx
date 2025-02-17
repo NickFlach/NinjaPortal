@@ -1,0 +1,120 @@
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { useWebSocket } from './WebSocketContext';
+import { useDimensionalTranslation } from './LocaleContext';
+import { useAccount } from 'wagmi';
+
+interface DimensionalState {
+  entropy: number;
+  harmonicAlignment: number;
+  dimensionalShift: number;
+  quantumState: 'aligned' | 'shifting' | 'unstable';
+}
+
+interface DimensionalMusicContextType {
+  currentDimension: string;
+  dimensionalState: DimensionalState;
+  syncWithDimension: (dimension: string) => Promise<void>;
+  isDimensionallyAligned: boolean;
+  dimensionalErrors: string[];
+}
+
+const DimensionalMusicContext = createContext<DimensionalMusicContextType | undefined>(undefined);
+
+export function DimensionalMusicProvider({ children }: { children: React.ReactNode }) {
+  const [currentDimension, setCurrentDimension] = useState<string>('prime');
+  const [dimensionalState, setDimensionalState] = useState<DimensionalState>({
+    entropy: 0,
+    harmonicAlignment: 1,
+    dimensionalShift: 0,
+    quantumState: 'aligned'
+  });
+  const [isDimensionallyAligned, setIsDimensionallyAligned] = useState(true);
+  const [dimensionalErrors, setDimensionalErrors] = useState<string[]>([]);
+  
+  const socket = useWebSocket();
+  const { t } = useDimensionalTranslation();
+  const { address } = useAccount();
+  const dimensionalSyncRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleMessage = async (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        switch (data.type) {
+          case 'dimensional_sync':
+            setDimensionalState({
+              entropy: data.entropy || 0,
+              harmonicAlignment: data.harmonicAlignment || 1,
+              dimensionalShift: data.dimensionalShift || 0,
+              quantumState: data.quantumState || 'aligned'
+            });
+            setIsDimensionallyAligned(data.isAligned || true);
+            break;
+          case 'dimensional_error':
+            setDimensionalErrors(prev => [...prev, data.message]);
+            break;
+          default:
+            // Handle other message types
+            break;
+        }
+      } catch (error) {
+        console.error('Error handling dimensional sync message:', error);
+        setDimensionalErrors(prev => [...prev, t('app.errors.dimension')]);
+      }
+    };
+
+    socket.addEventListener('message', handleMessage);
+    return () => {
+      socket.removeEventListener('message', handleMessage);
+    };
+  }, [socket, t]);
+
+  const syncWithDimension = async (dimension: string) => {
+    try {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        throw new Error('Dimensional sync connection not available');
+      }
+
+      // Clear previous errors
+      setDimensionalErrors([]);
+
+      // Request dimensional sync
+      socket.send(JSON.stringify({
+        type: 'dimensional_sync_request',
+        dimension,
+        address,
+        timestamp: Date.now(),
+        syncId: ++dimensionalSyncRef.current
+      }));
+
+      setCurrentDimension(dimension);
+    } catch (error) {
+      console.error('Dimensional sync error:', error);
+      setDimensionalErrors(prev => [...prev, t('app.errors.quantum')]);
+    }
+  };
+
+  return (
+    <DimensionalMusicContext.Provider
+      value={{
+        currentDimension,
+        dimensionalState,
+        syncWithDimension,
+        isDimensionallyAligned,
+        dimensionalErrors
+      }}
+    >
+      {children}
+    </DimensionalMusicContext.Provider>
+  );
+}
+
+export function useDimensionalMusic() {
+  const context = useContext(DimensionalMusicContext);
+  if (!context) {
+    throw new Error('useDimensionalMusic must be used within a DimensionalMusicProvider');
+  }
+  return context;
+}

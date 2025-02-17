@@ -17,10 +17,11 @@ import { MusicSyncProvider } from "@/contexts/MusicSyncContext";
 import { WebSocketProvider } from "@/contexts/WebSocketContext";
 import { useEffect } from "react";
 import { DimensionalProvider } from "./contexts/LocaleContext";
+import { DimensionalMusicProvider } from "./contexts/DimensionalMusicContext";
 import Whitepaper from "./pages/Whitepaper";
 import LumiraData from "@/pages/LumiraData";
 
-// Error Boundary Component remains unchanged
+// Error Boundary Component
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean }
@@ -129,14 +130,16 @@ function App() {
       <WagmiConfig config={config}>
         <QueryClientProvider client={queryClient}>
           <DimensionalProvider>
-            <WebSocketProvider>
-              <MusicPlayerProvider>
-                <MusicSyncProvider>
-                  <Router />
-                  <Toaster />
-                </MusicSyncProvider>
-              </MusicPlayerProvider>
-            </WebSocketProvider>
+            <DimensionalMusicProvider>
+              <WebSocketProvider>
+                <MusicPlayerProvider>
+                  <MusicSyncProvider>
+                    <Router />
+                    <Toaster />
+                  </MusicSyncProvider>
+                </MusicPlayerProvider>
+              </WebSocketProvider>
+            </DimensionalMusicProvider>
           </DimensionalProvider>
         </QueryClientProvider>
       </WagmiConfig>

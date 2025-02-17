@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useQuery } from "@tanstack/react-query";
 import { getFromIPFS } from "@/lib/ipfs";
 import { useAccount } from 'wagmi';
 import { useWebSocket } from './WebSocketContext';
+import { useDimensionalMusic } from './DimensionalMusicContext';
+import { useDimensionalTranslation } from './LocaleContext';
 
 interface Song {
   id: number;
@@ -16,11 +18,6 @@ interface Song {
 
 type PlaylistContext = 'landing' | 'library' | 'feed';
 
-interface Coordinates {
-  lat: number;
-  lng: number;
-}
-
 interface MusicPlayerContextType {
   currentSong: Song | undefined;
   isPlaying: boolean;
@@ -30,66 +27,14 @@ interface MusicPlayerContextType {
   isLandingPage: boolean;
   currentContext: PlaylistContext;
   audioRef: React.RefObject<HTMLAudioElement>;
-  userCoordinates?: Coordinates;
-  activeListeners: number;
-  isSynced: boolean;
-  toggleBluetoothSync: () => Promise<void>;
-  isBluetoothEnabled: boolean;
-  isLeader: boolean;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
-
-// Simple PID controller implementation
-class PIDController {
-  private kp: number;
-  private ki: number;
-  private kd: number;
-  private integral: number;
-  private lastError: number;
-
-  constructor(kp = 0.5, ki = 0.1, kd = 0.01) {
-    this.kp = kp;
-    this.ki = ki;
-    this.kd = kd;
-    this.integral = 0;
-    this.lastError = 0;
-  }
-
-  compute(target: number, current: number): number {
-    const error = target - current;
-    this.integral += error;
-    const derivative = error - this.lastError;
-    this.lastError = error;
-
-    return 1.0 + (
-      this.kp * error +
-      this.ki * this.integral +
-      this.kd * derivative
-    );
-  }
-
-  reset(): void {
-    this.integral = 0;
-    this.lastError = 0;
-  }
-
-  setParameters(kp: number, ki: number, kd: number): void {
-    this.kp = kp;
-    this.ki = ki;
-    this.kd = kd;
-  }
-}
 
 export function MusicPlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentSong, setCurrentSong] = useState<Song>();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentContext, setCurrentContext] = useState<PlaylistContext>('landing');
-  const [userCoordinates, setUserCoordinates] = useState<Coordinates>();
-  const [activeListeners, setActiveListeners] = useState(0);
-  const [isSynced, setIsSynced] = useState(false);
-  const [isBluetoothEnabled, setIsBluetoothEnabled] = useState(false);
-  const [isLeader, setIsLeader] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { address: userAddress } = useAccount();
@@ -97,9 +42,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const landingAddress = userAddress || defaultWallet;
   const isLandingPage = !userAddress;
   const audioContextRef = useRef<AudioContext>();
-  const pidControllerRef = useRef(new PIDController());
-  const lastSyncRef = useRef<{ timestamp: number; playing: boolean } | null>(null);
-  const socket = useWebSocket();
+  const { t } = useDimensionalTranslation();
+  const { currentDimension, dimensionalState, syncWithDimension } = useDimensionalMusic();
 
   // Initialize audio element
   useEffect(() => {
@@ -115,42 +59,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
-  // Request geolocation when needed
-  const requestGeolocation = async () => {
-    if (!geolocationPermissionAsked.current && 'geolocation' in navigator) {
-      geolocationPermissionAsked.current = true;
-      console.log('Requesting geolocation permission...');
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0
-          });
-        });
-
-        const coordinates = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        };
-
-        setUserCoordinates(coordinates);
-
-        // Send location update if connected
-        if (socket?.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({
-            type: 'location_update',
-            coordinates,
-            countryCode: 'US' // Default to US for demo
-          }));
-        }
-      } catch (error) {
-        console.error('Error getting location:', error);
-      }
-    }
-  };
-
-  // Fetch landing page feed (recent songs)
+  // Fetch recent songs
   const { data: recentSongs } = useQuery<Song[]>({
     queryKey: ["/api/songs/recent"],
     queryFn: async () => {
@@ -196,6 +105,9 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         setCurrentContext(context);
       }
 
+      // Sync with current dimension before playing
+      await syncWithDimension(currentDimension);
+
       // Get IPFS data
       console.log('Fetching from IPFS gateway:', song.ipfsHash);
       const audioData = await getFromIPFS(song.ipfsHash);
@@ -217,6 +129,11 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
       // Update state
       setCurrentSong(song);
+
+      // Apply dimensional adjustments
+      if (audioRef.current && dimensionalState.harmonicAlignment !== 1) {
+        audioRef.current.playbackRate = dimensionalState.harmonicAlignment;
+      }
 
       // Try to play
       if (audioRef.current) {
@@ -285,172 +202,14 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [recentSongs, isLandingPage]);
 
-  // Add event listener for song end
-  useEffect(() => {
-    if (!audioRef.current) return;
-
-    const handleSongEnd = async () => {
-      if (!currentSong) return;
-
-      try {
-        // Get the next song in the current context
-        const nextSong = getNextSong(currentSong.id);
-        if (nextSong) {
-          console.log('Current song ended, playing next:', nextSong.title);
-          await playSong(nextSong, currentContext);
-        }
-      } catch (error) {
-        console.error('Error auto-playing next song:', error);
-        setIsPlaying(false);
-      }
-    };
-
-    audioRef.current.addEventListener('ended', handleSongEnd);
-    return () => {
-      audioRef.current?.removeEventListener('ended', handleSongEnd);
-    };
-  }, [currentSong, currentContext]);
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      // WebSocket cleanup handled by WebSocketContext
-      if (audioRef.current) {
-        audioRef.current.playbackRate = 1;
-      }
-    };
-  }, []);
-
-
-  // Enhanced WebSocket connection handling
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleMessage = async (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-        switch (data.type) {
-          case 'stats_update':
-            setActiveListeners(data.data.activeListeners);
-            break;
-          case 'leader_update':
-            console.log('Leader status updated:', data.isLeader);
-            setIsLeader(data.isLeader);
-            break;
-          case 'sync':
-            if (!isLeader && audioRef.current && data.songId === currentSong?.id) {
-              lastSyncRef.current = {
-                timestamp: data.timestamp,
-                playing: data.playing
-              };
-
-              const timeDiff = Math.abs(audioRef.current.currentTime - data.timestamp);
-              if (timeDiff > 5) {
-                audioRef.current.currentTime = data.timestamp;
-                pidControllerRef.current.reset();
-              }
-              if (data.playing !== isPlaying) {
-                await togglePlay().catch(console.error);
-              }
-            }
-            break;
-          case 'error':
-            console.error('WebSocket error message:', data.message);
-            break;
-          default:
-            console.log('Received websocket message:', data);
-        }
-      } catch (error) {
-        console.error('Error handling WebSocket message:', error);
-      }
-    };
-
-    socket.addEventListener('message', handleMessage);
-    setIsSynced(socket.readyState === WebSocket.OPEN);
-
-    return () => {
-      socket.removeEventListener('message', handleMessage);
-    };
-  }, [socket, currentSong, isPlaying, isLeader, togglePlay]);
-
-  // Add playback rate validation
-  const adjustPlaybackSync = useCallback(() => {
-    if (!audioRef.current || !currentSong || isLeader) return;
-
-    // Get the target time from the leader's last sync message
-    const targetTime = lastSyncRef.current?.timestamp || 0;
-    const currentTime = audioRef.current.currentTime;
-
-    // Compute new playback rate using PID controller
-    const newRate = pidControllerRef.current.compute(targetTime, currentTime);
-
-    // Clamp playback rate to valid range (0.25 to 4.0 for most browsers)
-    const clampedRate = Math.max(0.25, Math.min(4.0, newRate));
-
-    // Apply the computed playback rate
-    if (audioRef.current) {
-      try {
-        audioRef.current.playbackRate = clampedRate;
-      } catch (error) {
-        console.warn('Failed to set playback rate:', error);
-        // Reset to normal playback on error
-        audioRef.current.playbackRate = 1.0;
-        pidControllerRef.current.reset();
-      }
-    }
-  }, [currentSong, isLeader]);
-
-  const toggleBluetoothSync = useCallback(async () => {
-    if (isBluetoothEnabled) {
-      setIsBluetoothEnabled(false);
-      return;
-    }
-
-    try {
-      if ('geolocation' in navigator) {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0
-          });
-        });
-
-        setUserCoordinates({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
-
-        setIsBluetoothEnabled(true);
-      }
-    } catch (error) {
-      console.error('Location sync error:', error);
-      // Even if we get an error, we'll still enable the feature
-      setIsBluetoothEnabled(true);
-    }
-  }, [isBluetoothEnabled]);
-
-  const getNextSong = (currentSongId: number): Song | undefined => {
-    if (!recentSongs?.length) return undefined;
-
-    const currentIndex = recentSongs.findIndex(song => song.id === currentSongId);
-    if (currentIndex === -1) return recentSongs[0];
-
-    return recentSongs[(currentIndex + 1) % recentSongs.length];
-  };
-
+  // Reset context when wallet disconnects
   useEffect(() => {
     if (!userAddress) {
       setCurrentContext('landing');
     }
   }, [userAddress]);
 
+  // Initialize audio context
   useEffect(() => {
     try {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -471,83 +230,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
-  useEffect(() => {
-    if (socket?.readyState === WebSocket.OPEN && currentSong && isLeader) {
-      try {
-        socket.send(JSON.stringify({
-          type: 'sync',
-          songId: currentSong.id,
-          playing: isPlaying,
-          timestamp: audioRef.current?.currentTime || 0
-        }));
-
-        if (isPlaying && userCoordinates) {
-          console.log('Sending location update:', userCoordinates);
-          socket.send(JSON.stringify({
-            type: 'location_update',
-            coordinates: userCoordinates,
-            countryCode: 'US' // Default to US for demo purposes
-          }));
-        }
-      } catch (error) {
-        console.error('Error sending WebSocket message:', error);
-      }
-    }
-  }, [isPlaying, currentSong, userCoordinates, isLeader, socket]);
-
-  useEffect(() => {
-    if (!isLeader && isBluetoothEnabled) {
-      // Reset PID controller when starting sync
-      pidControllerRef.current.reset();
-
-      // Start sync adjustment interval
-      const syncInterval = setInterval(adjustPlaybackSync, 100); // 10Hz update rate
-
-      // Report experience data every second
-      const experienceInterval = setInterval(async () => {
-        try {
-          if (audioRef.current) {
-            const currentTime = audioRef.current.currentTime;
-            const targetTime = lastSyncRef.current?.timestamp || 0;
-            const timeDiff = Math.abs(currentTime - targetTime);
-
-            // Calculate experience metrics
-            const audioQuality = Math.max(0, 1 - (timeDiff / 5)); // 0-1 scale, lower diff = better
-            const syncQuality = isPlaying === (lastSyncRef.current?.playing || false) ? 1 : 0;
-
-            await fetch('/api/lumira/experience', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'audio',
-                sentiment: audioQuality * 2 - 1, // Convert to -1 to 1 scale
-                intensity: syncQuality,
-                context: 'sync',
-                songId: currentSong?.id
-              })
-            });
-
-            // Update PID parameters based on experience
-            const kp = 0.5 + (audioQuality * 0.5); // Adjust proportional gain
-            const ki = 0.1 + (syncQuality * 0.1); // Adjust integral gain
-            pidControllerRef.current.setParameters(kp, ki, 0.01);
-          }
-        } catch (error) {
-          console.error('Error reporting sync experience:', error);
-        }
-      }, 1000);
-
-      return () => {
-        clearInterval(syncInterval);
-        clearInterval(experienceInterval);
-        // Reset playback rate when stopping sync
-        if (audioRef.current) {
-          audioRef.current.playbackRate = 1;
-        }
-      };
-    }
-  }, [isLeader, isBluetoothEnabled, currentSong, isPlaying]);
-
   return (
     <MusicPlayerContext.Provider value={{
       currentSong,
@@ -557,13 +239,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       recentSongs,
       isLandingPage,
       currentContext,
-      audioRef,
-      userCoordinates,
-      activeListeners,
-      isSynced,
-      toggleBluetoothSync,
-      isBluetoothEnabled,
-      isLeader
+      audioRef
     }}>
       {children}
     </MusicPlayerContext.Provider>
