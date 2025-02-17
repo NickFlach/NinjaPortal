@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useWebSocket } from './WebSocketContext';
-import { useDimensionalTranslation } from './LocaleContext';
 import { useAccount } from 'wagmi';
 
 interface DimensionalState {
@@ -32,7 +31,6 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
   const [dimensionalErrors, setDimensionalErrors] = useState<string[]>([]);
 
   const { socket, isConnected } = useWebSocket();
-  const { t } = useDimensionalTranslation();
   const { address } = useAccount();
   const dimensionalSyncRef = useRef<number>(0);
 
@@ -59,12 +57,11 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
             setDimensionalErrors(prev => [...prev, data.message]);
             break;
           default:
-            // Ignore other message types
             break;
         }
       } catch (error) {
         console.error('Error handling dimensional sync message:', error);
-        setDimensionalErrors(prev => [...prev, t('app.errors.dimension')]);
+        setDimensionalErrors(prev => [...prev, 'Error processing sync message']);
       }
     };
 
@@ -75,7 +72,7 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
       console.log('Cleaning up dimensional sync WebSocket listener');
       socket.removeEventListener('message', handleMessage);
     };
-  }, [socket, isConnected, t]);
+  }, [socket, isConnected]);
 
   const syncWithDimension = async (dimension: string) => {
     try {
@@ -98,7 +95,7 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
       setCurrentDimension(dimension);
     } catch (error) {
       console.error('Dimensional sync error:', error);
-      setDimensionalErrors(prev => [...prev, t('app.errors.quantum')]);
+      setDimensionalErrors(prev => [...prev, 'Failed to sync with dimension']);
     }
   };
 
