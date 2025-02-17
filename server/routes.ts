@@ -364,10 +364,18 @@ export function registerRoutes(app: Express) {
       let processedData = mapData;
       if (targetLanguage !== 'en') {
         try {
-          const translationResponse = await fetch('/api/translate/map-data', {
+          // Use absolute URL with current host
+          const host = req.get('host');
+          const protocol = req.protocol;
+          const translationUrl = `${protocol}://${host}/api/translate/map-data`;
+
+          console.log('Attempting translation with URL:', translationUrl);
+
+          const translationResponse = await fetch(translationUrl, {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'Accept-Language': targetLanguage
             },
             body: JSON.stringify({
               mapData,
@@ -376,8 +384,15 @@ export function registerRoutes(app: Express) {
           });
 
           if (translationResponse.ok) {
-            const { translatedData } = await translationResponse.json();
-            processedData = translatedData;
+            const translatedResult = await translationResponse.json();
+            if (translatedResult.translatedData) {
+              processedData = translatedResult.translatedData;
+              console.log('Translation successful');
+            } else {
+              console.warn('Translation response missing translatedData:', translatedResult);
+            }
+          } else {
+            console.warn('Translation failed:', await translationResponse.text());
           }
         } catch (translationError) {
           console.warn('Failed to translate map data:', translationError);
@@ -974,8 +989,7 @@ export function registerRoutes(app: Express) {
 
       // In development, send unencrypted response if no secure channel
       if (process.env.NODE_ENV === 'development' && !(req as any).secureChannel) {
-        return res.json({ 
-          loved: !existingLove,
+        return res.json({ loved: !existingLove,
           totalLoves: total,
           dev: true
         });

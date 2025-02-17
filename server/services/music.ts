@@ -2,6 +2,7 @@ import { db } from '@db';
 import { listeners, songs } from '@db/schema';
 import { sql, eq } from 'drizzle-orm';
 import { desc } from 'drizzle-orm/expressions';
+import { lumiraService } from '../routes/lumira';
 
 export interface MapDataResponse {
   countries: {
@@ -79,10 +80,34 @@ export async function getMapData(): Promise<MapDataResponse> {
       }
     });
 
-    return {
-      countries,
-      totalListeners
-    };
+    // Process through Lumira for data enrichment
+    try {
+      const enrichedData = await lumiraService.processMetricsPrivately({
+        type: 'gps',
+        timestamp: new Date().toISOString(),
+        data: {
+          countries,
+          totalListeners,
+          success: true
+        },
+        metadata: {
+          source: 'map-data-service',
+          processed: true
+        }
+      });
+
+      return enrichedData.data || {
+        countries,
+        totalListeners
+      };
+    } catch (lumiraError) {
+      console.warn('Non-critical Lumira enrichment error:', lumiraError);
+      // Return original data if Lumira processing fails
+      return {
+        countries,
+        totalListeners
+      };
+    }
   } catch (error) {
     console.error('Error in getMapData:', error);
     throw error;

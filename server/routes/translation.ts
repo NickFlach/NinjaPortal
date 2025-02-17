@@ -9,6 +9,27 @@ const translate = new v2.Translate({
   key: process.env.TRANSLATION_API_KEY
 });
 
+// Helper function to translate map-specific strings
+async function translateMapData(data: any, targetLanguage: string) {
+  // Translate map-specific messages
+  const keysToTranslate = [
+    'map.title',
+    'map.noActivity',
+    'map.noData',
+    'map.error',
+    'map.totalListeners'
+  ];
+
+  const translations = await Promise.all(
+    keysToTranslate.map(async (key) => {
+      const [translation] = await translate.translate(data[key] || '', targetLanguage);
+      return [key, translation];
+    })
+  );
+
+  return Object.fromEntries(translations);
+}
+
 router.post('/translate', async (req, res) => {
   try {
     const { text, targetLanguage } = req.body;
@@ -22,7 +43,7 @@ router.post('/translate', async (req, res) => {
     // Send anonymized translation data to Lumira for analysis
     try {
       await lumiraService.processMetricsPrivately({
-        type: 'translation',
+        type: 'gps',
         timestamp: new Date().toISOString(),
         data: {
           sourceLanguage: 'en',
@@ -37,7 +58,6 @@ router.post('/translate', async (req, res) => {
       });
     } catch (lumiraError) {
       console.warn('Non-critical Lumira metrics error:', lumiraError);
-      // Don't fail the translation if metrics fail
     }
 
     res.json({
@@ -51,7 +71,7 @@ router.post('/translate', async (req, res) => {
     // Log failed translation attempt for analysis
     try {
       await lumiraService.processMetricsPrivately({
-        type: 'translation',
+        type: 'gps',
         timestamp: new Date().toISOString(),
         data: {
           sourceLanguage: 'en',
@@ -85,14 +105,20 @@ router.post('/translate/map-data', async (req, res) => {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    // Process through Lumira for enhanced translation
-    const translatedData = await lumiraService.processMetricsPrivately({
-      type: 'map_translation',
+    // Translate map-specific strings
+    const translatedStrings = await translateMapData(mapData, targetLanguage);
+
+    // Process through Lumira for enhanced translation and data enrichment
+    const enrichedData = await lumiraService.processMetricsPrivately({
+      type: 'gps',
       timestamp: new Date().toISOString(),
       data: {
         sourceLanguage: 'en',
         targetLanguage,
-        mapData,
+        mapData: {
+          ...mapData,
+          translations: translatedStrings
+        },
         success: true
       },
       metadata: {
@@ -102,7 +128,11 @@ router.post('/translate/map-data', async (req, res) => {
     });
 
     res.json({
-      translatedData,
+      translatedData: {
+        ...mapData,
+        translations: translatedStrings,
+        ...enrichedData.data
+      },
       sourceLanguage: 'en',
       targetLanguage
     });
