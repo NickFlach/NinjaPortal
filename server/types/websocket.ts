@@ -11,7 +11,9 @@ export interface ClientInfo {
   countryCode?: string;
   connectedAt: number;
   isLeader?: boolean;
-  currentTime?: number; // Add current playback time
+  currentTime?: number;
+  lastSyncTime?: number;
+  connectionQuality?: number;
 }
 
 export type WebSocketMessage = 
@@ -19,12 +21,14 @@ export type WebSocketMessage =
   | { type: 'subscribe'; songId: number }
   | { type: 'sync'; songId: number; timestamp: number; playing: boolean }
   | { type: 'request_sync'; songId: number }
-  | { type: 'location_update'; coordinates: Coordinates; countryCode: string };
+  | { type: 'location_update'; coordinates: Coordinates; countryCode: string }
+  | { type: 'ping' };
 
 export type ServerMessage =
   | { type: 'stats_update'; data: LiveStats }
   | { type: 'sync'; songId: number; timestamp: number; playing: boolean }
-  | { type: 'leader_update'; isLeader: boolean };
+  | { type: 'leader_update'; isLeader: boolean }
+  | { type: 'pong' };
 
 export interface LiveStats {
   activeListeners: number;
