@@ -62,7 +62,7 @@ const startServer = async (retryCount = 0) => {
 
     // Initialize WebSocket server with a distinct path
     const wss = new WebSocketServer({ 
-      noServer: true, // Important: Use noServer mode to handle upgrade manually
+      noServer: true,
       perMessageDeflate: {
         zlibDeflateOptions: {
           chunkSize: 1024,
@@ -79,29 +79,6 @@ const startServer = async (retryCount = 0) => {
         threshold: 1024
       }
     });
-
-    // Generate stats function with access to wss
-    function generateStats() {
-      const stats = {
-        activeListeners: wss.clients.size,
-        geotaggedListeners: 0,
-        anonymousListeners: wss.clients.size,
-        listenersByCountry: {},
-        locations: []
-      };
-      console.log('Generated stats:', stats);
-      return stats;
-    }
-
-    // Broadcast updates to all connected clients
-    function broadcastUpdate(type: string, data: any) {
-      const message = JSON.stringify({ type, data });
-      wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(message);
-        }
-      });
-    }
 
     // Keep track of handled sockets to prevent duplicate upgrades
     const handledSockets = new WeakSet();
@@ -144,16 +121,9 @@ const startServer = async (retryCount = 0) => {
     // WebSocket connection handling with proper error handling
     wss.on('connection', (ws: CustomWebSocket) => {
       ws.isAlive = true;
-      console.log('New client connected');
+      console.log('New music sync client connected');
 
-      // Send initial stats to the new client
-      const stats = generateStats();
-      ws.send(JSON.stringify({
-        type: 'stats_update',
-        data: stats
-      }));
-
-      // Handle incoming messages
+      // Handle incoming messages - only for music sync
       ws.on('message', async (message: string) => {
         try {
           const data = JSON.parse(message.toString());
@@ -177,18 +147,6 @@ const startServer = async (retryCount = 0) => {
                   }));
                 }
               });
-              break;
-
-            case 'location_update':
-              // Validate location data
-              if (!data.coordinates || typeof data.coordinates.lat !== 'number' || typeof data.coordinates.lng !== 'number') {
-                console.error('Invalid location data received:', data);
-                return;
-              }
-
-              // Update client location and broadcast new stats
-              const updatedStats = generateStats();
-              broadcastUpdate('stats_update', updatedStats);
               break;
 
             case 'ping':
@@ -225,13 +183,9 @@ const startServer = async (retryCount = 0) => {
         clearInterval(pingInterval);
       });
 
-      ws.on('close', (code: number) => {
-        console.log('Client disconnected:', code);
+      ws.on('close', () => {
+        console.log('Music sync client disconnected');
         clearInterval(pingInterval);
-
-        // Broadcast updated stats to remaining clients
-        const updatedStats = generateStats();
-        broadcastUpdate('stats_update', updatedStats);
       });
     });
 
