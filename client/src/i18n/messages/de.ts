@@ -9,7 +9,7 @@ export default {
   'app.songs': 'Lieder',
   'app.recent': 'Aktuelle Wiedergaben der Community',
   'app.noSongs': 'Noch keine Songs in deiner Bibliothek',
-  'app.noRecentSongs': 'Noch keine Songs abgespielt',
+  'app.noRecentSongs': 'Keine kürzlichen Wiedergaben',
   'app.loading': 'Lade deine Bibliothek...',
   'app.welcome.back': 'Willkommen zurück!',
   'app.welcome.opera': 'Willkommen zurück im Opera Wallet!',

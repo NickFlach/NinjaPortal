@@ -9,6 +9,7 @@ export default {
   'app.songs': '歌曲',
   'app.recent': '社区最新播放',
   'app.noSongs': '你的库中还没有歌曲',
+  'app.noRecentSongs': '暂无最近播放',
   'app.loading': '正在加载你的库...',
   'app.welcome.back': '欢迎回来！',
   'app.welcome.opera': '欢迎回到Opera钱包！',
