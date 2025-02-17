@@ -12,6 +12,11 @@ const router = Router();
 // Get recent songs
 router.get("/recent", async (req, res) => {
   try {
+    console.log('Fetching recent songs with headers:', {
+      wallet: req.headers['x-wallet-address'],
+      internal: !!req.headers['x-internal-token']
+    });
+
     const recentSongs = await db.query.recentlyPlayed.findMany({
       orderBy: desc(recentlyPlayed.playedAt),
       limit: 100,

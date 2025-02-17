@@ -31,6 +31,9 @@ interface MusicPlayerContextType {
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 2000;
+
 export function MusicPlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentSong, setCurrentSong] = useState<Song>();
   const [isPlaying, setIsPlaying] = useState(false);
@@ -42,28 +45,85 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const landingAddress = userAddress || defaultWallet;
   const isLandingPage = !userAddress;
   const audioContextRef = useRef<AudioContext>();
-  const { t } = useDimensionalTranslation();
   const { currentDimension, dimensionalState, syncWithDimension } = useDimensionalMusic();
+  const lastFetchRef = useRef<number>(0);
 
   // Initialize audio element
   useEffect(() => {
-    if (!audioRef.current) {
-      const audio = new Audio();
-      audio.preload = 'auto';
-      audioRef.current = audio;
+    try {
+      if (!audioRef.current) {
+        const audio = new Audio();
+        audio.preload = 'auto';
+        audioRef.current = audio;
+
+        // Add error handling for audio element
+        audio.addEventListener('error', (e) => {
+          console.error('Audio element error:', e);
+          setIsPlaying(false);
+        });
+      }
+
+      // Initialize or resume AudioContext on user interaction
+      const initAudioContext = () => {
+        try {
+          const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+          if (!audioContextRef.current) {
+            audioContextRef.current = new AudioContext();
+            console.log('AudioContext initialized successfully');
+          } else if (audioContextRef.current.state === 'suspended') {
+            audioContextRef.current.resume().catch(console.error);
+          }
+        } catch (error) {
+          console.error('Failed to initialize AudioContext:', error);
+        }
+      };
+
+      document.addEventListener('click', initAudioContext, { once: true });
+
+      return () => {
+        document.removeEventListener('click', initAudioContext);
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+      };
+    } catch (error) {
+      console.error('Error in audio initialization:', error);
     }
+  }, []);
+
+  // Monitor and cleanup AudioContext
+  useEffect(() => {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+        console.log('AudioContext initialized successfully');
+      }
+    } catch (error) {
+      console.error('Failed to initialize AudioContext:', error);
+    }
+
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
+      try {
+        audioContextRef.current?.close().catch(console.error);
+      } catch (error) {
+        console.error('Error closing AudioContext:', error);
       }
     };
   }, []);
 
-  // Fetch recent songs
+  // Fetch recent songs with proper error handling and retries
   const { data: recentSongs } = useQuery<Song[]>({
-    queryKey: ["/api/music/recent"],
+    queryKey: ["/api/music/recent", landingAddress],
     queryFn: async () => {
       try {
+        // Implement request debouncing
+        const now = Date.now();
+        if (now - lastFetchRef.current < 5000) { // 5 second debounce
+          return []; // Return empty array instead of throwing
+        }
+        lastFetchRef.current = now;
+
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
           'X-Internal-Token': 'landing-page'
@@ -73,22 +133,56 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           headers['X-Wallet-Address'] = landingAddress;
         }
 
+        console.log('Fetching recent songs with headers:', headers);
         const response = await fetch("/api/music/recent", { headers });
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch recent songs: ${response.statusText}`);
+          console.error('Failed to fetch recent songs:', response.statusText);
+          return [];
         }
 
         const data = await response.json();
-        console.log('Recent songs loaded:', data.length, 'songs');
-        return data;
+        if (!Array.isArray(data)) {
+          console.error('Unexpected response format:', data);
+          return [];
+        }
+
+        // Validate song data
+        const validSongs = data.filter(song => 
+          song && 
+          typeof song.id === 'number' && 
+          typeof song.title === 'string' && 
+          typeof song.artist === 'string' && 
+          typeof song.ipfsHash === 'string'
+        );
+
+        console.log('Recent songs loaded:', validSongs.length, 'songs');
+        return validSongs;
       } catch (error) {
         console.error('Error fetching recent songs:', error);
         return [];
       }
     },
     refetchInterval: isLandingPage ? 30000 : false,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 30000),
+    gcTime: 5 * 60 * 1000 // 5 minutes cache time
   });
+
+  const fetchFromIPFS = async (hash: string, attempt = 1): Promise<ArrayBuffer> => {
+    try {
+      console.log('Fetching from IPFS gateway:', { hash, attempt, timestamp: new Date().toISOString() });
+      const audioData = await getFromIPFS(hash);
+      return audioData;
+    } catch (error) {
+      console.error(`IPFS fetch attempt ${attempt} failed:`, error);
+      if (attempt >= MAX_RETRIES) {
+        throw new Error(`Failed to fetch from IPFS after ${MAX_RETRIES} attempts`);
+      }
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      return fetchFromIPFS(hash, attempt + 1);
+    }
+  };
 
   const playSong = async (song: Song, context?: PlaylistContext) => {
     try {
@@ -106,25 +200,49 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       }
 
       // Sync with current dimension before playing
-      await syncWithDimension(currentDimension);
+      try {
+        await syncWithDimension(currentDimension);
+      } catch (error) {
+        console.error('Dimensional sync error:', error);
+        // Continue playback even if sync fails
+      }
 
-      // Get IPFS data
+      // Get IPFS data with retries
       console.log('Fetching from IPFS gateway:', song.ipfsHash);
-      const audioData = await getFromIPFS(song.ipfsHash);
+      const audioData = await fetchFromIPFS(song.ipfsHash);
 
+      // Create blob and URL
       const blob = new Blob([audioData], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
 
       // Set source and load
       if (audioRef.current) {
+        const previousUrl = audioRef.current.src;
         audioRef.current.src = url;
+
+        // Wait for audio to load
         await new Promise((resolve, reject) => {
           if (audioRef.current) {
-            audioRef.current.addEventListener('loadeddata', resolve, { once: true });
-            audioRef.current.addEventListener('error', reject, { once: true });
+            const onLoad = () => {
+              audioRef.current?.removeEventListener('loadeddata', onLoad);
+              audioRef.current?.removeEventListener('error', onError);
+              resolve(undefined);
+            };
+            const onError = (error: Event) => {
+              audioRef.current?.removeEventListener('loadeddata', onLoad);
+              audioRef.current?.removeEventListener('error', onError);
+              reject(error);
+            };
+            audioRef.current.addEventListener('loadeddata', onLoad, { once: true });
+            audioRef.current.addEventListener('error', onError, { once: true });
             audioRef.current.load();
           }
         });
+
+        // Clean up previous URL
+        if (previousUrl) {
+          URL.revokeObjectURL(previousUrl);
+        }
       }
 
       // Update state
@@ -184,8 +302,10 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
   // Initialize music once on load - only if we're on landing page
   useEffect(() => {
+    let mounted = true;
+
     async function initializeMusic() {
-      if (!recentSongs?.length || audioRef.current?.src) return;
+      if (!recentSongs?.length || audioRef.current?.src || !mounted) return;
 
       try {
         const firstSong = recentSongs[0];
@@ -200,6 +320,10 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     if (isLandingPage) {
       initializeMusic();
     }
+
+    return () => {
+      mounted = false;
+    };
   }, [recentSongs, isLandingPage]);
 
   // Reset context when wallet disconnects
@@ -208,27 +332,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       setCurrentContext('landing');
     }
   }, [userAddress]);
-
-  // Initialize audio context
-  useEffect(() => {
-    try {
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
-        console.log('AudioContext initialized successfully');
-      }
-    } catch (error) {
-      console.error('Failed to initialize AudioContext:', error);
-    }
-
-    return () => {
-      try {
-        audioContextRef.current?.close().catch(console.error);
-      } catch (error) {
-        console.error('Error closing AudioContext:', error);
-      }
-    };
-  }, []);
 
   return (
     <MusicPlayerContext.Provider value={{
