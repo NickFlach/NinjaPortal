@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { useQuery } from "@tanstack/react-query";
 import { getFromIPFS } from "@/lib/ipfs";
 import { useAccount } from 'wagmi';
-import { PIDController } from '@/lib/PIDController';
 import { useWebSocket } from './WebSocketContext';
 
 interface Song {
@@ -41,6 +40,47 @@ interface MusicPlayerContextType {
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
+// Simple PID controller implementation
+class PIDController {
+  private kp: number;
+  private ki: number;
+  private kd: number;
+  private integral: number;
+  private lastError: number;
+
+  constructor(kp = 0.5, ki = 0.1, kd = 0.01) {
+    this.kp = kp;
+    this.ki = ki;
+    this.kd = kd;
+    this.integral = 0;
+    this.lastError = 0;
+  }
+
+  compute(target: number, current: number): number {
+    const error = target - current;
+    this.integral += error;
+    const derivative = error - this.lastError;
+    this.lastError = error;
+
+    return 1.0 + (
+      this.kp * error +
+      this.ki * this.integral +
+      this.kd * derivative
+    );
+  }
+
+  reset(): void {
+    this.integral = 0;
+    this.lastError = 0;
+  }
+
+  setParameters(kp: number, ki: number, kd: number): void {
+    this.kp = kp;
+    this.ki = ki;
+    this.kd = kd;
+  }
+}
+
 export function MusicPlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentSong, setCurrentSong] = useState<Song>();
   const [isPlaying, setIsPlaying] = useState(false);
@@ -49,6 +89,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [activeListeners, setActiveListeners] = useState(0);
   const [isSynced, setIsSynced] = useState(false);
   const [isBluetoothEnabled, setIsBluetoothEnabled] = useState(false);
+  const [isLeader, setIsLeader] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { address: userAddress } = useAccount();
@@ -56,13 +97,9 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const landingAddress = userAddress || defaultWallet;
   const isLandingPage = !userAddress;
   const audioContextRef = useRef<AudioContext>();
-  const geolocationPermissionAsked = useRef(false);
-  const [isLeader, setIsLeader] = useState(false);
+  const pidControllerRef = useRef(new PIDController());
   const lastSyncRef = useRef<{ timestamp: number; playing: boolean } | null>(null);
-  const pidControllerRef = useRef<PIDController>(new PIDController());
-  const syncIntervalRef = useRef<NodeJS.Timeout>();
   const socket = useWebSocket();
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Initialize audio element
   useEffect(() => {
@@ -119,6 +156,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     queryFn: async () => {
       try {
         const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
           'X-Internal-Token': 'landing-page'
         };
 
@@ -126,9 +164,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           headers['X-Wallet-Address'] = landingAddress;
         }
 
-        const response = await fetch("/api/songs/recent", {
-          headers
-        });
+        const response = await fetch("/api/songs/recent", { headers });
 
         if (!response.ok) {
           throw new Error(`Failed to fetch recent songs: ${response.statusText}`);
@@ -179,7 +215,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         });
       }
 
-      // Update refs and state
+      // Update state
       setCurrentSong(song);
 
       // Try to play
@@ -196,24 +232,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           }
         }
       }
-
-      // Record play with location
-      try {
-        await fetch(`/api/songs/play/${song.id}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(userAddress && { 'X-Wallet-Address': userAddress })
-          },
-          body: JSON.stringify(userCoordinates ? {
-            latitude: userCoordinates.lat,
-            longitude: userCoordinates.lng
-          } : {})
-        });
-      } catch (error) {
-        console.error('Error recording play:', error);
-      }
-
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('IPFS fetch aborted');
@@ -227,7 +245,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   };
 
-  // Simple volume toggle for landing page
   const togglePlay = async () => {
     if (!audioRef.current) return;
 
@@ -304,9 +321,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         audioRef.current.pause();
       }
       // WebSocket cleanup handled by WebSocketContext
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current);
-      }
       if (audioRef.current) {
         audioRef.current.playbackRate = 1;
       }
@@ -487,7 +501,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       pidControllerRef.current.reset();
 
       // Start sync adjustment interval
-      syncIntervalRef.current = setInterval(adjustPlaybackSync, 100); // 10Hz update rate
+      const syncInterval = setInterval(adjustPlaybackSync, 100); // 10Hz update rate
 
       // Report experience data every second
       const experienceInterval = setInterval(async () => {
@@ -524,9 +538,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       }, 1000);
 
       return () => {
-        if (syncIntervalRef.current) {
-          clearInterval(syncIntervalRef.current);
-        }
+        clearInterval(syncInterval);
         clearInterval(experienceInterval);
         // Reset playback rate when stopping sync
         if (audioRef.current) {
