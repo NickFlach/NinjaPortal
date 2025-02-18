@@ -48,19 +48,26 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
   // Setup audio event listeners
   useEffect(() => {
-    // Basic event handlers
     const handleError = () => {
       console.error('Audio playback error');
       setIsPlaying(false);
     };
 
     const handlePlay = () => {
+      console.log('Audio play event triggered');
       setIsPlaying(true);
       setHasInteracted(true);
     };
 
-    const handlePause = () => setIsPlaying(false);
-    const handleEnded = () => setIsPlaying(false);
+    const handlePause = () => {
+      console.log('Audio pause event triggered');
+      setIsPlaying(false);
+    };
+
+    const handleEnded = () => {
+      console.log('Audio ended event triggered');
+      setIsPlaying(false);
+    };
 
     // Add event listeners
     audio.addEventListener('error', handleError);
@@ -70,6 +77,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
     // Cleanup
     return () => {
+      console.log('Cleaning up audio event listeners');
       audio.removeEventListener('error', handleError);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
@@ -118,6 +126,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       setCurrentSong(song);
       if (context) setCurrentContext(context);
 
+      console.log('Starting to play song:', song.title);
+
       // Get audio data
       const audioData = await getFromIPFS(song.ipfsHash);
       const blob = new Blob([audioData], { type: 'audio/mp3' });
@@ -138,6 +148,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       }
 
       await audio.play();
+      console.log('Successfully started playing:', song.title);
     } catch (error) {
       console.error('Error playing song:', error);
       setIsPlaying(false);
@@ -146,12 +157,17 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
   const togglePlay = async () => {
     try {
+      console.log('Toggle play called, current state:', { isPlaying, currentSong: currentSong?.title });
+
       if (isPlaying) {
+        console.log('Pausing audio');
         audio.pause();
       } else {
         if (!currentSong && recentSongs.length > 0) {
+          console.log('No current song, playing first song from recent songs');
           await playSong(recentSongs[0], currentContext);
         } else if (currentSong) {
+          console.log('Resuming current song:', currentSong.title);
           await audio.play();
         }
       }
@@ -166,6 +182,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     if (!recentSongs.length || hasInteracted) return;
 
     if (!currentSong && isLandingPage) {
+      console.log('Initializing landing page music');
       const firstSong = recentSongs[0];
       playSong(firstSong, 'landing').catch(error => {
         console.error('Error initializing landing page music:', error);
