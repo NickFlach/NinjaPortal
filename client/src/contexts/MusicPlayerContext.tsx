@@ -94,29 +94,36 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     queryKey: ["/api/music/recent"],
     queryFn: async () => {
       try {
+        console.log('Fetching recent songs...');
         const response = await fetch("/api/music/recent");
         if (!response.ok) {
-          throw new Error(`Failed to fetch recent songs: ${response.statusText}`);
+          throw new Error(`Failed to fetch recent songs: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
         if (!Array.isArray(data)) {
-          throw new Error('Unexpected response format');
+          console.error('Unexpected response format:', data);
+          throw new Error('Unexpected response format from recent songs API');
         }
 
-        return data.filter(song =>
+        const validSongs = data.filter(song =>
           song &&
           typeof song.id === 'number' &&
           typeof song.title === 'string' &&
           typeof song.artist === 'string' &&
           typeof song.ipfsHash === 'string'
-        ).slice(0, 5);
+        );
+
+        console.log('Successfully fetched recent songs:', validSongs.length);
+        return validSongs.slice(0, 5);
       } catch (error) {
         console.error('Error fetching recent songs:', error);
-        return [];
+        throw error;
       }
     },
-    staleTime: 30000
+    staleTime: 30000,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 30000)
   });
 
   const playSong = async (song: Song, context?: PlaylistContext) => {
