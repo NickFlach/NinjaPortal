@@ -17,7 +17,7 @@ export const DimensionalTrackSchema = z.object({
 export type DimensionalTrack = z.infer<typeof DimensionalTrackSchema>;
 
 export const DimensionalPortalSchema = z.object({
-  portalId: z.string(),
+  portalId: z.string().optional(),
   tracks: z.array(DimensionalTrackSchema),
   timestamp: z.number(),
   portalSignature: z.string().optional(),
@@ -30,6 +30,7 @@ export type DimensionalPortal = z.infer<typeof DimensionalPortalSchema>;
 class DimensionalPortalManager {
   private currentPortal: DimensionalPortal | null = null;
   private audioCache: Map<string, ArrayBuffer> = new Map();
+  private loadingPromises: Map<string, Promise<ArrayBuffer>> = new Map();
 
   async loadCurrentPortal(): Promise<DimensionalPortal> {
     try {
@@ -38,13 +39,54 @@ class DimensionalPortalManager {
         throw new Error('Failed to load portal');
       }
 
-      const portal = DimensionalPortalSchema.parse(await response.json());
+      const data = await response.json();
+      const portal = DimensionalPortalSchema.parse({
+        ...data,
+        tracks: data.items.map((item: any) => ({
+          id: item.id,
+          ipfsHash: item.ipfsHash,
+          title: item.title || 'Untitled',
+          artist: item.artist || 'Unknown Artist',
+          dimensionalSignature: item.dimensionalSignature,
+          harmonicAlignment: item.harmonicAlignment,
+          dimension: item.dimension,
+        }))
+      });
+
       this.currentPortal = portal;
       return portal;
     } catch (error) {
       console.error('Error loading portal:', error);
       throw error;
     }
+  }
+
+  async preloadAudio(ipfsHash: string): Promise<ArrayBuffer> {
+    // Check cache first
+    if (this.audioCache.has(ipfsHash)) {
+      return this.audioCache.get(ipfsHash)!;
+    }
+
+    // Check if already loading
+    if (this.loadingPromises.has(ipfsHash)) {
+      return this.loadingPromises.get(ipfsHash)!;
+    }
+
+    // Start new load
+    const loadPromise = (async () => {
+      try {
+        const buffer = await getFromIPFS(ipfsHash);
+        this.audioCache.set(ipfsHash, buffer);
+        this.loadingPromises.delete(ipfsHash);
+        return buffer;
+      } catch (error) {
+        this.loadingPromises.delete(ipfsHash);
+        throw error;
+      }
+    })();
+
+    this.loadingPromises.set(ipfsHash, loadPromise);
+    return loadPromise;
   }
 
   async generateZKProof(params: {
@@ -64,16 +106,6 @@ class DimensionalPortalManager {
     return Buffer.from(JSON.stringify(proofData)).toString('base64');
   }
 
-  async preloadAudio(ipfsHash: string): Promise<ArrayBuffer> {
-    if (this.audioCache.has(ipfsHash)) {
-      return this.audioCache.get(ipfsHash)!;
-    }
-
-    const buffer = await getFromIPFS(ipfsHash);
-    this.audioCache.set(ipfsHash, buffer);
-    return buffer;
-  }
-
   async submitPlaybackProof(proof: string): Promise<void> {
     await fetch('/api/dimensional/proofs', {
       method: 'POST',
@@ -84,6 +116,7 @@ class DimensionalPortalManager {
 
   clearCache(): void {
     this.audioCache.clear();
+    this.loadingPromises.clear();
   }
 }
 
