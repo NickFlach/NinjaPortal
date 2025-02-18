@@ -5,12 +5,14 @@ interface WebSocketContextType {
   socket: WebSocket | null;
   isConnected: boolean;
   connectionQuality: number;
+  dimensionalLatency: number;
 }
 
 const WebSocketContext = createContext<WebSocketContextType>({
   socket: null,
   isConnected: false,
-  connectionQuality: 1
+  connectionQuality: 1,
+  dimensionalLatency: 0
 });
 
 export const useWebSocket = () => {
@@ -25,6 +27,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionQuality, setConnectionQuality] = useState(1);
+  const [dimensionalLatency, setDimensionalLatency] = useState(0);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
@@ -46,12 +49,12 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${protocol}//${window.location.host}/ws`;
-      console.log('Connecting to WebSocket:', wsUrl);
+      console.log('Connecting to dimensional portal:', wsUrl);
 
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        console.log('WebSocket connected successfully');
+        console.log('Dimensional portal connected');
         setIsConnected(true);
         reconnectAttempts.current = 0;
         setConnectionQuality(1);
@@ -63,10 +66,13 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         heartbeatIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             lastPingRef.current = Date.now();
-            ws.send(JSON.stringify({ type: 'ping' }));
+            ws.send(JSON.stringify({ 
+              type: 'dimensional_ping',
+              timestamp: Date.now()
+            }));
 
             if (Date.now() - lastHeartbeatRef.current > 5000) {
-              console.warn('No heartbeat received, reconnecting...');
+              console.warn('Dimensional sync lost, reconnecting...');
               ws.close();
             }
           }
@@ -74,8 +80,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         if (address) {
           ws.send(JSON.stringify({
-            type: 'auth',
-            address
+            type: 'dimensional_auth',
+            address,
+            timestamp: Date.now()
           }));
         }
       };
@@ -83,21 +90,22 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === 'error') {
-            console.error('WebSocket server error:', data.message);
-          } else if (data.type === 'pong') {
+          if (data.type === 'dimensional_error') {
+            console.error('Dimensional portal error:', data.message);
+          } else if (data.type === 'dimensional_pong') {
             const latency = Date.now() - lastPingRef.current;
             const quality = Math.max(0, Math.min(1, 1 - (latency / 1000)));
             setConnectionQuality(quality);
+            setDimensionalLatency(latency);
             lastHeartbeatRef.current = Date.now();
           }
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+          console.error('Error parsing dimensional message:', error);
         }
       };
 
       ws.onclose = (event) => {
-        console.log('WebSocket disconnected:', event.code, event.reason);
+        console.log('Dimensional portal closed:', event.code, event.reason);
         setIsConnected(false);
         setSocket(null);
         setConnectionQuality(0);
@@ -110,25 +118,25 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         if (reconnectAttempts.current < maxReconnectAttempts) {
           const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);
-          console.log(`Attempting reconnect in ${timeout}ms (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
+          console.log(`Attempting dimensional reconnect in ${timeout}ms (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
 
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectAttempts.current++;
             connect();
           }, timeout);
         } else {
-          console.log('Max reconnection attempts reached');
+          console.log('Max dimensional reconnection attempts reached');
         }
       };
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('Dimensional portal error:', error);
         setConnectionQuality(0);
       };
 
       setSocket(ws);
     } catch (error) {
-      console.error('Error creating WebSocket connection:', error);
+      console.error('Error creating dimensional portal:', error);
       setSocket(null);
       setIsConnected(false);
       setConnectionQuality(0);
@@ -154,14 +162,20 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     if (address && socket?.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({
-        type: 'auth',
-        address
+        type: 'dimensional_auth',
+        address,
+        timestamp: Date.now()
       }));
     }
   }, [address, socket]);
 
   return (
-    <WebSocketContext.Provider value={{ socket, isConnected, connectionQuality }}>
+    <WebSocketContext.Provider value={{ 
+      socket, 
+      isConnected, 
+      connectionQuality,
+      dimensionalLatency 
+    }}>
       {children}
     </WebSocketContext.Provider>
   );

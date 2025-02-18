@@ -1,42 +1,34 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useQuery } from "@tanstack/react-query";
-import { PlaylistItem, playlistManager } from "@/lib/playlist";
+import { playlistManager } from "@/lib/playlist";
 import { useAccount } from 'wagmi';
+import { useDimensionalMusic } from './DimensionalMusicContext';
+
+interface DimensionalTrack {
+  id: number;
+  ipfsHash: string;
+  dimensionalSignature: string;
+  harmonicAlignment: number;
+}
 
 interface MusicPlayerContextType {
-  currentTrack: PlaylistItem | null;
+  currentDimensionalSignature: string | null;
   isPlaying: boolean;
-  togglePlay: () => void;
-  playTrack: (track: PlaylistItem) => Promise<void>;
-  playlist: PlaylistItem[];
-  hasInteracted: boolean;
+  toggleDimensionalPortal: () => void;
+  harmonicAlignment: number;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
 export function MusicPlayerProvider({ children }: { children: React.ReactNode }) {
-  const [currentTrack, setCurrentTrack] = useState<PlaylistItem | null>(null);
+  const [currentDimensionalSignature, setCurrentDimensionalSignature] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [hasInteracted, setHasInteracted] = useState(false);
+  const [harmonicAlignment, setHarmonicAlignment] = useState(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { address } = useAccount();
+  const { dimensionalState, currentDimension } = useDimensionalMusic();
 
-  // Fetch current playlist
-  const { data: playlist = [] } = useQuery({
-    queryKey: ["/api/playlists/current"],
-    queryFn: async () => {
-      try {
-        const playlist = await playlistManager.loadPlaylist('current');
-        return playlist.items;
-      } catch (error) {
-        console.error('Error loading playlist:', error);
-        return [];
-      }
-    },
-    staleTime: 30000
-  });
-
-  // Initialize audio element
+  // Initialize audio element with dimensional properties
   useEffect(() => {
     if (!audioRef.current) {
       const audio = new Audio();
@@ -44,13 +36,12 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       audioRef.current = audio;
 
       const handleError = (error: ErrorEvent) => {
-        console.error('Audio playback error:', error);
+        console.error('Portal audio error:', error);
         setIsPlaying(false);
       };
 
       const handlePlay = () => {
         setIsPlaying(true);
-        setHasInteracted(true);
       };
 
       const handlePause = () => {
@@ -63,13 +54,17 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           URL.revokeObjectURL(audioRef.current.src);
           audioRef.current.src = '';
         }
-        // Generate and submit proof after track ends
-        if (currentTrack) {
+        // Generate dimensional proof
+        if (currentDimensionalSignature) {
           try {
-            const proof = await playlistManager.generateZKProof(currentTrack);
+            const proof = await playlistManager.generateZKProof({
+              signature: currentDimensionalSignature,
+              dimension: currentDimension,
+              harmonicAlignment
+            });
             await playlistManager.submitPlaybackProof(proof);
           } catch (error) {
-            console.error('Error submitting playback proof:', error);
+            console.error('Error submitting dimensional proof:', error);
           }
         }
       };
@@ -91,75 +86,42 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         audioRef.current?.pause();
       };
     }
-  }, [currentTrack]);
+  }, [currentDimensionalSignature, currentDimension, harmonicAlignment]);
 
-  const playTrack = async (track: PlaylistItem) => {
-    if (!audioRef.current) return;
-
-    try {
-      setCurrentTrack(track);
-
-      // Preload audio data
-      const audioData = await playlistManager.preloadAudio(track.ipfsHash);
-      const blob = new Blob([audioData], { type: 'audio/mp3' });
-
-      if (audioRef.current.src) {
-        URL.revokeObjectURL(audioRef.current.src);
+  // Update harmonic alignment based on dimensional state
+  useEffect(() => {
+    if (dimensionalState) {
+      setHarmonicAlignment(dimensionalState.harmonicAlignment);
+      if (audioRef.current && isPlaying) {
+        audioRef.current.playbackRate = dimensionalState.harmonicAlignment;
       }
-
-      const url = URL.createObjectURL(blob);
-      audioRef.current.src = url;
-
-      await audioRef.current.play();
-      setIsPlaying(true);
-    } catch (error) {
-      console.error('Error playing track:', error);
-      setIsPlaying(false);
     }
-  };
+  }, [dimensionalState, isPlaying]);
 
-  const togglePlay = async () => {
-    if (!audioRef.current) return;
-
-    if (!hasInteracted) {
-      setHasInteracted(true);
-    }
+  const toggleDimensionalPortal = async () => {
+    if (!audioRef.current || !address) return;
 
     try {
       if (isPlaying) {
         audioRef.current.pause();
       } else {
-        if (!currentTrack && playlist.length > 0) {
-          await playTrack(playlist[0]);
-        } else if (currentTrack) {
+        // Only attempt to play if we have a dimensional signature
+        if (currentDimensionalSignature) {
           await audioRef.current.play();
         }
       }
     } catch (error) {
-      console.error('Error toggling playback:', error);
+      console.error('Error toggling dimensional portal:', error);
       setIsPlaying(false);
     }
   };
 
-  // Auto-play first track on landing page
-  useEffect(() => {
-    if (!playlist.length || !hasInteracted) return;
-
-    if (!currentTrack && !isPlaying) {
-      playTrack(playlist[0]).catch(error => {
-        console.error('Error initializing playback:', error);
-      });
-    }
-  }, [playlist, currentTrack, isPlaying, hasInteracted]);
-
   return (
     <MusicPlayerContext.Provider value={{
-      currentTrack,
+      currentDimensionalSignature,
       isPlaying,
-      togglePlay,
-      playTrack,
-      playlist,
-      hasInteracted
+      toggleDimensionalPortal,
+      harmonicAlignment
     }}>
       {children}
     </MusicPlayerContext.Provider>

@@ -2,39 +2,47 @@ import { z } from 'zod';
 import { Buffer } from 'buffer';
 import { getFromIPFS } from './ipfs';
 
-export const PlaylistItemSchema = z.object({
+export const DimensionalTrackSchema = z.object({
   id: z.number(),
-  title: z.string(),
-  artist: z.string(),
   ipfsHash: z.string(),
-  duration: z.number().optional(),
-  order: z.number(),
+  dimensionalSignature: z.string(),
+  harmonicAlignment: z.number(),
+  dimension: z.string(),
+  entropyLevel: z.number().optional(),
+  quantumState: z.enum(['aligned', 'shifting', 'unstable']).optional(),
 });
 
-export type PlaylistItem = z.infer<typeof PlaylistItemSchema>;
+export type DimensionalTrack = z.infer<typeof DimensionalTrackSchema>;
 
-export const PlaylistSchema = z.object({
-  id: z.string(),
-  items: z.array(PlaylistItemSchema),
+export const DimensionalPortalSchema = z.object({
+  portalId: z.string(),
+  tracks: z.array(DimensionalTrackSchema),
   timestamp: z.number(),
-  signature: z.string(),
+  portalSignature: z.string(),
+  currentDimension: z.string(),
+  entropyState: z.number(),
 });
 
-export type Playlist = z.infer<typeof PlaylistSchema>;
+export type DimensionalPortal = z.infer<typeof DimensionalPortalSchema>;
 
-class PlaylistManager {
-  private currentPlaylist: Playlist | null = null;
+class DimensionalPortalManager {
+  private currentPortal: DimensionalPortal | null = null;
   private audioCache: Map<string, ArrayBuffer> = new Map();
-  
-  async loadPlaylist(playlistId: string): Promise<Playlist> {
-    const response = await fetch(`/api/playlists/${playlistId}`);
-    if (!response.ok) {
-      throw new Error('Failed to load playlist');
-    }
-    
-    const playlist = PlaylistSchema.parse(await response.json());
-    this.currentPlaylist = playlist;
-    return playlist;
+
+  async generateZKProof(params: {
+    signature: string;
+    dimension: string;
+    harmonicAlignment: number;
+    timestamp?: number;
+    address?: string;
+  }): Promise<string> {
+    const proofData = {
+      ...params,
+      timestamp: params.timestamp || Date.now(),
+      entropy: Math.random(), // This will be replaced with actual entropy calculation
+    };
+
+    return Buffer.from(JSON.stringify(proofData)).toString('base64');
   }
 
   async preloadAudio(ipfsHash: string): Promise<ArrayBuffer> {
@@ -47,20 +55,8 @@ class PlaylistManager {
     return buffer;
   }
 
-  async generateZKProof(playlistItem: PlaylistItem): Promise<string> {
-    // Generate zero-knowledge proof of playback
-    // This will be implemented with actual ZK circuit
-    const proofData = {
-      timestamp: Date.now(),
-      itemId: playlistItem.id,
-      playlistId: this.currentPlaylist?.id
-    };
-    
-    return Buffer.from(JSON.stringify(proofData)).toString('base64');
-  }
-
   async submitPlaybackProof(proof: string): Promise<void> {
-    await fetch('/api/proofs', {
+    await fetch('/api/dimensional/proofs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ proof })
@@ -72,4 +68,4 @@ class PlaylistManager {
   }
 }
 
-export const playlistManager = new PlaylistManager();
+export const playlistManager = new DimensionalPortalManager();

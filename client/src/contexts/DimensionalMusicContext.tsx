@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useWebSocket } from './WebSocketContext';
 import { useAccount } from 'wagmi';
+import { playlistManager } from '@/lib/playlist';
 
 interface DimensionalState {
   entropy: number;
@@ -15,12 +16,14 @@ interface DimensionalMusicContextType {
   syncWithDimension: (dimension: string) => Promise<void>;
   isDimensionallyAligned: boolean;
   dimensionalErrors: string[];
+  currentPortalSignature: string | null;
 }
 
 const DimensionalMusicContext = createContext<DimensionalMusicContextType | undefined>(undefined);
 
 export function DimensionalMusicProvider({ children }: { children: React.ReactNode }) {
   const [currentDimension, setCurrentDimension] = useState<string>('prime');
+  const [currentPortalSignature, setCurrentPortalSignature] = useState<string | null>(null);
   const [dimensionalState, setDimensionalState] = useState<DimensionalState>({
     entropy: 0,
     harmonicAlignment: 1,
@@ -52,6 +55,9 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
               quantumState: data.quantumState ?? 'aligned'
             });
             setIsDimensionallyAligned(data.isAligned ?? true);
+            if (data.portalSignature) {
+              setCurrentPortalSignature(data.portalSignature);
+            }
             break;
           case 'dimensional_error':
             setDimensionalErrors(prev => [...prev, data.message]);
@@ -65,11 +71,9 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
       }
     };
 
-    console.log('Setting up dimensional sync WebSocket listener');
     socket.addEventListener('message', handleMessage);
 
     return () => {
-      console.log('Cleaning up dimensional sync WebSocket listener');
       socket.removeEventListener('message', handleMessage);
     };
   }, [socket, isConnected]);
@@ -80,10 +84,8 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
         throw new Error('Dimensional sync connection not available');
       }
 
-      // Clear previous errors
       setDimensionalErrors([]);
 
-      // Request dimensional sync
       socket.send(JSON.stringify({
         type: 'dimensional_sync_request',
         dimension,
@@ -93,6 +95,21 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
       }));
 
       setCurrentDimension(dimension);
+
+      // Request new portal signature for the dimension
+      if (address) {
+        const proof = await playlistManager.generateZKProof({
+          dimension,
+          address,
+          timestamp: Date.now()
+        });
+
+        socket.send(JSON.stringify({
+          type: 'portal_signature_request',
+          proof,
+          dimension
+        }));
+      }
     } catch (error) {
       console.error('Dimensional sync error:', error);
       setDimensionalErrors(prev => [...prev, 'Failed to sync with dimension']);
@@ -106,7 +123,8 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
         dimensionalState,
         syncWithDimension,
         isDimensionallyAligned,
-        dimensionalErrors
+        dimensionalErrors,
+        currentPortalSignature
       }}
     >
       {children}
