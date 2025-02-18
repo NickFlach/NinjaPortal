@@ -15,6 +15,7 @@ interface MusicPlayerContextType {
   currentDimensionalSignature: string | null;
   isPlaying: boolean;
   toggleDimensionalPortal: () => void;
+  openDimensionalPortal: (track: DimensionalTrack) => Promise<void>;
   harmonicAlignment: number;
 }
 
@@ -98,6 +99,29 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [dimensionalState, isPlaying]);
 
+  const openDimensionalPortal = async (track: DimensionalTrack) => {
+    if (!audioRef.current || !address) return;
+
+    try {
+      setCurrentDimensionalSignature(track.dimensionalSignature);
+
+      // Preload audio through the dimensional portal
+      const audioData = await playlistManager.preloadAudio(track.ipfsHash);
+      const blob = new Blob([audioData], { type: 'audio/mp3' });
+
+      if (audioRef.current.src) {
+        URL.revokeObjectURL(audioRef.current.src);
+      }
+
+      const url = URL.createObjectURL(blob);
+      audioRef.current.src = url;
+      await audioRef.current.play();
+    } catch (error) {
+      console.error('Error opening dimensional portal:', error);
+      setIsPlaying(false);
+    }
+  };
+
   const toggleDimensionalPortal = async () => {
     if (!audioRef.current || !address) return;
 
@@ -121,6 +145,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       currentDimensionalSignature,
       isPlaying,
       toggleDimensionalPortal,
+      openDimensionalPortal,
       harmonicAlignment
     }}>
       {children}
