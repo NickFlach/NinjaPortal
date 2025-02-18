@@ -40,10 +40,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      // Update the WebSocket endpoint to use the correct path
-      const wsUrl = `${protocol}//${window.location.host}/ws/dimensional-portal`;
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
 
-      // Use our secure WebSocket implementation
+      console.log('Connecting to WebSocket:', wsUrl);
       const ws = new SecureWebSocket(wsUrl);
 
       ws.onMessage((data) => {
@@ -62,9 +61,18 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
 
       ws.onClose(() => {
+        console.log('WebSocket disconnected');
         setIsConnected(false);
         setSocket(null);
         setConnectionQuality(0);
+
+        // Attempt to reconnect
+        if (!reconnectTimeoutRef.current) {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            console.log('Attempting to reconnect...');
+            connect();
+          }, 5000);
+        }
       });
 
       setSocket(ws);
@@ -73,13 +81,13 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       // Initial auth if we have an address
       if (address) {
         ws.send({
-          type: 'dimensional_auth',
+          type: 'auth',
           address,
           timestamp: Date.now()
         });
       }
     } catch (error) {
-      console.error('Error creating dimensional portal:', error);
+      console.error('Error creating WebSocket connection:', error);
       setSocket(null);
       setIsConnected(false);
       setConnectionQuality(0);
@@ -102,7 +110,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     if (address && socket && isConnected) {
       socket.send({
-        type: 'dimensional_auth',
+        type: 'auth',
         address,
         timestamp: Date.now()
       });
