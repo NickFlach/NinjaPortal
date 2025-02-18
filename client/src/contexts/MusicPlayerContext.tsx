@@ -1,46 +1,40 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useQuery } from "@tanstack/react-query";
-import { getFromIPFS } from "@/lib/ipfs";
+import { PlaylistItem, playlistManager } from "@/lib/playlist";
 import { useAccount } from 'wagmi';
-import { useWebSocket } from './WebSocketContext';
-import { useDimensionalMusic } from './DimensionalMusicContext';
-
-interface Song {
-  id: number;
-  title: string;
-  artist: string;
-  ipfsHash: string;
-  uploadedBy: string | null;
-  createdAt: string | null;
-  votes: number | null;
-}
-
-type PlaylistContext = 'landing' | 'library' | 'feed';
 
 interface MusicPlayerContextType {
-  currentSong: Song | undefined;
+  currentTrack: PlaylistItem | null;
   isPlaying: boolean;
   togglePlay: () => void;
-  playSong: (song: Song, context?: PlaylistContext) => Promise<void>;
-  recentSongs: Song[];
-  isLandingPage: boolean;
-  currentContext: PlaylistContext;
+  playTrack: (track: PlaylistItem) => Promise<void>;
+  playlist: PlaylistItem[];
   hasInteracted: boolean;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
 export function MusicPlayerProvider({ children }: { children: React.ReactNode }) {
-  const [currentSong, setCurrentSong] = useState<Song>();
+  const [currentTrack, setCurrentTrack] = useState<PlaylistItem | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentContext, setCurrentContext] = useState<PlaylistContext>('landing');
   const [hasInteracted, setHasInteracted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { address } = useAccount();
 
-  const { address: userAddress } = useAccount();
-  const isLandingPage = !userAddress;
-  const { dimensionalState } = useDimensionalMusic();
-  const { socket } = useWebSocket();
+  // Fetch current playlist
+  const { data: playlist = [] } = useQuery({
+    queryKey: ["/api/playlists/current"],
+    queryFn: async () => {
+      try {
+        const playlist = await playlistManager.loadPlaylist('current');
+        return playlist.items;
+      } catch (error) {
+        console.error('Error loading playlist:', error);
+        return [];
+      }
+    },
+    staleTime: 30000
+  });
 
   // Initialize audio element
   useEffect(() => {
@@ -63,11 +57,20 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         setIsPlaying(false);
       };
 
-      const handleEnded = () => {
+      const handleEnded = async () => {
         setIsPlaying(false);
-        if (audioRef.current && audioRef.current.src) {
+        if (audioRef.current?.src) {
           URL.revokeObjectURL(audioRef.current.src);
           audioRef.current.src = '';
+        }
+        // Generate and submit proof after track ends
+        if (currentTrack) {
+          try {
+            const proof = await playlistManager.generateZKProof(currentTrack);
+            await playlistManager.submitPlaybackProof(proof);
+          } catch (error) {
+            console.error('Error submitting playback proof:', error);
+          }
         }
       };
 
@@ -82,58 +85,22 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         audioRef.current?.removeEventListener('pause', handlePause);
         audioRef.current?.removeEventListener('ended', handleEnded);
 
-        if (audioRef.current && audioRef.current.src) {
+        if (audioRef.current?.src) {
           URL.revokeObjectURL(audioRef.current.src);
         }
         audioRef.current?.pause();
       };
     }
-  }, []);
+  }, [currentTrack]);
 
-  const { data: recentSongs = [] } = useQuery<Song[]>({
-    queryKey: ["/api/music/recent"],
-    queryFn: async () => {
-      try {
-        console.log('Fetching recent songs...');
-        const response = await fetch("/api/music/recent");
-        if (!response.ok) {
-          throw new Error(`Failed to fetch recent songs: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        if (!Array.isArray(data)) {
-          console.error('Unexpected response format:', data);
-          throw new Error('Unexpected response format from recent songs API');
-        }
-
-        const validSongs = data.filter(song =>
-          song &&
-          typeof song.id === 'number' &&
-          typeof song.title === 'string' &&
-          typeof song.artist === 'string' &&
-          typeof song.ipfsHash === 'string'
-        );
-
-        console.log('Successfully fetched recent songs:', validSongs.length);
-        return validSongs.slice(0, 5);
-      } catch (error) {
-        console.error('Error fetching recent songs:', error);
-        throw error;
-      }
-    },
-    staleTime: 30000,
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 30000)
-  });
-
-  const playSong = async (song: Song, context?: PlaylistContext) => {
+  const playTrack = async (track: PlaylistItem) => {
     if (!audioRef.current) return;
 
     try {
-      setCurrentSong(song);
-      if (context) setCurrentContext(context);
+      setCurrentTrack(track);
 
-      const audioData = await getFromIPFS(song.ipfsHash);
+      // Preload audio data
+      const audioData = await playlistManager.preloadAudio(track.ipfsHash);
       const blob = new Blob([audioData], { type: 'audio/mp3' });
 
       if (audioRef.current.src) {
@@ -143,21 +110,10 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       const url = URL.createObjectURL(blob);
       audioRef.current.src = url;
 
-      await new Promise((resolve) => {
-        if (audioRef.current) {
-          audioRef.current.oncanplaythrough = resolve;
-          audioRef.current.load();
-        }
-      });
-
-      if (userAddress && dimensionalState.harmonicAlignment !== 1) {
-        audioRef.current.playbackRate = dimensionalState.harmonicAlignment;
-      }
-
       await audioRef.current.play();
       setIsPlaying(true);
     } catch (error) {
-      console.error('Error playing song:', error);
+      console.error('Error playing track:', error);
       setIsPlaying(false);
     }
   };
@@ -173,9 +129,9 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       if (isPlaying) {
         audioRef.current.pause();
       } else {
-        if (!currentSong && recentSongs.length > 0) {
-          await playSong(recentSongs[0], currentContext);
-        } else if (currentSong) {
+        if (!currentTrack && playlist.length > 0) {
+          await playTrack(playlist[0]);
+        } else if (currentTrack) {
           await audioRef.current.play();
         }
       }
@@ -185,36 +141,24 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   };
 
+  // Auto-play first track on landing page
   useEffect(() => {
-    if (!recentSongs.length || !isLandingPage) return;
+    if (!playlist.length || !hasInteracted) return;
 
-    const handleFirstInteraction = () => {
-      setHasInteracted(true);
-      if (!currentSong && !isPlaying && recentSongs.length > 0) {
-        playSong(recentSongs[0], 'landing').catch(error => {
-          console.error('Error initializing landing page music:', error);
-        });
-      }
-    };
-
-    document.body.addEventListener('click', handleFirstInteraction, { once: true });
-    document.body.addEventListener('keydown', handleFirstInteraction, { once: true });
-
-    return () => {
-      document.body.removeEventListener('click', handleFirstInteraction);
-      document.body.removeEventListener('keydown', handleFirstInteraction);
-    };
-  }, [recentSongs, currentSong, isPlaying, isLandingPage]);
+    if (!currentTrack && !isPlaying) {
+      playTrack(playlist[0]).catch(error => {
+        console.error('Error initializing playback:', error);
+      });
+    }
+  }, [playlist, currentTrack, isPlaying, hasInteracted]);
 
   return (
     <MusicPlayerContext.Provider value={{
-      currentSong,
+      currentTrack,
       isPlaying,
       togglePlay,
-      playSong,
-      recentSongs,
-      isLandingPage,
-      currentContext,
+      playTrack,
+      playlist,
       hasInteracted
     }}>
       {children}
