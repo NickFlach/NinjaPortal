@@ -36,7 +36,11 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentContext, setCurrentContext] = useState<PlaylistContext>('landing');
   const [hasInteracted, setHasInteracted] = useState(false);
-  const [audio] = useState(() => new Audio());
+  const [audio] = useState(() => {
+    const audio = new Audio();
+    audio.preload = 'auto';
+    return audio;
+  });
 
   // Authentication state
   const { address: userAddress } = useAccount();
@@ -48,8 +52,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
   // Setup audio event listeners
   useEffect(() => {
-    const handleError = () => {
-      console.error('Audio playback error');
+    const handleError = (error: ErrorEvent) => {
+      console.error('Audio playback error:', error);
       setIsPlaying(false);
     };
 
@@ -67,6 +71,11 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     const handleEnded = () => {
       console.log('Audio ended event triggered');
       setIsPlaying(false);
+      // Reset audio source to prevent memory leaks
+      if (audio.src) {
+        URL.revokeObjectURL(audio.src);
+        audio.src = '';
+      }
     };
 
     // Add event listeners
@@ -74,6 +83,9 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('ended', handleEnded);
+
+    // Enable controls
+    audio.controls = true;
 
     // Cleanup
     return () => {
@@ -105,7 +117,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           throw new Error('Unexpected response format');
         }
 
-        // Basic validation for landing page
         return data.filter(song =>
           song &&
           typeof song.id === 'number' &&
@@ -140,18 +151,29 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       // Set up new audio source
       const url = URL.createObjectURL(blob);
       audio.src = url;
-      await audio.load();
+
+      // Wait for audio to be loaded
+      await new Promise((resolve, reject) => {
+        audio.oncanplaythrough = resolve;
+        audio.onerror = reject;
+        audio.load();
+      });
 
       // Apply advanced features only if authenticated
       if (userAddress && dimensionalState.harmonicAlignment !== 1) {
         audio.playbackRate = dimensionalState.harmonicAlignment;
       }
 
-      await audio.play();
-      console.log('Successfully started playing:', song.title);
+      // Play the audio
+      const playPromise = audio.play();
+      if (playPromise) {
+        await playPromise;
+        console.log('Successfully started playing:', song.title);
+      }
     } catch (error) {
       console.error('Error playing song:', error);
       setIsPlaying(false);
+      throw error; // Propagate error for UI handling
     }
   };
 
@@ -177,17 +199,33 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   };
 
-  // Auto-play for landing page
+  // Auto-play for landing page with user interaction check
   useEffect(() => {
     if (!recentSongs.length || hasInteracted) return;
 
-    if (!currentSong && isLandingPage) {
-      console.log('Initializing landing page music');
-      const firstSong = recentSongs[0];
-      playSong(firstSong, 'landing').catch(error => {
-        console.error('Error initializing landing page music:', error);
-      });
-    }
+    const handleFirstInteraction = () => {
+      if (!currentSong && isLandingPage && !hasInteracted) {
+        console.log('Initializing landing page music after user interaction');
+        const firstSong = recentSongs[0];
+        playSong(firstSong, 'landing').catch(error => {
+          console.error('Error initializing landing page music:', error);
+        });
+      }
+
+      // Remove event listeners after first interaction
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    };
+
+    // Add event listeners for user interaction
+    document.addEventListener('click', handleFirstInteraction);
+    document.addEventListener('keydown', handleFirstInteraction);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    };
   }, [recentSongs, currentSong, hasInteracted, isLandingPage]);
 
   return (
