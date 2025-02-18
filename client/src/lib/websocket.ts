@@ -11,14 +11,16 @@ class SecureWebSocket {
   private messageHandlers: ((data: any) => void)[] = [];
   private closeHandlers: (() => void)[] = [];
   private reconnectTimeout?: NodeJS.Timeout;
-  private reconnectAttempts = 0;
+  public reconnectAttempts = 0;
   private readonly MAX_RECONNECT_ATTEMPTS = 5;
 
   constructor(url: string) {
     console.log('Initializing SecureWebSocket with URL:', url);
     this.ws = new WebSocket(url);
+    this.setupEventListeners();
+  }
 
-    // Set up message handling
+  private setupEventListeners() {
     this.ws.addEventListener('message', this.handleMessage);
     this.ws.addEventListener('close', this.handleClose);
     this.ws.addEventListener('open', () => {
@@ -82,10 +84,8 @@ class SecureWebSocket {
       this.reconnectTimeout = setTimeout(() => {
         this.reconnectAttempts++;
         // Recreate the WebSocket with the same URL
-        const url = this.ws.url;
-        this.ws = new WebSocket(url);
-        this.ws.addEventListener('message', this.handleMessage);
-        this.ws.addEventListener('close', this.handleClose);
+        this.ws = new WebSocket(this.ws.url);
+        this.setupEventListeners();
       }, delay);
     }
   };
@@ -97,10 +97,16 @@ class SecureWebSocket {
     }
 
     try {
+      let dataToSend = message;
+
+      if (typeof message !== 'string') {
+        dataToSend = JSON.stringify(message);
+      }
+
       if (this.channel) {
         // Encrypt message if we have a secure channel
         const encrypted = CryptoJS.AES.encrypt(
-          JSON.stringify(message),
+          dataToSend,
           this.channel.encryptionKey
         ).toString();
 
@@ -110,7 +116,7 @@ class SecureWebSocket {
         }));
       } else {
         // Fall back to unencrypted in development
-        this.ws.send(JSON.stringify(message));
+        this.ws.send(dataToSend);
       }
     } catch (error) {
       console.error('Error sending WebSocket message:', error);
@@ -118,11 +124,11 @@ class SecureWebSocket {
   }
 
   public onMessage(callback: (data: any) => void) {
-    this.messageHandlers.push(callback);
+    this.messageHandlers = [callback]; // Replace existing handlers
   }
 
   public onClose(callback: () => void) {
-    this.closeHandlers.push(callback);
+    this.closeHandlers = [callback]; // Replace existing handlers
   }
 
   public close() {

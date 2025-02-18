@@ -66,12 +66,15 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setSocket(null);
         setConnectionQuality(0);
 
-        // Attempt to reconnect
+        // Attempt to reconnect with exponential backoff
         if (!reconnectTimeoutRef.current) {
+          const delay = Math.min(1000 * Math.pow(2, ws.reconnectAttempts || 0), 30000);
+          console.log(`Attempting reconnect in ${delay}ms`);
+
           reconnectTimeoutRef.current = setTimeout(() => {
-            console.log('Attempting to reconnect...');
+            reconnectTimeoutRef.current = undefined;
             connect();
-          }, 5000);
+          }, delay);
         }
       });
 
