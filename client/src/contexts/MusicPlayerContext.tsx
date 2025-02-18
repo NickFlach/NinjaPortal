@@ -58,20 +58,16 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
 
     const handlePlay = () => {
-      console.log('Audio play event triggered');
       setIsPlaying(true);
       setHasInteracted(true);
     };
 
     const handlePause = () => {
-      console.log('Audio pause event triggered');
       setIsPlaying(false);
     };
 
     const handleEnded = () => {
-      console.log('Audio ended event triggered');
       setIsPlaying(false);
-      // Reset audio source to prevent memory leaks
       if (audio.src) {
         URL.revokeObjectURL(audio.src);
         audio.src = '';
@@ -84,12 +80,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('ended', handleEnded);
 
-    // Enable controls
-    audio.controls = true;
-
-    // Cleanup
     return () => {
-      console.log('Cleaning up audio event listeners');
       audio.removeEventListener('error', handleError);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
@@ -123,21 +114,19 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           typeof song.title === 'string' &&
           typeof song.artist === 'string' &&
           typeof song.ipfsHash === 'string'
-        ).slice(0, 5); // Limit to 5 songs for landing page
+        ).slice(0, 5);
       } catch (error) {
         console.error('Error fetching recent songs:', error);
         return [];
       }
     },
-    staleTime: 30000 // Consider data fresh for 30 seconds
+    staleTime: 30000
   });
 
   const playSong = async (song: Song, context?: PlaylistContext) => {
     try {
       setCurrentSong(song);
       if (context) setCurrentContext(context);
-
-      console.log('Starting to play song:', song.title);
 
       // Get audio data
       const audioData = await getFromIPFS(song.ipfsHash);
@@ -153,9 +142,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       audio.src = url;
 
       // Wait for audio to be loaded
-      await new Promise((resolve, reject) => {
+      await new Promise((resolve) => {
         audio.oncanplaythrough = resolve;
-        audio.onerror = reject;
         audio.load();
       });
 
@@ -165,31 +153,26 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       }
 
       // Play the audio
-      const playPromise = audio.play();
-      if (playPromise) {
-        await playPromise;
-        console.log('Successfully started playing:', song.title);
-      }
+      await audio.play();
+      setIsPlaying(true);
     } catch (error) {
       console.error('Error playing song:', error);
       setIsPlaying(false);
-      throw error; // Propagate error for UI handling
     }
   };
 
   const togglePlay = async () => {
-    try {
-      console.log('Toggle play called, current state:', { isPlaying, currentSong: currentSong?.title });
+    if (!hasInteracted) {
+      setHasInteracted(true);
+    }
 
+    try {
       if (isPlaying) {
-        console.log('Pausing audio');
         audio.pause();
       } else {
         if (!currentSong && recentSongs.length > 0) {
-          console.log('No current song, playing first song from recent songs');
           await playSong(recentSongs[0], currentContext);
         } else if (currentSong) {
-          console.log('Resuming current song:', currentSong.title);
           await audio.play();
         }
       }
@@ -199,34 +182,28 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   };
 
-  // Auto-play for landing page with user interaction check
+  // Landing page initialization
   useEffect(() => {
-    if (!recentSongs.length || hasInteracted) return;
+    if (!recentSongs.length || !isLandingPage) return;
 
     const handleFirstInteraction = () => {
-      if (!currentSong && isLandingPage && !hasInteracted) {
-        console.log('Initializing landing page music after user interaction');
+      setHasInteracted(true);
+      if (!currentSong && !isPlaying) {
         const firstSong = recentSongs[0];
         playSong(firstSong, 'landing').catch(error => {
           console.error('Error initializing landing page music:', error);
         });
       }
-
-      // Remove event listeners after first interaction
-      document.removeEventListener('click', handleFirstInteraction);
-      document.removeEventListener('keydown', handleFirstInteraction);
     };
 
-    // Add event listeners for user interaction
-    document.addEventListener('click', handleFirstInteraction);
-    document.addEventListener('keydown', handleFirstInteraction);
+    document.body.addEventListener('click', handleFirstInteraction, { once: true });
+    document.body.addEventListener('keydown', handleFirstInteraction, { once: true });
 
-    // Cleanup
     return () => {
-      document.removeEventListener('click', handleFirstInteraction);
-      document.removeEventListener('keydown', handleFirstInteraction);
+      document.body.removeEventListener('click', handleFirstInteraction);
+      document.body.removeEventListener('keydown', handleFirstInteraction);
     };
-  }, [recentSongs, currentSong, hasInteracted, isLandingPage]);
+  }, [recentSongs, currentSong, isPlaying, isLandingPage]);
 
   return (
     <MusicPlayerContext.Provider value={{

@@ -1,20 +1,32 @@
 import { motion, useAnimation, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
+import { useDimensionalMusic } from "@/contexts/DimensionalMusicContext";
 import { useLocation } from "wouter";
 import { useAccount } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
-import { Code2, ThumbsUp, MessageSquare, Sparkles, CheckCircle2 } from "lucide-react";
+import { Code2, ThumbsUp, MessageSquare, Sparkles, CheckCircle2, Boxes } from "lucide-react";
 import { useDimensionalTranslation } from "@/contexts/LocaleContext";
 
 interface TourStep {
   message: string;
   messageId: string;
+  dimension?: string;
+}
+
+interface CodeSuggestion {
+  pattern: string;
+  context: string;
+  confidence: number;
+  dimension?: string;
+  usage: number;
+  lastUsed: Date;
 }
 
 interface CommunityFeedback {
   id: string;
   category: string;
+  dimension: string;
   sentiment: number;
   impact: number;
   suggestions: string[];
@@ -35,48 +47,91 @@ export function NinjaTour() {
   const [feedbackInput, setFeedbackInput] = useState('');
   const [feedbackCategory, setFeedbackCategory] = useState('feature');
   const controls = useAnimation();
+
+  // Context hooks
   const { isPlaying, currentSong } = useMusicPlayer();
   const { t } = useDimensionalTranslation();
   const { address } = useAccount();
   const [location] = useLocation();
+  const {
+    currentDimension,
+    dimensionalState,
+    syncWithDimension,
+    isDimensionallyAligned
+  } = useDimensionalMusic();
+
+  // Animation and visualization refs
   const animationFrameRef = useRef(0);
   const [freqData, setFreqData] = useState<Uint8Array | null>(null);
 
-  // Fetch code suggestions from Lumira
+  // Dimensional wisdom quotes based on current dimension
+  const dimensionalWisdomQuotes = useMemo(() => ({
+    prime: [
+      "Music is the harmony of the universe made audible.",
+      "The journey of a thousand songs begins with a single note.",
+      "Music in the heart can be heard by the universe.",
+    ],
+    quantum: [
+      "In the quantum realm, every note exists in superposition.",
+      "Dimensional harmony transcends space and time.",
+      "The observer and the music become one in quantum space.",
+    ],
+    ethereal: [
+      "Beyond the veil, music flows like starlight.",
+      "In ethereal dimensions, silence speaks volumes.",
+      "Time is but a rhythm in the cosmic dance.",
+    ],
+    neural: [
+      "The mind's symphony creates reality.",
+      "Neural pathways dance to consciousness's tune.",
+      "In the mind's eye, music paints infinite worlds.",
+    ]
+  }), []);
+
+  // Fetch dimension-specific code suggestions
   const { data: codeSuggestions } = useQuery({
-    queryKey: ['code-suggestions'],
+    queryKey: ['code-suggestions', currentDimension],
     queryFn: async () => {
-      const response = await fetch('/api/lumira/code-suggestions');
+      const response = await fetch(`/api/lumira/code-suggestions?dimension=${currentDimension}`);
       if (!response.ok) throw new Error('Failed to fetch code suggestions');
       return response.json() as Promise<CodeSuggestion[]>;
     },
     enabled: isVisible,
-    refetchInterval: 10000 // Refresh every 10 seconds when visible
+    refetchInterval: isDimensionallyAligned ? 10000 : 5000
   });
 
-  // Fetch community insights from Lumira
+  // Fetch community insights for current dimension
   const { data: communityInsights } = useQuery({
-    queryKey: ['community-insights'],
+    queryKey: ['community-insights', currentDimension],
     queryFn: async () => {
-      const response = await fetch('/api/lumira/community-insights');
+      const response = await fetch(`/api/lumira/community-insights?dimension=${currentDimension}`);
       if (!response.ok) throw new Error('Failed to fetch community insights');
       return response.json() as Promise<CommunityFeedback[]>;
     },
     enabled: showFeedback,
-    refetchInterval: 30000 // Refresh every 30 seconds when visible
+    refetchInterval: 30000
   });
 
-  // Update suggestions when new data arrives
+  // Update suggestions based on dimension
   useEffect(() => {
     if (codeSuggestions) {
-      setSuggestions(codeSuggestions);
+      setSuggestions(codeSuggestions.filter(s =>
+        !s.dimension || s.dimension === currentDimension
+      ));
     }
-  }, [codeSuggestions]);
+  }, [codeSuggestions, currentDimension]);
 
-  const tourSteps: TourStep[] = [
+  // Dynamic tour steps based on dimension
+  const tourSteps: TourStep[] = useMemo(() => [
     {
       message: t('tour.welcome'),
-      messageId: "tour.welcome"
+      messageId: "tour.welcome",
+      dimension: "prime"
+    },
+    {
+      message: t('tour.dimensional.intro'),
+      messageId: "tour.dimensional.intro",
+      dimension: currentDimension
     },
     {
       message: t('tour.connect'),
@@ -86,7 +141,33 @@ export function NinjaTour() {
       message: t('tour.upload'),
       messageId: "tour.upload"
     }
-  ];
+  ], [t, currentDimension]);
+
+  // Visual effects based on dimensional state
+  const getDimensionalEffects = () => {
+    const { entropy, harmonicAlignment, dimensionalShift } = dimensionalState;
+    return {
+      scale: 1 + (entropy * 0.1),
+      rotate: dimensionalShift * 45,
+      opacity: harmonicAlignment
+    };
+  };
+
+  // Dimensional transition animation
+  const animateDimensionalShift = async () => {
+    await controls.start({
+      scale: [1, 1.2, 0.8, 1],
+      rotate: [0, 180, 360, 0],
+      transition: { duration: 2, ease: "easeInOut" }
+    });
+  };
+
+  // Effect to handle dimensional transitions
+  useEffect(() => {
+    if (isDimensionallyAligned) {
+      animateDimensionalShift();
+    }
+  }, [currentDimension, isDimensionallyAligned]);
 
   // Check if we should show the tour
   useEffect(() => {
@@ -128,11 +209,11 @@ export function NinjaTour() {
   // Rotate wisdom quotes
   useEffect(() => {
     const quoteInterval = setInterval(() => {
-      setCurrentQuote(prev => (prev + 1) % wisdomQuotes.length);
+      setCurrentQuote(prev => (prev + 1) % dimensionalWisdomQuotes[currentDimension as keyof typeof dimensionalWisdomQuotes].length);
     }, 8000); // Change quote every 8 seconds
 
     return () => clearInterval(quoteInterval);
-  }, []);
+  }, [currentDimension]);
 
   const handleDismiss = () => {
     localStorage.setItem('ninja-tour-dismissed', 'true');
@@ -152,7 +233,8 @@ export function NinjaTour() {
             pattern: suggestion.pattern,
             context: suggestion.context,
             success: true,
-            impact: 1
+            impact: 1,
+            dimension: currentDimension
           }
         })
       });
@@ -179,7 +261,8 @@ export function NinjaTour() {
           sentiment: 1, // Positive by default
           impact: 8, // High impact by default
           suggestions: [feedbackInput],
-          source: 'ninja-helper'
+          source: 'ninja-helper',
+          dimension: currentDimension
         })
       });
 
@@ -206,33 +289,6 @@ export function NinjaTour() {
     }
   };
 
-  const wisdomQuotes = [
-    "Music is the harmony of the universe made audible.",
-    "The journey of a thousand songs begins with a single note.",
-    "Music in the heart can be heard by the universe.",
-    "Silence is a source of great strength, but music is the voice of the soul.",
-    "In music, as in war, victory belongs to those who listen carefully.",
-    "The supreme art of creation is to compose without conflict.",
-    "Do nothing that is of no use - in music and in life.",
-    "Like the way of the sword, the way of music requires dedication to master.",
-    "I often think in music. I live my daydreams in music.",
-    "If I were not a physicist, I would probably be a musician.",
-    "Art and music are the windows to one's soul.",
-    "Learn to listen as nature listens - in perfect harmony.",
-    "Like a ninja in shadows, true music moves silently through hearts.",
-    "As the bamboo bends with wind, let your rhythm flow with time.",
-    "In silence, find rhythm. In rhythm, find wisdom.",
-    "Let your heart be like a bamboo flute, hollow and ready to make music."
-  ];
-
-  interface CodeSuggestion {
-    pattern: string;
-    context: string;
-    confidence: number;
-    usage: number;
-    lastUsed: Date;
-  }
-
 
   if (!isVisible) return null;
 
@@ -247,6 +303,7 @@ export function NinjaTour() {
           justifyContent: 'center',
           paddingTop: '1rem',
         }}
+        animate={getDimensionalEffects()}
       >
         <motion.div
           className="relative"
@@ -364,20 +421,43 @@ export function NinjaTour() {
           </motion.svg>
 
           <motion.div
-            className="absolute left-full ml-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg shadow-lg pointer-events-auto"
+            className={`absolute left-full ml-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg shadow-lg pointer-events-auto ${
+              currentDimension !== 'prime' ? 'dimensional-glow' : ''
+            }`}
             style={{
               width: "max-content",
               maxWidth: "300px",
               top: "50%",
-              transform: "translateY(-50%)"
+              transform: "translateY(-50%)",
+              borderColor: `var(--${currentDimension}-border)`,
             }}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
           >
             <p className="text-sm mb-2">
-              {t(tourSteps[currentStep].messageId)}
+              {t(tourSteps[currentStep].messageId, { dimension: currentDimension })}
             </p>
+
+            {address && (
+              <div className="mt-4 border-t border-border pt-2">
+                <div className="flex gap-2">
+                  {Object.keys(dimensionalWisdomQuotes).map((dim) => (
+                    <motion.button
+                      key={dim}
+                      className={`p-2 rounded ${
+                        currentDimension === dim ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                      }`}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => syncWithDimension(dim)}
+                    >
+                      <Boxes className="h-4 w-4" /> {dim}
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {suggestions.length > 0 && (
               <div className="mt-4 border-t border-border pt-2">
@@ -416,10 +496,10 @@ export function NinjaTour() {
               className="text-xs italic text-muted-foreground mt-2 border-t border-border pt-2"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              key={currentQuote}
+              key={`${currentDimension}-${currentQuote}`}
               transition={{ duration: 0.5 }}
             >
-              "{wisdomQuotes[currentQuote]}"
+              "{dimensionalWisdomQuotes[currentDimension as keyof typeof dimensionalWisdomQuotes][currentQuote]}"
             </motion.p>
 
             {currentStep === tourSteps.length - 1 && (
@@ -434,7 +514,6 @@ export function NinjaTour() {
             )}
           </motion.div>
         </motion.div>
-        {/* New Community Feedback Component */}
         <motion.div className="fixed bottom-4 right-4 z-50">
           <motion.button
             className="bg-primary text-primary-foreground rounded-full p-3 shadow-lg"
