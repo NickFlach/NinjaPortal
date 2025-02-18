@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { Buffer } from 'buffer';
 import { getFromIPFS } from './ipfs';
 
 export const DimensionalTrackSchema = z.object({
@@ -7,8 +6,6 @@ export const DimensionalTrackSchema = z.object({
   ipfsHash: z.string(),
   title: z.string(),
   artist: z.string(),
-  dimensionalSignature: z.string().optional(),
-  harmonicAlignment: z.number().optional(),
   dimension: z.string().optional(),
   entropyLevel: z.number().optional(),
   quantumState: z.enum(['aligned', 'shifting', 'unstable']).optional(),
@@ -20,7 +17,6 @@ export const DimensionalPortalSchema = z.object({
   portalId: z.string().optional(),
   tracks: z.array(DimensionalTrackSchema),
   timestamp: z.number(),
-  portalSignature: z.string().optional(),
   currentDimension: z.string().optional(),
   entropyState: z.number().optional(),
 });
@@ -47,8 +43,6 @@ class DimensionalPortalManager {
           ipfsHash: item.ipfsHash,
           title: item.title || 'Untitled',
           artist: item.artist || 'Unknown Artist',
-          dimensionalSignature: item.dimensionalSignature,
-          harmonicAlignment: item.harmonicAlignment,
           dimension: item.dimension,
         }))
       });
@@ -87,31 +81,6 @@ class DimensionalPortalManager {
 
     this.loadingPromises.set(ipfsHash, loadPromise);
     return loadPromise;
-  }
-
-  async generateZKProof(params: {
-    signature?: string;
-    dimension?: string;
-    harmonicAlignment?: number;
-    timestamp?: number;
-    address?: string;
-  }): Promise<string> {
-    const proofData = {
-      ...params,
-      timestamp: params.timestamp || Date.now(),
-      entropy: Math.random(), // This will be replaced with actual entropy calculation
-      portalId: this.currentPortal?.portalId
-    };
-
-    return Buffer.from(JSON.stringify(proofData)).toString('base64');
-  }
-
-  async submitPlaybackProof(proof: string): Promise<void> {
-    await fetch('/api/dimensional/proofs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ proof })
-    });
   }
 
   clearCache(): void {

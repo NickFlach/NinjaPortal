@@ -2,9 +2,6 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useWebSocket } from './WebSocketContext';
 import { useAccount } from 'wagmi';
 import { playlistManager } from '@/lib/playlist';
-import { buildPoseidon } from 'circomlibjs';
-import { groth16 } from 'snarkjs';
-import { Buffer } from 'buffer';
 
 interface DimensionalState {
   entropy: number;
@@ -39,99 +36,34 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
   const { socket, isConnected } = useWebSocket();
   const { address } = useAccount();
   const dimensionalSyncRef = useRef<number>(0);
-  const poseidonRef = useRef<any>(null);
-
-  // Initialize Poseidon hash function for ZK proof generation
-  useEffect(() => {
-    const initPoseidon = async () => {
-      if (!poseidonRef.current) {
-        poseidonRef.current = await buildPoseidon();
-      }
-    };
-    initPoseidon();
-  }, []);
-
-  const generateZKProof = async (dimension: string) => {
-    try {
-      if (!poseidonRef.current) {
-        throw new Error('Poseidon hash not initialized');
-      }
-
-      // Use TextEncoder instead of Buffer for string to bytes conversion
-      const encoder = new TextEncoder();
-      const dimensionBytes = encoder.encode(dimension);
-      const dimensionHex = Array.from(dimensionBytes)
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-
-      const dimensionId = BigInt('0x' + dimensionHex);
-      const timestamp = BigInt(Date.now());
-      const publicAddr = BigInt(address || '0');
-      const nonce = BigInt(Math.floor(Math.random() * 1000000));
-
-      const input = {
-        portalTimestamp: timestamp.toString(),
-        dimensionId: dimensionId.toString(),
-        publicAddress: publicAddr.toString(),
-        userPrivateKey: publicAddr.toString(), // In development, use public address as private key
-        harmonicAlignment: Math.floor(dimensionalState.harmonicAlignment * 1000000).toString(),
-        entropyFactor: Math.floor(dimensionalState.entropy * 1000000).toString(),
-        dimensionalNonce: nonce.toString()
-      };
-
-      console.log('Generating ZK proof with inputs:', {
-        dimension,
-        timestamp: timestamp.toString(),
-        harmonicAlignment: dimensionalState.harmonicAlignment
-      });
-
-      const { proof, publicSignals } = await groth16.fullProve(
-        input,
-        "/circuits/dimensional_portal.wasm",
-        "/circuits/dimensional_portal.zkey"
-      );
-
-      return {
-        proof,
-        publicSignals,
-        input
-      };
-    } catch (error: unknown) {
-      console.error('Error generating ZK proof:', error);
-      throw new Error(`Failed to generate dimensional proof: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  };
 
   const syncWithDimension = async (dimension: string) => {
-    try {
-      if (!socket || !isConnected) {
-        throw new Error('Dimensional sync connection not available');
-      }
+    if (!socket || !isConnected) {
+      throw new Error('Dimensional sync connection not available');
+    }
 
+    try {
       setDimensionalErrors([]);
       console.log('Starting dimensional sync for dimension:', dimension);
-
-      // Generate ZK proof for dimensional portal access
-      const zkProof = await generateZKProof(dimension);
-      console.log('Generated ZK proof:', { ...zkProof, proof: '...' });
 
       socket.send({
         type: 'dimensional_sync_request',
         dimension,
         address,
         timestamp: Date.now(),
-        syncId: ++dimensionalSyncRef.current,
-        proof: zkProof
+        syncId: ++dimensionalSyncRef.current
       });
 
       setCurrentDimension(dimension);
     } catch (error: unknown) {
       console.error('Dimensional sync error:', error);
-      setDimensionalErrors(prev => [...prev, error instanceof Error ? error.message : 'Unknown error']);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setDimensionalErrors(prev => [...prev, errorMessage]);
       setIsDimensionallyAligned(false);
     }
   };
 
+  // Handle WebSocket messages for dimensional sync
   useEffect(() => {
     if (!socket || !isConnected) return;
 
@@ -157,10 +89,11 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
             setIsDimensionallyAligned(false);
             break;
           default:
+            // Ignore unknown message types
             break;
         }
       } catch (error) {
-        console.error('Error handling dimensional sync message:', error);
+        console.error('Error processing dimensional sync message:', error);
         setDimensionalErrors(prev => [...prev, 'Error processing sync message']);
       }
     };
@@ -172,17 +105,17 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
     };
   }, [socket, isConnected]);
 
+  const contextValue = {
+    currentDimension,
+    dimensionalState,
+    syncWithDimension,
+    isDimensionallyAligned,
+    dimensionalErrors,
+    currentPortalSignature
+  };
+
   return (
-    <DimensionalMusicContext.Provider
-      value={{
-        currentDimension,
-        dimensionalState,
-        syncWithDimension,
-        isDimensionallyAligned,
-        dimensionalErrors,
-        currentPortalSignature
-      }}
-    >
+    <DimensionalMusicContext.Provider value={contextValue}>
       {children}
     </DimensionalMusicContext.Provider>
   );
