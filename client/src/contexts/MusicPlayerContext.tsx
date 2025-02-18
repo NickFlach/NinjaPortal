@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useQuery } from "@tanstack/react-query";
 import { getFromIPFS } from "@/lib/ipfs";
 import { useAccount } from 'wagmi';
@@ -25,33 +25,32 @@ interface MusicPlayerContextType {
   recentSongs: Song[];
   isLandingPage: boolean;
   currentContext: PlaylistContext;
-  audioRef: React.RefObject<HTMLAudioElement>;
   hasInteracted: boolean;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
 export function MusicPlayerProvider({ children }: { children: React.ReactNode }) {
+  // Basic state management
   const [currentSong, setCurrentSong] = useState<Song>();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentContext, setCurrentContext] = useState<PlaylistContext>('landing');
   const [hasInteracted, setHasInteracted] = useState(false);
-  const [audioElement] = useState(() => new Audio());
-  const audioRef = useRef<HTMLAudioElement>(audioElement);
+  const [audio] = useState(() => new Audio());
+
+  // Authentication state
   const { address: userAddress } = useAccount();
   const isLandingPage = !userAddress;
+
+  // Advanced features (only used when authenticated)
   const { dimensionalState } = useDimensionalMusic();
   const { socket } = useWebSocket();
 
-  // Initialize audio element
+  // Setup audio event listeners
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    audio.preload = 'auto';
-
-    const handleError = (e: ErrorEvent) => {
-      console.error('Audio element error:', e);
+    // Basic event handlers
+    const handleError = () => {
+      console.error('Audio playback error');
       setIsPlaying(false);
     };
 
@@ -69,20 +68,19 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('ended', handleEnded);
 
+    // Cleanup
     return () => {
-      // Cleanup event listeners
       audio.removeEventListener('error', handleError);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('ended', handleEnded);
 
-      // Cleanup audio
-      audio.pause();
       if (audio.src) {
         URL.revokeObjectURL(audio.src);
       }
+      audio.pause();
     };
-  }, []);
+  }, [audio]);
 
   // Fetch recent songs - simplified for landing page
   const { data: recentSongs = [] } = useQuery<Song[]>({
@@ -117,30 +115,29 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
   const playSong = async (song: Song, context?: PlaylistContext) => {
     try {
-      if (!audioRef.current) {
-        throw new Error('Audio element not initialized');
-      }
-
       setCurrentSong(song);
       if (context) setCurrentContext(context);
 
+      // Get audio data
       const audioData = await getFromIPFS(song.ipfsHash);
       const blob = new Blob([audioData], { type: 'audio/mp3' });
+
+      // Clean up previous audio source
+      if (audio.src) {
+        URL.revokeObjectURL(audio.src);
+      }
+
+      // Set up new audio source
       const url = URL.createObjectURL(blob);
+      audio.src = url;
+      await audio.load();
 
-      if (audioRef.current.src) {
-        URL.revokeObjectURL(audioRef.current.src);
-      }
-
-      audioRef.current.src = url;
-      await audioRef.current.load();
-
-      // Only apply dimensional adjustments if wallet is connected
+      // Apply advanced features only if authenticated
       if (userAddress && dimensionalState.harmonicAlignment !== 1) {
-        audioRef.current.playbackRate = dimensionalState.harmonicAlignment;
+        audio.playbackRate = dimensionalState.harmonicAlignment;
       }
 
-      await audioRef.current.play();
+      await audio.play();
     } catch (error) {
       console.error('Error playing song:', error);
       setIsPlaying(false);
@@ -148,33 +145,30 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   };
 
   const togglePlay = async () => {
-    if (!audioRef.current) return;
-
     try {
       if (isPlaying) {
-        audioRef.current.pause();
+        audio.pause();
       } else {
         if (!currentSong && recentSongs.length > 0) {
           await playSong(recentSongs[0], currentContext);
-          return;
+        } else if (currentSong) {
+          await audio.play();
         }
-        await audioRef.current.play();
       }
     } catch (error) {
-      console.error('Error toggling play:', error);
+      console.error('Error toggling playback:', error);
       setIsPlaying(false);
     }
   };
 
-  // Initialize landing page music - only if not played before
+  // Auto-play for landing page
   useEffect(() => {
-    if (!recentSongs.length || !audioRef.current || hasInteracted) return;
+    if (!recentSongs.length || hasInteracted) return;
 
-    // Auto-play first song when on landing page and no song is currently playing
     if (!currentSong && isLandingPage) {
       const firstSong = recentSongs[0];
       playSong(firstSong, 'landing').catch(error => {
-        console.error('Error initializing music:', error);
+        console.error('Error initializing landing page music:', error);
       });
     }
   }, [recentSongs, currentSong, hasInteracted, isLandingPage]);
@@ -188,7 +182,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       recentSongs,
       isLandingPage,
       currentContext,
-      audioRef,
       hasInteracted
     }}>
       {children}
