@@ -5,7 +5,7 @@ import { useDimensionalMusic } from "@/contexts/DimensionalMusicContext";
 import { useLocation } from "wouter";
 import { useAccount } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
-import { Code2, ThumbsUp, MessageSquare, Sparkles, CheckCircle2, Boxes } from "lucide-react";
+import { Code2, ThumbsUp, MessageSquare, Sparkles, CheckCircle2 } from "lucide-react";
 import { useDimensionalTranslation } from "@/contexts/LocaleContext";
 
 interface TourStep {
@@ -48,7 +48,6 @@ export function NinjaTour() {
   const [feedbackCategory, setFeedbackCategory] = useState('feature');
   const controls = useAnimation();
 
-  // Context hooks
   const { isPlaying, currentSong } = useMusicPlayer();
   const { t } = useDimensionalTranslation();
   const { address } = useAccount();
@@ -56,15 +55,12 @@ export function NinjaTour() {
   const {
     currentDimension,
     dimensionalState,
-    syncWithDimension,
     isDimensionallyAligned
   } = useDimensionalMusic();
 
-  // Animation and visualization refs
   const animationFrameRef = useRef(0);
   const [freqData, setFreqData] = useState<Uint8Array | null>(null);
 
-  // Dimensional wisdom quotes based on current dimension
   const dimensionalWisdomQuotes = useMemo(() => ({
     prime: [
       "Music is the harmony of the universe made audible.",
@@ -88,7 +84,6 @@ export function NinjaTour() {
     ]
   }), []);
 
-  // Fetch dimension-specific code suggestions
   const { data: codeSuggestions } = useQuery({
     queryKey: ['code-suggestions', currentDimension],
     queryFn: async () => {
@@ -100,7 +95,6 @@ export function NinjaTour() {
     refetchInterval: isDimensionallyAligned ? 10000 : 5000
   });
 
-  // Fetch community insights for current dimension
   const { data: communityInsights } = useQuery({
     queryKey: ['community-insights', currentDimension],
     queryFn: async () => {
@@ -112,7 +106,6 @@ export function NinjaTour() {
     refetchInterval: 30000
   });
 
-  // Update suggestions based on dimension
   useEffect(() => {
     if (codeSuggestions) {
       setSuggestions(codeSuggestions.filter(s =>
@@ -121,7 +114,6 @@ export function NinjaTour() {
     }
   }, [codeSuggestions, currentDimension]);
 
-  // Dynamic tour steps based on dimension
   const tourSteps: TourStep[] = useMemo(() => [
     {
       message: t('tour.welcome'),
@@ -143,7 +135,6 @@ export function NinjaTour() {
     }
   ], [t, currentDimension]);
 
-  // Visual effects based on dimensional state
   const getDimensionalEffects = () => {
     const { entropy, harmonicAlignment, dimensionalShift } = dimensionalState;
     return {
@@ -153,7 +144,6 @@ export function NinjaTour() {
     };
   };
 
-  // Dimensional transition animation
   const animateDimensionalShift = async () => {
     await controls.start({
       scale: [1, 1.2, 0.8, 1],
@@ -162,41 +152,29 @@ export function NinjaTour() {
     });
   };
 
-  // Effect to handle dimensional transitions
   useEffect(() => {
     if (isDimensionallyAligned) {
       animateDimensionalShift();
     }
   }, [currentDimension, isDimensionallyAligned]);
 
-  // Check if we should show the tour
   useEffect(() => {
     const shouldShowTour = () => {
-      // Only show on home page
       if (location !== '/') return false;
-
-      // Check if user has dismissed the tour
       const tourDismissed = localStorage.getItem('ninja-tour-dismissed');
       const lastWalletAddress = localStorage.getItem('last-wallet-address');
-
-      // Show tour if:
-      // 1. Never dismissed before, or
-      // 2. New wallet connection (different from last address)
       if (!tourDismissed || (address && lastWalletAddress !== address)) {
-        // Update last wallet address
         if (address) {
           localStorage.setItem('last-wallet-address', address);
         }
         return true;
       }
-
       return false;
     };
 
     setIsVisible(shouldShowTour());
   }, [location, address]);
 
-  // Auto-advance tour steps
   useEffect(() => {
     if (currentStep < tourSteps.length - 1) {
       const timer = setTimeout(() => {
@@ -204,16 +182,15 @@ export function NinjaTour() {
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [currentStep]);
+  }, [currentStep, tourSteps.length]);
 
-  // Rotate wisdom quotes
   useEffect(() => {
     const quoteInterval = setInterval(() => {
       setCurrentQuote(prev => (prev + 1) % dimensionalWisdomQuotes[currentDimension as keyof typeof dimensionalWisdomQuotes].length);
-    }, 8000); // Change quote every 8 seconds
+    }, 8000);
 
     return () => clearInterval(quoteInterval);
-  }, [currentDimension]);
+  }, [currentDimension, dimensionalWisdomQuotes]);
 
   const handleDismiss = () => {
     localStorage.setItem('ninja-tour-dismissed', 'true');
@@ -223,7 +200,6 @@ export function NinjaTour() {
   const handleSuggestionApply = async (suggestion: CodeSuggestion) => {
     try {
       setActiveSuggestion(suggestion);
-      // Send feedback to Lumira about the applied suggestion
       await fetch('/api/lumira/data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -239,7 +215,6 @@ export function NinjaTour() {
         })
       });
 
-      // Show success animation
       await controls.start({
         scale: [1, 1.1, 1],
         transition: { duration: 0.3 }
@@ -258,8 +233,8 @@ export function NinjaTour() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           category: feedbackCategory,
-          sentiment: 1, // Positive by default
-          impact: 8, // High impact by default
+          sentiment: 1,
+          impact: 8,
           suggestions: [feedbackInput],
           source: 'ninja-helper',
           dimension: currentDimension
@@ -268,7 +243,6 @@ export function NinjaTour() {
 
       if (response.ok) {
         setFeedbackInput('');
-        // Show success animation
         await controls.start({
           scale: [1, 1.1, 1],
           transition: { duration: 0.3 }
@@ -288,7 +262,6 @@ export function NinjaTour() {
       console.error('Error voting on feedback:', error);
     }
   };
-
 
   if (!isVisible) return null;
 
@@ -439,26 +412,6 @@ export function NinjaTour() {
               {t(tourSteps[currentStep].messageId, { dimension: currentDimension })}
             </p>
 
-            {address && (
-              <div className="mt-4 border-t border-border pt-2">
-                <div className="flex gap-2">
-                  {Object.keys(dimensionalWisdomQuotes).map((dim) => (
-                    <motion.button
-                      key={dim}
-                      className={`p-2 rounded ${
-                        currentDimension === dim ? 'bg-primary text-primary-foreground' : 'bg-muted'
-                      }`}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => syncWithDimension(dim)}
-                    >
-                      <Boxes className="h-4 w-4" /> {dim}
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {suggestions.length > 0 && (
               <div className="mt-4 border-t border-border pt-2">
                 <p className="text-xs font-medium mb-2">
@@ -514,6 +467,7 @@ export function NinjaTour() {
             )}
           </motion.div>
         </motion.div>
+
         <motion.div className="fixed bottom-4 right-4 z-50">
           <motion.button
             className="bg-primary text-primary-foreground rounded-full p-3 shadow-lg"
