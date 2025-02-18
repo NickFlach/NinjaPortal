@@ -40,7 +40,8 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/dimensional-portal`;
+      // Update the WebSocket endpoint to use the correct path
+      const wsUrl = `${protocol}//${window.location.host}/ws/dimensional-portal`;
 
       // Use our secure WebSocket implementation
       const ws = new SecureWebSocket(wsUrl);
