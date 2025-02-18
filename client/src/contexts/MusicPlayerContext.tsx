@@ -26,6 +26,7 @@ interface MusicPlayerContextType {
   isLandingPage: boolean;
   currentContext: PlaylistContext;
   audioRef: React.RefObject<HTMLAudioElement>;
+  hasInteracted: boolean;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -34,6 +35,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [currentSong, setCurrentSong] = useState<Song>();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentContext, setCurrentContext] = useState<PlaylistContext>('landing');
+  const [hasInteracted, setHasInteracted] = useState(false);
   const [audioElement] = useState(() => new Audio());
   const audioRef = useRef<HTMLAudioElement>(audioElement);
   const { address: userAddress } = useAccount();
@@ -53,7 +55,11 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       setIsPlaying(false);
     };
 
-    const handlePlay = () => setIsPlaying(true);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      setHasInteracted(true);
+    };
+
     const handlePause = () => setIsPlaying(false);
     const handleEnded = () => setIsPlaying(false);
 
@@ -78,7 +84,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
-  // Fetch recent songs
+  // Fetch recent songs - simplified for landing page
   const { data: recentSongs = [] } = useQuery<Song[]>({
     queryKey: ["/api/music/recent"],
     queryFn: async () => {
@@ -93,14 +99,14 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           throw new Error('Unexpected response format');
         }
 
-        // Validate song data
+        // Basic validation for landing page
         return data.filter(song =>
           song &&
           typeof song.id === 'number' &&
           typeof song.title === 'string' &&
           typeof song.artist === 'string' &&
           typeof song.ipfsHash === 'string'
-        );
+        ).slice(0, 5); // Limit to 5 songs for landing page
       } catch (error) {
         console.error('Error fetching recent songs:', error);
         return [];
@@ -129,7 +135,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       audioRef.current.src = url;
       await audioRef.current.load();
 
-      if (dimensionalState.harmonicAlignment !== 1) {
+      // Only apply dimensional adjustments if wallet is connected
+      if (userAddress && dimensionalState.harmonicAlignment !== 1) {
         audioRef.current.playbackRate = dimensionalState.harmonicAlignment;
       }
 
@@ -159,18 +166,18 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   };
 
-  // Initialize landing page music
+  // Initialize landing page music - only if not played before
   useEffect(() => {
-    if (!recentSongs.length || !audioRef.current) return;
+    if (!recentSongs.length || !audioRef.current || hasInteracted) return;
 
     // Auto-play first song when on landing page and no song is currently playing
-    if (!currentSong) {
+    if (!currentSong && isLandingPage) {
       const firstSong = recentSongs[0];
       playSong(firstSong, 'landing').catch(error => {
         console.error('Error initializing music:', error);
       });
     }
-  }, [recentSongs, currentSong]);
+  }, [recentSongs, currentSong, hasInteracted, isLandingPage]);
 
   return (
     <MusicPlayerContext.Provider value={{
@@ -181,7 +188,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       recentSongs,
       isLandingPage,
       currentContext,
-      audioRef
+      audioRef,
+      hasInteracted
     }}>
       {children}
     </MusicPlayerContext.Provider>
