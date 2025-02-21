@@ -4,7 +4,6 @@ import { useAccount } from 'wagmi';
 import { playlistManager } from '@/lib/playlist';
 import { buildPoseidon } from 'circomlibjs';
 import { groth16 } from 'snarkjs';
-import { Buffer } from 'buffer';
 
 interface DimensionalState {
   entropy: number;
@@ -41,7 +40,6 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
   const dimensionalSyncRef = useRef<number>(0);
   const poseidonRef = useRef<any>(null);
 
-  // Initialize Poseidon hash function for ZK proof generation
   useEffect(() => {
     const initPoseidon = async () => {
       if (!poseidonRef.current) {
@@ -57,7 +55,6 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
         throw new Error('Poseidon hash not initialized');
       }
 
-      // Use TextEncoder instead of Buffer for string to bytes conversion
       const encoder = new TextEncoder();
       const dimensionBytes = encoder.encode(dimension);
       const dimensionHex = Array.from(dimensionBytes)
@@ -69,20 +66,29 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
       const publicAddr = BigInt(address || '0');
       const nonce = BigInt(Math.floor(Math.random() * 1000000));
 
+      const neoFSDetails = await playlistManager.getNeoFSDetails();
+
       const input = {
         portalTimestamp: timestamp.toString(),
         dimensionId: dimensionId.toString(),
         publicAddress: publicAddr.toString(),
-        userPrivateKey: publicAddr.toString(), // In development, use public address as private key
+        userPrivateKey: publicAddr.toString(), 
         harmonicAlignment: Math.floor(dimensionalState.harmonicAlignment * 1000000).toString(),
         entropyFactor: Math.floor(dimensionalState.entropy * 1000000).toString(),
-        dimensionalNonce: nonce.toString()
+        dimensionalNonce: nonce.toString(),
+        neoFSObjectId: neoFSDetails.objectId,
+        neoFSContainerId: neoFSDetails.containerId,
+        neoFSBearerToken: neoFSDetails.bearerToken,
+        neoFSStorageGroup: neoFSDetails.storageGroup,
+        neoFSDataSize: neoFSDetails.dataSize.toString(),
+        neoFSRepFactor: neoFSDetails.replicationFactor.toString()
       };
 
       console.log('Generating ZK proof with inputs:', {
         dimension,
         timestamp: timestamp.toString(),
-        harmonicAlignment: dimensionalState.harmonicAlignment
+        harmonicAlignment: dimensionalState.harmonicAlignment,
+        neoFSObjectId: neoFSDetails.objectId
       });
 
       const { proof, publicSignals } = await groth16.fullProve(
@@ -111,7 +117,6 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
       setDimensionalErrors([]);
       console.log('Starting dimensional sync for dimension:', dimension);
 
-      // Generate ZK proof for dimensional portal access
       const zkProof = await generateZKProof(dimension);
       console.log('Generated ZK proof:', { ...zkProof, proof: '...' });
 
@@ -168,7 +173,7 @@ export function DimensionalMusicProvider({ children }: { children: React.ReactNo
     socket.onMessage(handleDimensionalMessage);
 
     return () => {
-      socket.onMessage(() => {}); // Cleanup listener
+      socket.onMessage(() => {}); 
     };
   }, [socket, isConnected]);
 

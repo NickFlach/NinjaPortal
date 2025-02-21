@@ -37,51 +37,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const { address } = useAccount();
   const { dimensionalState, currentDimension, isDimensionallyAligned } = useDimensionalMusic();
 
-  // Fetch current playlist
-  const { data: playlist = [] } = useQuery({
-    queryKey: ["/api/playlists/current"],
-    queryFn: async () => {
-      try {
-        const playlist = await playlistManager.loadCurrentPortal();
-        return playlist.tracks;
-      } catch (error) {
-        console.error('Error loading dimensional portal:', error);
-        return [];
-      }
-    },
-    staleTime: 30000,
-    enabled: isDimensionallyAligned
-  });
-
-  // Initialize audio context on first user interaction
-  const initializeAudio = () => {
-    if (!hasInteracted && !audioContextRef.current) {
-      try {
-        audioContextRef.current = new AudioContext();
-        setHasInteracted(true);
-        console.log('Audio context initialized');
-      } catch (error) {
-        console.error('Failed to initialize audio context:', error);
-      }
-    }
-  };
-
-  useEffect(() => {
-    const handleInteraction = () => {
-      initializeAudio();
-      window.removeEventListener('click', handleInteraction);
-      window.removeEventListener('touchstart', handleInteraction);
-    };
-
-    window.addEventListener('click', handleInteraction);
-    window.addEventListener('touchstart', handleInteraction);
-
-    return () => {
-      window.removeEventListener('click', handleInteraction);
-      window.removeEventListener('touchstart', handleInteraction);
-    };
-  }, []);
-
   // Initialize audio element
   useEffect(() => {
     if (!audioRef.current) {
@@ -163,19 +118,70 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [currentTrack, currentDimension, address]);
 
-  // Update harmonic alignment based on dimensional state
-  useEffect(() => {
-    if (dimensionalState && currentTrack?.dimensionalSignature) {
-      setHarmonicAlignment(dimensionalState.harmonicAlignment);
-      if (audioRef.current && isPlaying) {
-        audioRef.current.playbackRate = dimensionalState.harmonicAlignment;
+  // Modified initialization of audio context
+  const initializeAudio = async () => {
+    if (!hasInteracted) {
+      try {
+        // Create AudioContext only on first interaction
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        audioContextRef.current = new AudioContextClass();
+
+        // Ensure the context is resumed
+        if (audioContextRef.current.state === 'suspended') {
+          await audioContextRef.current.resume();
+        }
+
+        setHasInteracted(true);
+        console.log('Audio context initialized and resumed');
+      } catch (error) {
+        console.error('Failed to initialize audio context:', error);
       }
     }
-  }, [dimensionalState, isPlaying, currentTrack]);
+  };
 
+  useEffect(() => {
+    const handleInteraction = async () => {
+      await initializeAudio();
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+    };
+
+    if (!hasInteracted) {
+      window.addEventListener('click', handleInteraction);
+      window.addEventListener('touchstart', handleInteraction);
+    }
+
+    return () => {
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+    };
+  }, [hasInteracted]);
+
+  // Fetch current playlist
+  const { data: playlist = [] } = useQuery({
+    queryKey: ["/api/playlists/current"],
+    queryFn: async () => {
+      try {
+        const playlist = await playlistManager.loadCurrentPortal();
+        return playlist.tracks;
+      } catch (error) {
+        console.error('Error loading dimensional portal:', error);
+        return [];
+      }
+    },
+    staleTime: 30000,
+    enabled: isDimensionallyAligned
+  });
+
+
+  // Modified playTrack function
   const playTrack = async (track: DimensionalTrack) => {
-    if (!audioRef.current || !hasInteracted) {
-      console.error('Audio not ready or user hasn\'t interacted');
+    if (!hasInteracted) {
+      await initializeAudio();
+    }
+
+    if (!audioRef.current) {
+      console.error('Audio element not ready');
       return;
     }
 
@@ -191,6 +197,11 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
       setCurrentTrack(track);
 
+      // Ensure audio context is ready
+      if (audioContextRef.current?.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+
       // Preload audio through IPFS
       console.log('Fetching audio data from IPFS');
       const audioData = await playlistManager.preloadAudio(track.ipfsHash);
@@ -199,11 +210,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
       console.log('Setting audio source');
       audioRef.current.src = url;
-      await audioRef.current.load(); // Ensure audio is loaded before playing
-
-      if (!audioContextRef.current?.state || audioContextRef.current.state === 'suspended') {
-        await audioContextRef.current?.resume();
-      }
+      await audioRef.current.load();
 
       await audioRef.current.play();
       console.log('Track playback started');

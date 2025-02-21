@@ -27,10 +27,20 @@ export const DimensionalPortalSchema = z.object({
 
 export type DimensionalPortal = z.infer<typeof DimensionalPortalSchema>;
 
+interface NeoFSDetails {
+  objectId: string;
+  containerId: string;
+  bearerToken: string;
+  storageGroup: string;
+  dataSize: number;
+  replicationFactor: number;
+}
+
 class DimensionalPortalManager {
   private currentPortal: DimensionalPortal | null = null;
   private audioCache: Map<string, ArrayBuffer> = new Map();
   private loadingPromises: Map<string, Promise<ArrayBuffer>> = new Map();
+  private neoFSCache: Map<string, NeoFSDetails> = new Map();
 
   async loadCurrentPortal(): Promise<DimensionalPortal> {
     try {
@@ -61,18 +71,40 @@ class DimensionalPortalManager {
     }
   }
 
+  async getNeoFSDetails(): Promise<NeoFSDetails> {
+    const portalId = this.currentPortal?.portalId;
+    if (!portalId) {
+      throw new Error('Portal not initialized');
+    }
+
+    if (this.neoFSCache.has(portalId)) {
+      return this.neoFSCache.get(portalId)!;
+    }
+
+    try {
+      const response = await fetch(`/api/neo-storage/details/${portalId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch NeoFS details');
+      }
+
+      const details: NeoFSDetails = await response.json();
+      this.neoFSCache.set(portalId, details);
+      return details;
+    } catch (error) {
+      console.error('Error fetching NeoFS details:', error);
+      throw error;
+    }
+  }
+
   async preloadAudio(ipfsHash: string): Promise<ArrayBuffer> {
-    // Check cache first
     if (this.audioCache.has(ipfsHash)) {
       return this.audioCache.get(ipfsHash)!;
     }
 
-    // Check if already loading
     if (this.loadingPromises.has(ipfsHash)) {
       return this.loadingPromises.get(ipfsHash)!;
     }
 
-    // Start new load
     const loadPromise = (async () => {
       try {
         const buffer = await getFromIPFS(ipfsHash);
@@ -99,7 +131,7 @@ class DimensionalPortalManager {
     const proofData = {
       ...params,
       timestamp: params.timestamp || Date.now(),
-      entropy: Math.random(), // This will be replaced with actual entropy calculation
+      entropy: Math.random(),
       portalId: this.currentPortal?.portalId
     };
 
@@ -117,6 +149,7 @@ class DimensionalPortalManager {
   clearCache(): void {
     this.audioCache.clear();
     this.loadingPromises.clear();
+    this.neoFSCache.clear();
   }
 }
 

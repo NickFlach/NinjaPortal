@@ -11,6 +11,7 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
     "@google-cloud/translate": "^8.5.0",
     "@googlemaps/markerclusterer": "^2.5.3",
     "@hookform/resolvers": "^3.9.1",
@@ -49,6 +50,7 @@
     "@react-three/drei": "^9.121.5",
     "@react-three/fiber": "^8.17.14",
     "@replit/vite-plugin-shadcn-theme-json": "^0.0.4",
+    "@rollup/plugin-node-resolve": "^16.0.0",
     "@tanstack/react-query": "^5.60.5",
     "@types/crypto-js": "^4.2.2",
     "@types/leaflet": "^1.9.8",
