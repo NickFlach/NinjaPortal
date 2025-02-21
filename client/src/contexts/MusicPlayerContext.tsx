@@ -3,14 +3,17 @@ import { useQuery } from "@tanstack/react-query";
 import { playlistManager } from "@/lib/playlist";
 import { useAccount } from 'wagmi';
 import { useDimensionalMusic } from './DimensionalMusicContext';
+import { getFileBuffer, checkFileAvailability } from '@/lib/storage';
 
 interface DimensionalTrack {
   id: number;
-  ipfsHash: string;
+  ipfsHash?: string;
+  neofsObjectId?: string;
   title: string;
   artist: string;
   dimensionalSignature?: string;
   harmonicAlignment?: number;
+  storageType: 'ipfs' | 'neofs';
 }
 
 interface MusicPlayerContextType {
@@ -202,9 +205,19 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         await audioContextRef.current.resume();
       }
 
-      // Preload audio through IPFS
-      console.log('Fetching audio data from IPFS');
-      const audioData = await playlistManager.preloadAudio(track.ipfsHash);
+      // Get the audio data from appropriate storage
+      const source = track.storageType === 'ipfs'
+        ? { type: 'ipfs' as const, hash: track.ipfsHash }
+        : { type: 'neofs' as const, objectId: track.neofsObjectId };
+
+      // Verify availability before attempting to load
+      const isAvailable = await checkFileAvailability(source);
+      if (!isAvailable) {
+        throw new Error('Track is currently unavailable');
+      }
+
+      console.log('Fetching audio data from', track.storageType);
+      const audioData = await getFileBuffer(source);
       const blob = new Blob([audioData], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
 

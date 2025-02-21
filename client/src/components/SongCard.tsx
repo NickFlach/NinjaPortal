@@ -21,7 +21,9 @@ interface Song {
   id: number;
   title: string;
   artist: string;
-  ipfsHash: string;
+  ipfsHash?: string;
+  neofsObjectId?: string;
+  storageType: 'ipfs' | 'neofs';
   uploadedBy: string | null;
   createdAt: string | null;
   votes: number | null;
@@ -167,6 +169,9 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false,
         >
           <span className="truncate">{song.title}</span>
           <span className="ml-2 text-muted-foreground">- {song.artist}</span>
+          {song.storageType === 'neofs' && (
+            <span className="ml-2 text-xs text-muted-foreground">(NeoFS)</span>
+          )}
         </Button>
 
         <div className="flex items-center">
@@ -184,8 +189,8 @@ export function SongCard({ song, onClick, variant = "ghost", showDelete = false,
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="icon"
                 className="opacity-0 group-hover:opacity-100 transition-opacity"
               >
