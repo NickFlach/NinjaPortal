@@ -45,6 +45,9 @@ const MapPage: FC = () => {
     pathColor: "#3b82f6"
   });
 
+  // Test location - Null Island
+  const testLocation: Array<[number, number]> = [[0, 0]];
+
   // Fetch map data with polling
   const { data: mapData, isLoading, error } = useQuery<MapData>({
     queryKey: ['/api/music/map'],
@@ -166,6 +169,16 @@ const MapPage: FC = () => {
 
                 {isSynced && locationData.length > 0 && (
                   <>
+                    {/* Always show test marker */}
+                    <MarkerLayer 
+                      data={testLocation}
+                      options={{
+                        ...visualizationOptions,
+                        markerSize: 12,
+                        pathColor: "#ff0000"  // Red color for test marker
+                      }}
+                    />
+
                     {visualizationOptions.showHeatmap && (
                       <HeatmapLayer data={locationData} />
                     )}
@@ -179,7 +192,7 @@ const MapPage: FC = () => {
 
                     {visualizationOptions.showPaths && (
                       <PathLayer 
-                        coordinates={locationData} 
+                        coordinates={locationData.map(([lat, lng]) => ({ lat, lng }))} 
                         options={visualizationOptions}
                       />
                     )}
