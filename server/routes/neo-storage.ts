@@ -14,7 +14,7 @@ interface MulterRequest extends Request {
 const router = Router();
 
 // Configure multer with proper field name and file type validation
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
@@ -44,8 +44,8 @@ router.post('/calculate-gas', async (req, res) => {
     const { fileSize, duration } = req.body;
 
     if (!fileSize || !duration) {
-      return res.status(400).json({ 
-        error: 'Missing required parameters. Please provide fileSize and duration.' 
+      return res.status(400).json({
+        error: 'Missing required parameters. Please provide fileSize and duration.'
       });
     }
 
@@ -69,7 +69,7 @@ router.post('/calculate-gas', async (req, res) => {
     const gasPriceMultiplier = parseInt(response.data.result.fast) / 1000;
     const totalCost = (sizeCost + overhead) * 1.2 * gasPriceMultiplier;
 
-    res.json({ 
+    res.json({
       requiredGas: totalCost.toFixed(8),
       gasPriceMultiplier,
       breakdown: {
@@ -81,7 +81,7 @@ router.post('/calculate-gas', async (req, res) => {
   } catch (error) {
     console.error('Error calculating GAS:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to calculate GAS requirement',
       details: errorMessage
     });
@@ -114,8 +114,8 @@ router.post('/upload', upload.single('file'), async (req: MulterRequest, res) =>
         address: !!address,
         gasTransaction: !!gasTransactionHash
       });
-      return res.status(400).json({ 
-        error: 'Missing required headers. Please provide wallet address and GAS transaction hash.' 
+      return res.status(400).json({
+        error: 'Missing required headers. Please provide wallet address and GAS transaction hash.'
       });
     }
 
@@ -220,7 +220,7 @@ router.post('/upload', upload.single('file'), async (req: MulterRequest, res) =>
   }
 });
 
-// Update the list files endpoint with proper types
+// Update list files endpoint with better error handling
 router.get('/files/:address', async (req, res) => {
   try {
     const { address } = req.params;
@@ -242,15 +242,24 @@ router.get('/files/:address', async (req, res) => {
     console.log('Neo FS list response:', {
       status: response.status,
       statusText: response.statusText,
-      dataLength: Array.isArray(response.data) ? response.data.length : 'not an array'
+      dataLength: Array.isArray(response.data) ? response.data.length : 'not an array',
+      error: response.data?.error || response.data?.message
     });
+
+    // If no files exist, return empty array instead of error
+    if (response.status === 404) {
+      console.log('No files found for wallet:', address);
+      return res.json([]);
+    }
 
     if (!response.data || response.status !== 200) {
       console.error('Neo FS list error:', response.data);
       throw new Error(response.data?.error || response.data?.message || 'Failed to list files from Neo FS');
     }
 
-    res.json(response.data);
+    // Ensure we always return an array
+    const files = Array.isArray(response.data) ? response.data : [];
+    res.json(files);
   } catch (error: any) {
     console.error('Neo FS list error:', error);
     console.error('Error details:', {
@@ -259,12 +268,19 @@ router.get('/files/:address', async (req, res) => {
       response: error.response?.data
     });
 
+    // Handle common errors gracefully
     if (error.code === 'ECONNABORTED') {
       return res.status(504).json({ error: 'Request timed out. Please try again.' });
     }
     if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
       return res.status(503).json({ error: 'Unable to connect to Neo FS. Please try again later.' });
     }
+
+    // For no files case, return empty array
+    if (error.response?.status === 404) {
+      return res.json([]);
+    }
+
     res.status(500).json({ error: 'Failed to list Neo FS files', details: error.message });
   }
 });
@@ -320,7 +336,7 @@ router.get('/download/:address/:fileId', async (req, res) => {
 router.use((err: Error, req: Request, res: Response, next: Function) => {
   console.error('NEO Storage error:', err);
   if (err instanceof multer.MulterError) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'File upload error',
       details: err.message
     });
@@ -331,7 +347,7 @@ router.use((err: Error, req: Request, res: Response, next: Function) => {
       details: err.message
     });
   }
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Internal server error',
     details: err.message
   });

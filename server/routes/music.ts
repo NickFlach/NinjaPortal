@@ -331,4 +331,59 @@ router.post("/:id/love", async (req, res) => {
   }
 });
 
+// Update the map data API endpoint to ensure proper JSON response
+router.get("/map", async (req, res) => {
+  const userAddress = req.headers['x-wallet-address'] as string;
+
+  try {
+    let countryCode = req.headers['cf-ipcountry'] as string;
+    if (!countryCode) {
+      countryCode = 'USA';
+    }
+
+    // Structure for map data
+    const mapData: {
+      countries: Record<string, {
+        locations: Array<[number, number]>;
+        listenerCount: number;
+        anonCount: number;
+      }>;
+      totalListeners: number;
+      allLocations: Array<[number, number]>;
+    } = {
+      countries: {},
+      totalListeners: 0,
+      allLocations: []
+    };
+
+    // If no data exists yet, return empty structure
+    if (!userAddress && !req.headers['x-internal-token']) {
+      return res.json(mapData);
+    }
+
+    // Add test location for development
+    mapData.allLocations.push([0, 0]);
+    mapData.totalListeners = 1;
+    mapData.countries['TEST'] = {
+      locations: [[0, 0]],
+      listenerCount: 1,
+      anonCount: 0
+    };
+
+    console.log('Sending map data:', {
+      totalLocations: mapData.allLocations.length,
+      totalListeners: mapData.totalListeners,
+      countries: Object.keys(mapData.countries).length
+    });
+
+    res.json(mapData);
+  } catch (error) {
+    console.error('Error fetching map data:', error);
+    res.status(500).json({
+      error: 'Failed to fetch map data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router;

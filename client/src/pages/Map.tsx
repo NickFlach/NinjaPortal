@@ -167,18 +167,20 @@ const MapPage: FC = () => {
                   className="dark-tiles"
                 />
 
+                {/* Always show test marker regardless of sync state */}
+                <MarkerLayer 
+                  data={testLocation}
+                  options={{
+                    showMarkers: true,
+                    markerSize: 20,
+                    pathColor: "#ff0000",  // Red color for test marker
+                    showHeatmap: false,
+                    showPaths: false
+                  }}
+                />
+
                 {isSynced && locationData.length > 0 && (
                   <>
-                    {/* Always show test marker */}
-                    <MarkerLayer 
-                      data={testLocation}
-                      options={{
-                        ...visualizationOptions,
-                        markerSize: 12,
-                        pathColor: "#ff0000"  // Red color for test marker
-                      }}
-                    />
-
                     {visualizationOptions.showHeatmap && (
                       <HeatmapLayer data={locationData} />
                     )}
