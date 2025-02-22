@@ -4,6 +4,7 @@ import { playlistManager } from "@/lib/playlist";
 import { useAccount } from 'wagmi';
 import { useDimensionalMusic } from './DimensionalMusicContext';
 import { getFileBuffer, checkFileAvailability } from '@/lib/storage';
+import { useDimensionalTranslation } from './LocaleContext';
 
 interface DimensionalTrack {
   id: number;
@@ -43,107 +44,20 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { address } = useAccount();
   const { dimensionalState, currentDimension, isDimensionallyAligned } = useDimensionalMusic();
+  const { t } = useDimensionalTranslation();
 
-  // Fetch radio stations for fallback
-  const { data: radioStations } = useQuery({
-    queryKey: ["/api/radio/top"],
-    queryFn: async () => {
-      const response = await fetch("/api/radio/top");
-      if (!response.ok) throw new Error('Failed to fetch radio stations');
-      return response.json();
-    },
-    enabled: !currentTrack || isRadioMode,
-    staleTime: 60000
-  });
-
-  // Modified playTrack function to handle radio streams
-  const playTrack = async (track: DimensionalTrack) => {
-    if (!hasInteracted) {
-      await initializeAudio();
-    }
-
-    if (!audioRef.current) {
-      console.error('Audio element not ready');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      console.log('Loading track:', track.title);
-
-      // Stop current playback and clear src
-      if (audioRef.current.src) {
-        audioRef.current.pause();
-        URL.revokeObjectURL(audioRef.current.src);
-      }
-
-      setCurrentTrack(track);
-
-      // Ensure audio context is ready
-      if (audioContextRef.current?.state === 'suspended') {
-        await audioContextRef.current.resume();
-      }
-
-      if (track.storageType === 'radio') {
-        // Handle radio stream directly
-        console.log('Playing radio stream:', track.streamUrl);
-        audioRef.current.src = track.streamUrl!;
-        await audioRef.current.load();
-      } else {
-        // Get the audio data from appropriate storage
-        const source = track.storageType === 'ipfs'
-          ? { type: 'ipfs' as const, hash: track.ipfsHash }
-          : { type: 'neofs' as const, objectId: track.neofsObjectId };
-
-        // Verify availability before attempting to load
-        const isAvailable = await checkFileAvailability(source);
-        if (!isAvailable) {
-          throw new Error('Track is currently unavailable');
-        }
-
-        console.log('Fetching audio data from', track.storageType);
-        const audioData = await getFileBuffer(source);
-        const blob = new Blob([audioData], { type: 'audio/mp3' });
-        const url = URL.createObjectURL(blob);
-        audioRef.current.src = url;
-        await audioRef.current.load();
-      }
-
-      await audioRef.current.play();
-      console.log('Track playback started');
-    } catch (error) {
-      console.error('Error playing track:', error);
-      setIsPlaying(false);
-      setIsLoading(false);
-
-      // If storage is unavailable, switch to radio mode
-      if (error instanceof Error && error.message.includes('unavailable') && !isRadioMode) {
-        console.log('Storage unavailable, switching to radio mode');
-        await switchToRadio();
-      } else {
-        setCurrentTrack(null);
+  // Initialize audio context
+  useEffect(() => {
+    if (!audioContextRef.current) {
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        audioContextRef.current = new AudioContextClass();
+        console.log('Audio context initialized');
+      } catch (error) {
+        console.error('Failed to initialize audio context:', error);
       }
     }
-  };
-
-  // Function to switch to radio mode
-  const switchToRadio = async () => {
-    if (!radioStations?.length) {
-      console.error('No radio stations available');
-      return;
-    }
-
-    setIsRadioMode(true);
-    const randomStation = radioStations[Math.floor(Math.random() * radioStations.length)];
-
-    await playTrack({
-      id: -1, // Use negative ID to indicate radio
-      title: randomStation.name,
-      artist: 'Radio',
-      storageType: 'radio',
-      streamUrl: randomStation.url
-    });
-  };
+  }, []);
 
   // Initialize audio element
   useEffect(() => {
@@ -152,6 +66,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       audio.preload = 'auto';
       audioRef.current = audio;
 
+      // Audio event handlers
       const handleCanPlay = () => {
         console.log('Audio can play');
         setIsLoading(false);
@@ -188,8 +103,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           audioRef.current.src = '';
         }
 
-        // Generate dimensional proof if track has dimensional signature
-        if (currentTrack?.dimensionalSignature) {
+        // Handle dimensional proof if needed
+        if (currentTrack?.dimensionalSignature && isDimensionallyAligned) {
           try {
             const proof = await playlistManager.generateZKProof({
               signature: currentTrack.dimensionalSignature,
@@ -205,6 +120,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         }
       };
 
+      // Add event listeners
       audio.addEventListener('canplay', handleCanPlay);
       audio.addEventListener('error', handleError);
       audio.addEventListener('play', handlePlay);
@@ -212,6 +128,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       audio.addEventListener('ended', handleEnded);
 
       return () => {
+        // Clean up event listeners
         audio.removeEventListener('canplay', handleCanPlay);
         audio.removeEventListener('error', handleError);
         audio.removeEventListener('play', handlePlay);
@@ -224,28 +141,141 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         audio.pause();
       };
     }
-  }, [currentTrack, currentDimension, address]);
+  }, [currentTrack, currentDimension, address, isDimensionallyAligned]);
 
-  // Modified initialization of audio context
+  const playTrack = async (track: DimensionalTrack) => {
+    console.log('Playing track:', track);
+
+    if (!hasInteracted) {
+      await initializeAudio();
+    }
+
+    if (!audioRef.current) {
+      console.error('Audio element not ready');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      // Stop current playback and clear src
+      if (audioRef.current.src) {
+        audioRef.current.pause();
+        URL.revokeObjectURL(audioRef.current.src);
+      }
+
+      setCurrentTrack(track);
+
+      // Ensure audio context is ready
+      if (audioContextRef.current?.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+
+      if (track.storageType === 'radio') {
+        console.log('Playing radio stream:', track.streamUrl);
+        audioRef.current.src = track.streamUrl!;
+        await audioRef.current.load();
+      } else {
+        // Get the audio data from appropriate storage
+        const source = track.storageType === 'ipfs'
+          ? { type: 'ipfs' as const, hash: track.ipfsHash }
+          : { type: 'neofs' as const, objectId: track.neofsObjectId };
+
+        // Verify availability before attempting to load
+        const isAvailable = await checkFileAvailability(source);
+        if (!isAvailable) {
+          throw new Error(t('app.errors.quantum'));
+        }
+
+        console.log('Fetching audio data from', track.storageType);
+        const audioData = await getFileBuffer(source);
+        const blob = new Blob([audioData], { type: 'audio/mp3' });
+        const url = URL.createObjectURL(blob);
+        audioRef.current.src = url;
+        await audioRef.current.load();
+      }
+
+      await audioRef.current.play();
+      console.log('Track playback started');
+      setIsPlaying(true);
+    } catch (error) {
+      console.error('Error playing track:', error);
+      setIsPlaying(false);
+      setIsLoading(false);
+      throw error;
+    }
+  };
+
   const initializeAudio = async () => {
     if (!hasInteracted) {
       try {
-        // Create AudioContext only on first interaction
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-        audioContextRef.current = new AudioContextClass();
-
-        // Ensure the context is resumed
-        if (audioContextRef.current.state === 'suspended') {
+        if (audioContextRef.current?.state === 'suspended') {
           await audioContextRef.current.resume();
         }
-
         setHasInteracted(true);
-        console.log('Audio context initialized and resumed');
       } catch (error) {
-        console.error('Failed to initialize audio context:', error);
+        console.error('Failed to initialize audio:', error);
       }
     }
   };
+
+  const togglePlay = async () => {
+    if (!hasInteracted) {
+      await initializeAudio();
+    }
+
+    if (!audioRef.current) return;
+
+    try {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else if (currentTrack) {
+        if (audioContextRef.current?.state === 'suspended') {
+          await audioContextRef.current.resume();
+        }
+        await audioRef.current.play();
+      }
+    } catch (error) {
+      console.error('Error toggling playback:', error);
+      setIsPlaying(false);
+    }
+  };
+
+  const switchToRadio = async () => {
+    setIsRadioMode(true);
+    // Radio implementation would go here
+    // For now, we'll just log that it's not implemented
+    console.log('Radio mode switched on');
+  };
+
+  // Fetch radio stations for fallback
+  const { data: radioStations } = useQuery({
+    queryKey: ["/api/radio/top"],
+    queryFn: async () => {
+      const response = await fetch("/api/radio/top");
+      if (!response.ok) throw new Error('Failed to fetch radio stations');
+      return response.json();
+    },
+    enabled: !currentTrack || isRadioMode,
+    staleTime: 60000
+  });
+
+  // Fetch current playlist
+  const { data: playlist = [] } = useQuery({
+    queryKey: ["/api/playlists/current"],
+    queryFn: async () => {
+      try {
+        const playlistData = await playlistManager.loadCurrentPortal();
+        return playlistData.tracks;
+      } catch (error) {
+        console.error('Error loading dimensional portal:', error);
+        return [];
+      }
+    },
+    staleTime: 30000,
+    enabled: isDimensionallyAligned
+  });
+
 
   useEffect(() => {
     const handleInteraction = async () => {
@@ -265,53 +295,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, [hasInteracted]);
 
-  // Fetch current playlist
-  const { data: playlist = [] } = useQuery({
-    queryKey: ["/api/playlists/current"],
-    queryFn: async () => {
-      try {
-        const playlist = await playlistManager.loadCurrentPortal();
-        return playlist.tracks;
-      } catch (error) {
-        console.error('Error loading dimensional portal:', error);
-        return [];
-      }
-    },
-    staleTime: 30000,
-    enabled: isDimensionallyAligned
-  });
-
-
-  const togglePlay = async () => {
-    if (!hasInteracted) {
-      console.error('User hasn\'t interacted yet');
-      return;
-    }
-
-    try {
-      if (!audioContextRef.current) {
-        initializeAudio();
-      }
-
-      if (isPlaying && audioRef.current) {
-        console.log('Pausing playback');
-        audioRef.current.pause();
-      } else {
-        console.log('Starting playback');
-        if (!currentTrack && playlist.length > 0) {
-          await playTrack(playlist[0]);
-        } else if (currentTrack && audioRef.current?.src) {
-          if (audioContextRef.current?.state === 'suspended') {
-            await audioContextRef.current.resume();
-          }
-          await audioRef.current.play();
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling playback:', error);
-      setIsPlaying(false);
-    }
-  };
 
   return (
     <MusicPlayerContext.Provider value={{
@@ -320,7 +303,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       isLoading,
       togglePlay,
       playTrack,
-      playlist,
+      playlist, 
       hasInteracted,
       harmonicAlignment,
       switchToRadio,
