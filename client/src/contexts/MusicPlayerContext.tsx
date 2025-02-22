@@ -213,20 +213,29 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   };
 
   const togglePlay = async () => {
+    console.log('Toggle play called, current state:', { isPlaying, hasInteracted });
+
     if (!hasInteracted) {
       await initializeAudio();
     }
 
-    if (!audioRef.current) return;
+    if (!audioRef.current) {
+      console.error('Audio element not ready');
+      return;
+    }
 
     try {
       if (isPlaying) {
+        console.log('Pausing playback');
         audioRef.current.pause();
+        setIsPlaying(false);
       } else if (currentTrack) {
+        console.log('Resuming playback');
         if (audioContextRef.current?.state === 'suspended') {
           await audioContextRef.current.resume();
         }
         await audioRef.current.play();
+        setIsPlaying(true);
       }
     } catch (error) {
       console.error('Error toggling playback:', error);
