@@ -2,7 +2,6 @@ import { Buffer } from 'buffer';
 
 const pinataJWT = import.meta.env.VITE_PINATA_JWT;
 const PINATA_API = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
-const PINATA_METADATA_API = 'https://api.pinata.cloud/pinning/hashMetadata';
 const IPFS_GATEWAY = 'https://ipfs.io/ipfs';
 
 if (!pinataJWT) {
@@ -42,31 +41,34 @@ export async function uploadToIPFS(file: File): Promise<string> {
     const formData = new FormData();
     formData.append('file', file);
 
-    // Add metadata
-    const metadata = JSON.stringify({
+    // Simplified metadata structure
+    const metadata = {
       name: file.name,
       keyvalues: {
-        fileType: file.type,
+        contentType: file.type,
+        size: file.size,
         uploadTimestamp: new Date().toISOString()
       }
-    });
-    formData.append('pinataMetadata', metadata);
+    };
+
+    // Add metadata as string
+    formData.append('pinataMetadata', JSON.stringify(metadata));
 
     // Add upload options
-    const options = JSON.stringify({
+    const options = {
       cidVersion: 1,
       wrapWithDirectory: false
-    });
-    formData.append('pinataOptions', options);
+    };
+    formData.append('pinataOptions', JSON.stringify(options));
 
     console.log('Sending file to Pinata...', { metadata });
 
     const res = await fetch(PINATA_API, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${pinataJWT}`,
+        'Authorization': `Bearer ${pinataJWT}`
       },
-      body: formData,
+      body: formData
     });
 
     if (!res.ok) {
