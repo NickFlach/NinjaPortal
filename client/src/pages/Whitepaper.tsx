@@ -48,26 +48,27 @@ export default function Whitepaper() {
   useEffect(() => {
     window.scrollTo(0, 0);
 
+    // Define all translation keys with whitepaper context
     const translationKeys = [
       'whitepaper.title',
       'whitepaper.summary',
-      'The Evolutionary AI-Powered Music & Intelligence Network',
-      'In an age where technology doesn\'t just reshape industries but the very core of human experience, we are forging a new evolutionary paradigm—where music, AI, and decentralized intelligence coalesce into a living system, validated through comprehensive testing and expert verification.',
-      'Core System Capabilities & Validation',
+      'whitepaper.intro',
+      'whitepaper.foundation',
+      'whitepaper.capabilities',
       'whitepaper.ai.lumira',
       'whitepaper.arch.title',
       'whitepaper.roadmap.title',
-      'The Big Picture: Beyond Music, Toward Collective Intelligence',
-      'This is More Than Music—This is a Symphony of Intelligence. And you are part of it.',
-      'Rigorous Capability Testing',
+      'whitepaper.big_picture',
+      'whitepaper.conclusion',
+      'whitepaper.testing',
       'whitepaper.storage.ipfs.hybrid',
       'whitepaper.contracts.treasury',
       'whitepaper.cascade.description',
       'whitepaper.sync.topology.mesh',
       'whitepaper.challenges.election.raft',
-      'Technology serves human progress, rather than extracting from it',
-      'Economic models regenerate value rather than concentrating wealth',
-      'Community-driven governance ensures transparency, accountability, and autonomy',
+      'whitepaper.tech_serves',
+      'whitepaper.economic_models',
+      'whitepaper.community_driven',
       'whitepaper.challenges.rate.title',
       'whitepaper.challenges.rate.adaptive',
       'whitepaper.challenges.rate.backoff',
@@ -85,7 +86,6 @@ export default function Whitepaper() {
       'whitepaper.sync.state.election',
       'whitepaper.sync.state.merkle',
       'whitepaper.storage.neofs.integrity',
-      'whitepaper.cascade.description',
       'whitepaper.cascade.inner.sync',
       'whitepaper.cascade.outer.sync',
       'whitepaper.cascade.inner.gain',
@@ -104,15 +104,15 @@ export default function Whitepaper() {
           title: t('whitepaper.title'),
           lead: t('whitepaper.summary'),
           sections: {
-            intro: t('The Evolutionary AI-Powered Music & Intelligence Network'),
-            foundation: t('In an age where technology doesn\'t just reshape industries but the very core of human experience, we are forging a new evolutionary paradigm—where music, AI, and decentralized intelligence coalesce into a living system, validated through comprehensive testing and expert verification.'),
-            capabilities: t('Core System Capabilities & Validation'),
+            intro: t('whitepaper.intro'),
+            foundation: t('whitepaper.foundation'),
+            capabilities: t('whitepaper.capabilities'),
             lumiraAI: t('whitepaper.ai.lumira'),
             technicalArch: t('whitepaper.arch.title'),
             roadmap: t('whitepaper.roadmap.title'),
-            bigPicture: t('The Big Picture: Beyond Music, Toward Collective Intelligence'),
-            conclusion: t('This is More Than Music—This is a Symphony of Intelligence. And you are part of it.'),
-            testing: t('Rigorous Capability Testing')
+            bigPicture: t('whitepaper.big_picture'),
+            conclusion: t('whitepaper.conclusion'),
+            testing: t('whitepaper.testing')
           },
           capabilities: {
             dataless: t('whitepaper.storage.ipfs.hybrid'),
@@ -122,9 +122,9 @@ export default function Whitepaper() {
             testing: t('whitepaper.challenges.election.raft')
           },
           listItems: {
-            techServes: t('Technology serves human progress, rather than extracting from it'),
-            economicModels: t('Economic models regenerate value rather than concentrating wealth'),
-            communityDriven: t('Community-driven governance ensures transparency, accountability, and autonomy')
+            techServes: t('whitepaper.tech_serves'),
+            economicModels: t('whitepaper.economic_models'),
+            communityDriven: t('whitepaper.community_driven')
           },
           testing: {
             evaluation: [
