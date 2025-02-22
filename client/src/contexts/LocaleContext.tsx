@@ -13,6 +13,14 @@ interface TranslationCache {
   [key: string]: LumiraTranslation;
 }
 
+interface TranslationState {
+  [key: string]: {
+    loading: boolean;
+    error?: string;
+    text?: string;
+  };
+}
+
 // Cache with expiration
 const translationCache: TranslationCache = {};
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
@@ -20,8 +28,10 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 interface LumiraContextType {
   locale: LocaleType;
   setLocale: (locale: LocaleType) => void;
-  t: (key: string, params?: Record<string, string | number>) => Promise<string>;
+  t: (key: string, params?: Record<string, string | number>) => string;
+  translate: (key: string, params?: Record<string, string | number>) => Promise<string>;
   isLoading: boolean;
+  translationState: TranslationState;
 }
 
 const LumiraContext = createContext<LumiraContextType | undefined>(undefined);
@@ -29,29 +39,39 @@ const LumiraContext = createContext<LumiraContextType | undefined>(undefined);
 export function LumiraProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<LocaleType>('en');
   const [isLoading, setIsLoading] = useState(false);
+  const [translationState, setTranslationState] = useState<TranslationState>({});
 
-  // Translation function with Lumira integration
-  const t = useCallback(async (key: string, params?: Record<string, string | number>): Promise<string> => {
-    try {
-      // Check cache first
-      const cacheKey = `${locale}.${key}`;
-      const cachedTranslation = translationCache[cacheKey];
-      if (cachedTranslation && Date.now() - cachedTranslation.timestamp < CACHE_DURATION) {
-        let translation = cachedTranslation.text;
+  // Synchronous translation function - returns immediately from cache or fallback
+  const t = useCallback((key: string, params?: Record<string, string | number>): string => {
+    const cacheKey = `${locale}.${key}`;
+    const cachedTranslation = translationCache[cacheKey];
 
-        // Handle parameter interpolation
-        if (params) {
-          translation = Object.entries(params).reduce((acc: string, [param, value]) => {
-            return acc.replace(`{${param}}`, String(value));
-          }, translation);
-        }
-
-        return translation;
+    // Use cached translation if valid
+    if (cachedTranslation && Date.now() - cachedTranslation.timestamp < CACHE_DURATION) {
+      let translation = cachedTranslation.text;
+      if (params) {
+        translation = Object.entries(params).reduce((acc: string, [param, value]) => {
+          return acc.replace(`{${param}}`, String(value));
+        }, translation);
       }
+      return translation;
+    }
 
-      setIsLoading(true);
+    // Fallback to static translations or key
+    const fallback = messages[locale]?.[key as keyof typeof messages[typeof locale]] || key;
+    return typeof fallback === 'string' ? fallback : key;
+  }, [locale]);
 
-      // Get translation from Lumira API
+  // Asynchronous translation function - updates state when translation arrives
+  const translate = useCallback(async (key: string, params?: Record<string, string | number>): Promise<string> => {
+    const cacheKey = `${locale}.${key}`;
+
+    try {
+      setTranslationState(prev => ({
+        ...prev,
+        [key]: { loading: true }
+      }));
+
       const response = await apiRequest<{
         translation: string;
         confidence: number;
@@ -65,28 +85,46 @@ export function LumiraProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
-      // Cache successful translations
       if (response.translation) {
+        // Cache successful translations
         translationCache[cacheKey] = {
           text: response.translation,
           confidence: response.confidence,
           timestamp: Date.now()
         };
 
+        setTranslationState(prev => ({
+          ...prev,
+          [key]: { loading: false, text: response.translation }
+        }));
+
         return response.translation;
       }
 
-      // Fallback to static translations if API fails
-      return messages[locale]?.[key as keyof typeof messages[typeof locale]] || key;
+      // Fallback to static translations
+      const fallback = t(key, params);
+      setTranslationState(prev => ({
+        ...prev,
+        [key]: { loading: false, text: fallback }
+      }));
+
+      return fallback;
     } catch (error) {
       console.error('Translation error:', error);
-      // Fallback to static translations
-      const fallbackTranslation = messages[locale]?.[key as keyof typeof messages[typeof locale]] || key;
-      return typeof fallbackTranslation === 'string' ? fallbackTranslation : key;
-    } finally {
-      setIsLoading(false);
+      const fallback = t(key, params);
+
+      setTranslationState(prev => ({
+        ...prev,
+        [key]: { 
+          loading: false, 
+          text: fallback,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      }));
+
+      return fallback;
     }
-  }, [locale]);
+  }, [locale, t]);
 
   // Update locale with proper error handling
   const setLocale = useCallback((newLocale: LocaleType) => {
@@ -119,7 +157,9 @@ export function LumiraProvider({ children }: { children: React.ReactNode }) {
       locale,
       setLocale,
       t,
-      isLoading
+      translate,
+      isLoading,
+      translationState
     }}>
       <IntlProvider
         messages={messages[locale]}
@@ -143,3 +183,9 @@ export function useLumiraTranslation() {
   }
   return context;
 }
+
+// Export DimensionalProvider as an alias for LumiraProvider
+export const DimensionalProvider = LumiraProvider;
+
+// Export useDimensionalTranslation as an alias for useLumiraTranslation
+export const useDimensionalTranslation = useLumiraTranslation;

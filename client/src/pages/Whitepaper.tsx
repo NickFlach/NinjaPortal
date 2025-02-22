@@ -53,67 +53,67 @@ export default function Whitepaper() {
       setIsLoadingContent(true);
       try {
         const translations = {
-          title: await t('whitepaper.title'),
-          lead: await t('whitepaper.summary'),
+          title: t('whitepaper.title'),
+          lead: t('whitepaper.summary'),
           sections: {
-            intro: await t('The Evolutionary AI-Powered Music & Intelligence Network'),
-            foundation: await t('In an age where technology doesn\'t just reshape industries but the very core of human experience, we are forging a new evolutionary paradigm—where music, AI, and decentralized intelligence coalesce into a living system, validated through comprehensive testing and expert verification.'),
-            capabilities: await t('Core System Capabilities & Validation'),
-            lumiraAI: await t('whitepaper.ai.lumira'),
-            technicalArch: await t('whitepaper.arch.title'),
-            roadmap: await t('whitepaper.roadmap.title'),
-            bigPicture: await t('The Big Picture: Beyond Music, Toward Collective Intelligence'),
-            conclusion: await t('This is More Than Music—This is a Symphony of Intelligence. And you are part of it.'),
-            testing: await t('Rigorous Capability Testing')
+            intro: t('The Evolutionary AI-Powered Music & Intelligence Network'),
+            foundation: t('In an age where technology doesn\'t just reshape industries but the very core of human experience, we are forging a new evolutionary paradigm—where music, AI, and decentralized intelligence coalesce into a living system, validated through comprehensive testing and expert verification.'),
+            capabilities: t('Core System Capabilities & Validation'),
+            lumiraAI: t('whitepaper.ai.lumira'),
+            technicalArch: t('whitepaper.arch.title'),
+            roadmap: t('whitepaper.roadmap.title'),
+            bigPicture: t('The Big Picture: Beyond Music, Toward Collective Intelligence'),
+            conclusion: t('This is More Than Music—This is a Symphony of Intelligence. And you are part of it.'),
+            testing: t('Rigorous Capability Testing')
           },
           capabilities: {
-            dataless: await t('whitepaper.storage.ipfs.hybrid'),
-            web3: await t('whitepaper.contracts.treasury'),
-            quantum: await t('whitepaper.cascade.description'),
-            selfHealing: await t('whitepaper.sync.topology.mesh'),
-            testing: await t('whitepaper.challenges.election.raft')
+            dataless: t('whitepaper.storage.ipfs.hybrid'),
+            web3: t('whitepaper.contracts.treasury'),
+            quantum: t('whitepaper.cascade.description'),
+            selfHealing: t('whitepaper.sync.topology.mesh'),
+            testing: t('whitepaper.challenges.election.raft')
           },
           listItems: {
-            techServes: await t('Technology serves human progress, rather than extracting from it'),
-            economicModels: await t('Economic models regenerate value rather than concentrating wealth'),
-            communityDriven: await t('Community-driven governance ensures transparency, accountability, and autonomy')
+            techServes: t('Technology serves human progress, rather than extracting from it'),
+            economicModels: t('Economic models regenerate value rather than concentrating wealth'),
+            communityDriven: t('Community-driven governance ensures transparency, accountability, and autonomy')
           },
           testing: {
             evaluation: [
-              await t('whitepaper.challenges.rate.title'),
-              await t('whitepaper.challenges.rate.adaptive'),
-              await t('whitepaper.challenges.rate.backoff'),
-              await t('whitepaper.challenges.rate.jitter')
+              t('whitepaper.challenges.rate.title'),
+              t('whitepaper.challenges.rate.adaptive'),
+              t('whitepaper.challenges.rate.backoff'),
+              t('whitepaper.challenges.rate.jitter')
             ],
             capability: [
-              await t('whitepaper.challenges.election.title'),
-              await t('whitepaper.challenges.election.raft'),
-              await t('whitepaper.challenges.election.failover'),
-              await t('whitepaper.challenges.election.transfer')
+              t('whitepaper.challenges.election.title'),
+              t('whitepaper.challenges.election.raft'),
+              t('whitepaper.challenges.election.failover'),
+              t('whitepaper.challenges.election.transfer')
             ]
           },
           sync: {
-            title: await t('whitepaper.sync.title'),
+            title: t('whitepaper.sync.title'),
             topology: [
-              await t('whitepaper.sync.topology.mesh'),
-              await t('whitepaper.sync.topology.cluster'),
-              await t('whitepaper.sync.topology.redundant'),
-              await t('whitepaper.storage.neofs.redundancy')
+              t('whitepaper.sync.topology.mesh'),
+              t('whitepaper.sync.topology.cluster'),
+              t('whitepaper.sync.topology.redundant'),
+              t('whitepaper.storage.neofs.redundancy')
             ],
             state: [
-              await t('whitepaper.sync.state.timestamp'),
-              await t('whitepaper.sync.state.election'),
-              await t('whitepaper.sync.state.merkle'),
-              await t('whitepaper.storage.neofs.integrity')
+              t('whitepaper.sync.state.timestamp'),
+              t('whitepaper.sync.state.election'),
+              t('whitepaper.sync.state.merkle'),
+              t('whitepaper.storage.neofs.integrity')
             ]
           },
           cascade: {
-            description: await t('whitepaper.cascade.description'),
+            description: t('whitepaper.cascade.description'),
             points: [
-              await t('whitepaper.cascade.inner.sync'),
-              await t('whitepaper.cascade.outer.sync'),
-              await t('whitepaper.cascade.inner.gain'),
-              await t('whitepaper.cascade.outer.gain')
+              t('whitepaper.cascade.inner.sync'),
+              t('whitepaper.cascade.outer.sync'),
+              t('whitepaper.cascade.inner.gain'),
+              t('whitepaper.cascade.outer.gain')
             ]
           }
         };

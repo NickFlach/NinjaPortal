@@ -2,21 +2,26 @@ import { Router } from 'express';
 import { db } from '@db';
 import { sql } from 'drizzle-orm';
 import type { WebSocket } from 'ws';
-import { 
-  StandardizedData, 
-  GpsData, 
+import {
+  StandardizedData,
+  GpsData,
   PlaybackData,
   TranslationRequest,
   TranslationResponse,
   ProcessedMetrics,
   translationRequestSchema,
-  translationResponseSchema
+  translationResponseSchema,
 } from '../types/lumira';
 import { aiInterpreter } from '../services/ai-interpreter';
+import { ragTranslator } from '../services/rag-translator';
+import { messages } from '../../client/src/i18n';
 
 const router = Router();
 
-// Add translation endpoint
+// Initialize RAG translator with our existing translations
+ragTranslator.initializeStore(messages);
+
+// Update translation endpoint
 router.post('/translate', async (req, res) => {
   try {
     const result = translationRequestSchema.safeParse(req.body);
@@ -29,7 +34,10 @@ router.post('/translate', async (req, res) => {
 
     const { key, targetLocale, params } = result.data;
 
-    // Process through AI interpreter
+    // First try RAG-based translation
+    const ragTranslation = await ragTranslator.findSimilarTranslation(key, targetLocale);
+
+    // Process through AI interpreter for metrics
     const standardizedData: StandardizedData = {
       type: 'translation',
       timestamp: new Date().toISOString(),
@@ -47,13 +55,14 @@ router.post('/translate', async (req, res) => {
 
     try {
       const interpretedMetrics = await aiInterpreter.interpretMetrics(standardizedData);
-
-      // Update translation metrics
       await processMetricsPrivately(standardizedData);
 
+      // Use RAG translation if available, otherwise fallback
+      const translation = ragTranslation || interpretedMetrics.translation || key;
+
       const response: TranslationResponse = {
-        translation: interpretedMetrics.translation || key,
-        confidence: interpretedMetrics.confidence || 1,
+        translation,
+        confidence: ragTranslation ? 0.95 : (interpretedMetrics.confidence || 1),
         metrics: interpretedMetrics.aggregates
       };
 
@@ -61,7 +70,6 @@ router.post('/translate', async (req, res) => {
     } catch (error) {
       console.error('Translation error:', error);
 
-      // Update metrics with failure
       await processMetricsPrivately({
         ...standardizedData,
         data: {
