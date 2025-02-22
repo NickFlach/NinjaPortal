@@ -53,11 +53,19 @@ export async function getFileBuffer(source: { type: 'ipfs', hash: string }): Pro
       throw new Error('Missing IPFS hash');
     }
 
-    const response = await apiRequest('GET', `/api/ipfs/fetch/${source.hash}`, {
-      responseType: 'arraybuffer'
+    // Use fetch directly for binary data
+    const response = await fetch(`/api/ipfs/fetch/${source.hash}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/octet-stream',
+      },
     });
 
-    return response;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.arrayBuffer();
   } catch (error) {
     console.error('File retrieval error:', error);
     throw error;
@@ -71,8 +79,10 @@ export async function checkFileAvailability(source: { type: 'ipfs', hash: string
       return false;
     }
 
-    await apiRequest('HEAD', `/api/ipfs/fetch/${source.hash}`);
-    return true;
+    const response = await fetch(`/api/ipfs/fetch/${source.hash}`, {
+      method: 'HEAD',
+    });
+    return response.ok;
   } catch {
     return false;
   }

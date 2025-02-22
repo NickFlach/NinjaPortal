@@ -111,6 +111,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     try {
       setIsLoading(true);
 
+      // Clean up previous track
       if (audioRef.current.src) {
         audioRef.current.pause();
         URL.revokeObjectURL(audioRef.current.src);
@@ -118,26 +119,34 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
       setCurrentTrack(track);
 
+      // Resume audio context if suspended
       if (audioContextRef.current?.state === 'suspended') {
         await audioContextRef.current.resume();
       }
 
+      // Get audio data
       const audioData = await getFileBuffer({
         type: 'ipfs',
         hash: track.ipfsHash
       });
 
+      // Create blob and URL
       const blob = new Blob([audioData], { type: 'audio/mpeg' });
       const url = URL.createObjectURL(blob);
+
+      // Load and play
       audioRef.current.src = url;
       await audioRef.current.load();
       await audioRef.current.play();
 
       setIsPlaying(true);
+
+      // Update recent tracks
       setRecentTracks(prev => {
         const newTracks = prev.filter(t => t.id !== track.id);
         return [track, ...newTracks].slice(0, 10);
       });
+
     } catch (error) {
       console.error('Error playing track:', error);
       setIsPlaying(false);
