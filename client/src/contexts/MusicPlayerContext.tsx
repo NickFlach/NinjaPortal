@@ -97,7 +97,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   }, [isPlaying]);
 
   const playTrack = async (track: Track) => {
-    console.log('Playing track:', track);
+    console.log('Playing song:', track);
 
     if (!hasInteracted) {
       await initializeAudio();
