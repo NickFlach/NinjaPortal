@@ -1,23 +1,13 @@
-import { create } from 'ipfs-http-client';
 import { Buffer } from 'buffer';
 
 // Simple wrapper for IPFS functionality through Neo X
 export class IPFSManager {
-  private ipfs;
+  private walletAddress: string;
   private readonly MAX_RETRIES = 3;
   private readonly RETRY_DELAY = 1000;
 
   constructor(walletAddress: string) {
-    // Connect to Neo X IPFS node
-    this.ipfs = create({
-      host: 'neox-ipfs.neo.org',  // Updated endpoint
-      port: 443,
-      protocol: 'https',
-      headers: {
-        'X-Wallet-Address': walletAddress,
-        'Accept': 'application/json'
-      }
-    });
+    this.walletAddress = walletAddress;
   }
 
   private async retry<T>(operation: () => Promise<T>): Promise<T> {
@@ -45,33 +35,31 @@ export class IPFSManager {
         timestamp: new Date().toISOString()
       });
 
-      // Convert file to buffer
-      const buffer = await file.arrayBuffer();
-      const content = Buffer.from(buffer);
+      const formData = new FormData();
+      formData.append('file', file);
 
-      // Add file to IPFS through Neo X with retry mechanism
-      const result = await this.retry(async () => {
-        const addResult = await this.ipfs.add({
-          path: file.name,
-          content: content
+      const response = await this.retry(async () => {
+        const uploadResponse = await fetch('/api/ipfs/upload', {
+          method: 'POST',
+          headers: {
+            'X-Wallet-Address': this.walletAddress
+          },
+          body: formData
         });
 
-        if (!addResult?.path) {
-          throw new Error('Invalid IPFS upload response');
+        if (!uploadResponse.ok) {
+          const error = await uploadResponse.text();
+          throw new Error(error || 'Failed to upload to IPFS');
         }
 
-        return addResult;
+        return uploadResponse.json();
       });
 
-      console.log('Neo X IPFS upload successful:', {
-        path: result.path,
-        size: result.size
-      });
-
-      return result.path;
+      console.log('Neo X IPFS upload successful:', response);
+      return response.path;
     } catch (error) {
       console.error('Neo X IPFS upload error:', error);
-      throw new Error(`Failed to upload to Neo X IPFS: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error instanceof Error ? error : new Error('Unknown upload error');
     }
   }
 
@@ -79,21 +67,29 @@ export class IPFSManager {
     try {
       console.log('Fetching from Neo X IPFS:', { cid });
 
-      const chunks: Uint8Array[] = [];
-      await this.retry(async () => {
-        for await (const chunk of this.ipfs.cat(cid)) {
-          chunks.push(chunk);
+      const response = await this.retry(async () => {
+        const fetchResponse = await fetch(`/api/ipfs/fetch/${cid}`, {
+          headers: {
+            'X-Wallet-Address': this.walletAddress
+          }
+        });
+
+        if (!fetchResponse.ok) {
+          const error = await fetchResponse.text();
+          throw new Error(error || 'Failed to fetch from IPFS');
         }
+
+        return fetchResponse.arrayBuffer();
       });
 
-      if (chunks.length === 0) {
+      if (!response || response.byteLength === 0) {
         throw new Error('No data received from IPFS');
       }
 
-      return new Uint8Array(Buffer.concat(chunks)).buffer;
+      return response;
     } catch (error) {
       console.error('Neo X IPFS fetch error:', error);
-      throw new Error(`Failed to fetch from Neo X IPFS: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error instanceof Error ? error : new Error('Unknown fetch error');
     }
   }
 }
