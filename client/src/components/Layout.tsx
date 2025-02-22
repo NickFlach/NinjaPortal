@@ -4,17 +4,11 @@ import { Link } from "wouter";
 import { MusicPlayer } from "@/components/MusicPlayer";
 import { useDimensionalTranslation } from "@/contexts/LocaleContext";
 import { Button } from "@/components/ui/button";
-import { Globe, Menu, X } from "lucide-react";
-import { messages, languageNames } from "@/i18n";
+import { Menu, X } from "lucide-react";
 import { NinjaTour } from "@/components/NinjaTour";
 import { useDevice } from "@/hooks/use-mobile";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import * as React from "react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
@@ -28,7 +22,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { t, locale, setLocale, currentDimension, quantumState } = useDimensionalTranslation();
+  const { t } = useDimensionalTranslation();
   const { isMobile, isTablet } = useDevice();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
@@ -54,29 +48,7 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center gap-2">
             {!isCompactView ? (
               <>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="hover:bg-accent"
-                    >
-                      <Globe className="h-4 w-4" />
-                      <span className="sr-only">Select Language</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {Object.entries(languageNames).map(([code, name]) => (
-                      <DropdownMenuItem
-                        key={code}
-                        onClick={() => setLocale(code as keyof typeof messages)}
-                        className={locale === code ? 'bg-accent' : ''}
-                      >
-                        {name}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <LanguageSwitcher />
                 <WalletConnect />
               </>
             ) : (
@@ -98,29 +70,7 @@ export function Layout({ children }: LayoutProps) {
                     <Navigation />
                     <div className="space-y-4">
                       <WalletConnect />
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                          >
-                            <Globe className="h-4 w-4 mr-2" />
-                            {languageNames[locale as keyof typeof languageNames]}
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {Object.entries(languageNames).map(([code, name]) => (
-                            <DropdownMenuItem
-                              key={code}
-                              onClick={() => setLocale(code as keyof typeof messages)}
-                              className={locale === code ? 'bg-accent' : ''}
-                            >
-                              {name}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <LanguageSwitcher />
                     </div>
                   </div>
                 </SheetContent>
@@ -134,8 +84,8 @@ export function Layout({ children }: LayoutProps) {
           <div 
             className="absolute inset-0 opacity-75"
             style={{
-              background: quantumState === 'coherent' ? 'linear-gradient(90deg, var(--primary) 0%, purple 50%, var(--primary) 100%)' : 'none',
-              animation: quantumState === 'superposed' ? 'quantum-shift 2s infinite' : 'none'
+              background: 'linear-gradient(90deg, var(--primary) 0%, purple 50%, var(--primary) 100%)',
+              animation: 'quantum-shift 2s infinite'
             }}
           />
         </div>

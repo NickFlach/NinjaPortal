@@ -96,6 +96,7 @@
     "react-leaflet": "^4.2.1",
     "react-resizable-panels": "^2.1.4",
     "react-simple-maps": "^3.0.0",
+    "react-world-flags": "^1.6.0",
     "recharts": "^2.13.0",
     "rss": "^1.2.2",
     "snarkjs": "^0.7.5",
