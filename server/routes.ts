@@ -9,6 +9,7 @@ import neoStorageRouter from './routes/neo-storage';
 import translationRouter from './routes/translation';
 import lumiraRouter from './routes/lumira';
 import radioRouter from './routes/radio';
+import apiRouter from './routes/api'; // Add new API router import
 
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
@@ -38,7 +39,8 @@ export function registerRoutes(app: Express) {
   app.use('/api/translate', translationRouter);
   app.use('/api/lumira', lumiraRouter);
   app.use('/api/neo-storage', neoStorageRouter);
-  app.use('/api/radio', radioRouter); // Add radio routes
+  app.use('/api/radio', radioRouter);
+  app.use('/api/v1', apiRouter); // Register new API router
 
   return httpServer;
 }

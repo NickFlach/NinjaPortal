@@ -13,7 +13,8 @@ import adminRouter from './routes/admin';
 import neoStorageRouter from './routes/neo-storage';
 import translationRouter from './routes/translation';
 import lumiraRouter from './routes/lumira';
-import ipfsRouter from './routes/ipfs'; // Add IPFS router import
+import ipfsRouter from './routes/ipfs';
+import apiRouter from './routes/api';
 
 // ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -59,7 +60,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Register API routes
+// Register API routes before Vite middleware
+app.use('/api/v1', apiRouter);
 app.use('/api/music', musicRouter);
 app.use('/api/playlists', playlistRouter);
 app.use('/api/users', userRouter);
@@ -67,7 +69,15 @@ app.use('/api/admin', adminRouter);
 app.use('/api/translate', translationRouter);
 app.use('/api/lumira', lumiraRouter);
 app.use('/api/neo-storage', neoStorageRouter);
-app.use('/api/ipfs', ipfsRouter); // Add IPFS routes
+app.use('/api/ipfs', ipfsRouter);
+
+// Error handling middleware
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  console.error('Server error:', err);
+  res.status(status).json({ message });
+});
 
 const startServer = async (retryCount = 0) => {
   const maxRetries = 3;
@@ -135,110 +145,12 @@ const startServer = async (retryCount = 0) => {
       }
     });
 
-    // WebSocket connection handling with proper error handling
-    wss.on('connection', (ws: CustomWebSocket) => {
-      ws.isAlive = true;
-      console.log('New music sync client connected');
-
-      // Handle incoming messages - only for music sync
-      ws.on('message', async (message: string) => {
-        try {
-          const data = JSON.parse(message.toString());
-
-          switch (data.type) {
-            case 'sync':
-              // Validate sync data before broadcasting
-              if (!data.songId || typeof data.timestamp !== 'number') {
-                console.error('Invalid sync data received:', data);
-                return;
-              }
-
-              // Broadcast sync data to all clients except sender
-              wss.clients.forEach((client) => {
-                if (client !== ws && client.readyState === WebSocket.OPEN) {
-                  client.send(JSON.stringify({
-                    type: 'sync',
-                    songId: data.songId,
-                    timestamp: data.timestamp,
-                    playing: data.playing
-                  }));
-                }
-              });
-              break;
-
-            case 'ping':
-              ws.send(JSON.stringify({ 
-                type: 'pong', 
-                timestamp: Date.now() 
-              }));
-              break;
-
-            default:
-              console.log('Received unknown message type:', data.type);
-          }
-        } catch (error) {
-          console.error('Error handling WebSocket message:', error);
-          ws.send(JSON.stringify({
-            type: 'error',
-            message: 'Failed to process message'
-          }));
-        }
-      });
-
-      const pingInterval = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.ping();
-        }
-      }, 30000);
-
-      ws.on('pong', () => {
-        ws.isAlive = true;
-      });
-
-      ws.on('error', (error: Error) => {
-        console.error('WebSocket error:', error);
-        clearInterval(pingInterval);
-      });
-
-      ws.on('close', () => {
-        console.log('Music sync client disconnected');
-        clearInterval(pingInterval);
-      });
-    });
-
-    // Error handling middleware
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-      console.error('Server error:', err);
-      res.status(status).json({ message });
-    });
-
+    // Set up Vite or static file serving after API routes
     if (app.get("env") === "development") {
       await setupVite(app, server);
     } else {
-      const distPath = path.resolve(__dirname, "..", "dist", "public");
-      app.use(express.static(distPath));
-      app.use('/api/*', (_req, res) => {
-        res.status(404).json({ error: 'API endpoint not found' });
-      });
-      app.get('*', (_req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
-      });
+      serveStatic(app);
     }
-
-    // Ensure cleanup of existing connections before starting
-    const cleanup = () => {
-      wss.close(() => {
-        server.close(() => {
-          console.log('Server and WebSocket connections closed');
-          process.exit(0);
-        });
-      });
-    };
-
-    process.on('SIGTERM', cleanup);
-    process.on('SIGINT', cleanup);
 
     await new Promise<void>((resolve, reject) => {
       server.listen(port, "0.0.0.0")
@@ -254,22 +166,6 @@ const startServer = async (retryCount = 0) => {
             reject(err);
           }
         });
-    });
-
-    // Health check interval
-    const healthCheckInterval = setInterval(() => {
-      wss.clients.forEach((ws) => {
-        const customWs = ws as CustomWebSocket;
-        if (!customWs.isAlive) {
-          return ws.terminate();
-        }
-        customWs.isAlive = false;
-        ws.ping();
-      });
-    }, 30000);
-
-    wss.on('close', () => {
-      clearInterval(healthCheckInterval);
     });
 
   } catch (error) {
