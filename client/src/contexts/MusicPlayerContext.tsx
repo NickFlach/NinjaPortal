@@ -4,39 +4,32 @@ import { playlistManager } from "@/lib/playlist";
 import { useAccount } from 'wagmi';
 import { getFileBuffer } from '@/lib/storage';
 
-interface DimensionalTrack {
+interface Track {
   id: number;
-  ipfsHash?: string;
-  neofsObjectId?: string;
+  ipfsHash: string;
   title: string;
   artist: string;
-  storageType: 'ipfs' | 'neofs' | 'radio';
-  streamUrl?: string;
 }
 
 interface MusicPlayerContextType {
-  currentTrack: DimensionalTrack | null;
-  currentSong: DimensionalTrack | null; 
+  currentTrack: Track | null;
   isPlaying: boolean;
   isLoading: boolean;
   togglePlay: () => Promise<void>;
-  playTrack: (track: DimensionalTrack) => Promise<void>;
-  playlist: DimensionalTrack[];
+  playTrack: (track: Track) => Promise<void>;
+  playlist: Track[];
   hasInteracted: boolean;
-  switchToRadio: () => Promise<void>;
-  isRadioMode: boolean;
-  recentTracks: DimensionalTrack[];
+  recentTracks: Track[];
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
 export function MusicPlayerProvider({ children }: { children: React.ReactNode }) {
-  const [currentTrack, setCurrentTrack] = useState<DimensionalTrack | null>(null);
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
-  const [isRadioMode, setIsRadioMode] = useState(false);
-  const [recentTracks, setRecentTracks] = useState<DimensionalTrack[]>([]);
+  const [recentTracks, setRecentTracks] = useState<Track[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { address } = useAccount();
@@ -76,37 +69,24 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         setIsLoading(false);
       };
 
-      const handlePlay = () => {
-        console.log('Audio playing');
-        setIsPlaying(true);
-      };
-
-      const handlePause = () => {
-        console.log('Audio paused');
-        setIsPlaying(false);
-      };
-
-      const handleEnded = async () => {
-        console.log('Audio ended');
+      audio.addEventListener('canplay', handleCanPlay);
+      audio.addEventListener('error', handleError);
+      audio.addEventListener('play', () => setIsPlaying(true));
+      audio.addEventListener('pause', () => setIsPlaying(false));
+      audio.addEventListener('ended', async () => {
         setIsPlaying(false);
         if (audioRef.current?.src) {
           URL.revokeObjectURL(audioRef.current.src);
           audioRef.current.src = '';
         }
-      };
-
-      audio.addEventListener('canplay', handleCanPlay);
-      audio.addEventListener('error', handleError);
-      audio.addEventListener('play', handlePlay);
-      audio.addEventListener('pause', handlePause);
-      audio.addEventListener('ended', handleEnded);
+      });
 
       return () => {
         audio.removeEventListener('canplay', handleCanPlay);
         audio.removeEventListener('error', handleError);
-        audio.removeEventListener('play', handlePlay);
-        audio.removeEventListener('pause', handlePause);
-        audio.removeEventListener('ended', handleEnded);
+        audio.removeEventListener('play', () => setIsPlaying(true));
+        audio.removeEventListener('pause', () => setIsPlaying(false));
+        audio.removeEventListener('ended', () => setIsPlaying(false));
 
         if (audio.src) {
           URL.revokeObjectURL(audio.src);
@@ -116,7 +96,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [isPlaying]);
 
-  const playTrack = async (track: DimensionalTrack) => {
+  const playTrack = async (track: Track) => {
     console.log('Playing track:', track);
 
     if (!hasInteracted) {
@@ -136,38 +116,24 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         URL.revokeObjectURL(audioRef.current.src);
       }
 
-      if (!track.storageType) {
-        throw new Error('Missing storage type');
-      }
-
       setCurrentTrack(track);
 
       if (audioContextRef.current?.state === 'suspended') {
         await audioContextRef.current.resume();
       }
 
-      if (track.storageType === 'radio' && track.streamUrl) {
-        console.log('Playing radio stream:', track.streamUrl);
-        audioRef.current.src = track.streamUrl;
-        await audioRef.current.load();
-      } else {
-        const audioData = await getFileBuffer({
-          type: track.storageType,
-          hash: track.ipfsHash,
-          objectId: track.neofsObjectId,
-          streamUrl: track.streamUrl
-        });
+      const audioData = await getFileBuffer({
+        type: 'ipfs',
+        hash: track.ipfsHash
+      });
 
-        const blob = new Blob([audioData], { type: 'audio/mpeg' });
-        const url = URL.createObjectURL(blob);
-        audioRef.current.src = url;
-        await audioRef.current.load();
-      }
-
+      const blob = new Blob([audioData], { type: 'audio/mpeg' });
+      const url = URL.createObjectURL(blob);
+      audioRef.current.src = url;
+      await audioRef.current.load();
       await audioRef.current.play();
-      console.log('Track playback started');
-      setIsPlaying(true);
 
+      setIsPlaying(true);
       setRecentTracks(prev => {
         const newTracks = prev.filter(t => t.id !== track.id);
         return [track, ...newTracks].slice(0, 10);
@@ -194,8 +160,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   };
 
   const togglePlay = async () => {
-    console.log('Toggle play called, current state:', { isPlaying, hasInteracted });
-
     if (!hasInteracted) {
       await initializeAudio();
     }
@@ -207,11 +171,9 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
     try {
       if (isPlaying) {
-        console.log('Pausing playback');
         audioRef.current.pause();
         setIsPlaying(false);
       } else if (currentTrack) {
-        console.log('Resuming playback');
         if (audioContextRef.current?.state === 'suspended') {
           await audioContextRef.current.resume();
         }
@@ -224,20 +186,12 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   };
 
-  const switchToRadio = async () => {
-    setIsRadioMode(true);
-    console.log('Radio mode switched on');
-  };
-
   const { data: playlist = [] } = useQuery({
     queryKey: ["/api/playlists/current"],
     queryFn: async () => {
       try {
         const playlistData = await playlistManager.loadCurrentPortal();
-        return playlistData.tracks.map(track => ({
-          ...track,
-          storageType: track.ipfsHash ? 'ipfs' : 'neofs'
-        })) as DimensionalTrack[];
+        return playlistData.tracks;
       } catch (error) {
         console.error('Error loading playlist:', error);
         return [];
@@ -267,15 +221,12 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   return (
     <MusicPlayerContext.Provider value={{
       currentTrack,
-      currentSong: currentTrack, 
       isPlaying,
       isLoading,
       togglePlay,
       playTrack,
       playlist,
       hasInteracted,
-      switchToRadio,
-      isRadioMode,
       recentTracks
     }}>
       {children}
