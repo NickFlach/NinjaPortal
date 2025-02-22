@@ -43,6 +43,21 @@ const translations = {
   'app.network.connect': 'Please make sure you\'re connected to the NEO X network',
   'app.network.install': 'Please install a Web3 wallet to continue',
 
+  // Experience and interaction translations
+  'experience.sound': 'Sound',
+  'experience.visual': 'Visual',
+  'experience.flow': 'Flow',
+  'experience.community': 'Community Insights',
+
+  // Storage related translations
+  'storage.title': 'Neo FS Storage',
+  'storage.upload': 'Upload to Neo FS',
+  'storage.uploading': 'Uploading...',
+  'storage.noFiles': 'No files in Neo FS yet',
+  'storage.success': 'File uploaded to Neo FS successfully',
+  'storage.error': 'Failed to upload file',
+  'storage.download.error': 'Failed to download file',
+
   // Song related
   'song.loved': 'Loved',
   'song.unloved': 'Unloved',
