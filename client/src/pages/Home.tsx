@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Library, Loader2 } from "lucide-react";
-import { uploadToIPFS } from "@/lib/ipfs";
+import { createIPFSManager } from "@/lib/ipfs";
 import { EditSongDialog } from "@/components/EditSongDialog";
 import { useDimensionalTranslation } from '@/contexts/LocaleContext';
 import { NeoStorage } from "@/components/NeoStorage";
@@ -166,14 +166,15 @@ export default function Home() {
         });
 
         try {
-          console.log('Starting IPFS upload for file:', {
+          console.log('Starting upload for file:', {
             name: file.name,
             size: file.size,
             type: file.type
           });
 
-          const ipfsHash = await uploadToIPFS(file);
-          console.log('IPFS upload successful, hash:', ipfsHash);
+          const ipfsManager = createIPFSManager(address);
+          const ipfsHash = await ipfsManager.uploadFile(file);
+          console.log('Upload successful, hash:', ipfsHash);
 
           const response = await apiRequest("POST", "/api/songs", {
             title,

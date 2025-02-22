@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Buffer } from 'buffer';
-import { getFromIPFS } from './ipfs';
+import { createIPFSManager } from './ipfs';
 
 export const DimensionalTrackSchema = z.object({
   id: z.number(),
@@ -41,6 +41,7 @@ class DimensionalPortalManager {
   private audioCache: Map<string, ArrayBuffer> = new Map();
   private loadingPromises: Map<string, Promise<ArrayBuffer>> = new Map();
   private neoFSCache: Map<string, NeoFSDetails> = new Map();
+  private ipfsManager = createIPFSManager('default');
 
   async loadCurrentPortal(): Promise<DimensionalPortal> {
     try {
@@ -107,7 +108,7 @@ class DimensionalPortalManager {
 
     const loadPromise = (async () => {
       try {
-        const buffer = await getFromIPFS(ipfsHash);
+        const buffer = await this.ipfsManager.getFile(ipfsHash);
         this.audioCache.set(ipfsHash, buffer);
         this.loadingPromises.delete(ipfsHash);
         return buffer;

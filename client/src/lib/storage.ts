@@ -1,8 +1,8 @@
 import { Buffer } from 'buffer';
-import { getFromIPFS, uploadToIPFS } from './ipfs';
+import { createIPFSManager } from './ipfs';
 import { apiRequest } from './queryClient';
 
-const MAX_IPFS_SIZE = 10 * 1024 * 1024; // 10MB limit for IPFS
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit
 
 interface StorageMetadata {
   title: string;
@@ -22,42 +22,21 @@ export async function uploadFile(file: File, metadata: StorageMetadata) {
       timestamp: new Date().toISOString()
     });
 
-    // Determine storage strategy based on file size
-    if (file.size <= MAX_IPFS_SIZE) {
-      // Use IPFS for smaller files
-      const ipfsHash = await uploadToIPFS(file);
-      return {
-        type: 'ipfs',
-        hash: ipfsHash,
-        metadata
-      };
-    } else {
-      // Use NeoFS for larger files
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      // Calculate GAS requirement
-      const gasResponse = await apiRequest('POST', '/api/neo-storage/calculate-gas', {
-        fileSize: file.size,
-        duration: metadata.duration || 300 // Default to 5 minutes if duration unknown
-      });
-
-      const gasData = await gasResponse.json();
-      
-      // Upload to NeoFS
-      const response = await apiRequest('POST', '/api/neo-storage/upload', formData, {
-        headers: {
-          'X-Gas-Required': gasData.requiredGas
-        }
-      });
-
-      const neoData = await response.json();
-      return {
-        type: 'neofs',
-        objectId: neoData.id,
-        metadata
-      };
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error(`File too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB`);
     }
+
+    // Create IPFS manager with wallet address
+    const ipfs = createIPFSManager(metadata.uploadedBy);
+
+    // Upload to IPFS
+    const ipfsHash = await ipfs.uploadFile(file);
+
+    return {
+      type: 'ipfs' as const,
+      hash: ipfsHash,
+      metadata
+    };
   } catch (error) {
     console.error('Upload error:', error);
     throw error;
@@ -67,7 +46,8 @@ export async function uploadFile(file: File, metadata: StorageMetadata) {
 export async function getFileBuffer(source: { type: 'ipfs' | 'neofs', hash?: string, objectId?: string }): Promise<ArrayBuffer> {
   try {
     if (source.type === 'ipfs' && source.hash) {
-      return await getFromIPFS(source.hash);
+      const ipfs = createIPFSManager('default'); // Use default for retrieval
+      return await ipfs.getFile(source.hash);
     } else if (source.type === 'neofs' && source.objectId) {
       const response = await fetch(`/api/neo-storage/download/${source.objectId}`);
       if (!response.ok) {
@@ -87,8 +67,9 @@ export async function getFileBuffer(source: { type: 'ipfs' | 'neofs', hash?: str
 export async function checkFileAvailability(source: { type: 'ipfs' | 'neofs', hash?: string, objectId?: string }): Promise<boolean> {
   try {
     if (source.type === 'ipfs' && source.hash) {
-      const response = await fetch(`https://ipfs.io/ipfs/${source.hash}`, { method: 'HEAD' });
-      return response.ok;
+      const ipfs = createIPFSManager('default');
+      await ipfs.getFile(source.hash); // Will throw if not available
+      return true;
     } else if (source.type === 'neofs' && source.objectId) {
       const response = await apiRequest('HEAD', `/api/neo-storage/check/${source.objectId}`);
       return response.ok;
