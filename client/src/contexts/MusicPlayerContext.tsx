@@ -24,17 +24,18 @@ interface MusicPlayerContextType {
   hasInteracted: boolean;
   switchToRadio: () => Promise<void>;
   isRadioMode: boolean;
+  recentTracks: DimensionalTrack[];
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
 export function MusicPlayerProvider({ children }: { children: React.ReactNode }) {
-  // Basic state management
   const [currentTrack, setCurrentTrack] = useState<DimensionalTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [isRadioMode, setIsRadioMode] = useState(false);
+  const [recentTracks, setRecentTracks] = useState<DimensionalTrack[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { address } = useAccount();
@@ -120,7 +121,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   }, [isPlaying]);
 
   const playTrack = async (track: DimensionalTrack) => {
-    console.log('Playing track:', track); // Debug log
+    console.log('Playing track:', track);
 
     if (!hasInteracted) {
       await initializeAudio();
@@ -164,33 +165,28 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         console.log('Playing radio stream:', track.streamUrl);
         audioRef.current.src = track.streamUrl;
         await audioRef.current.load();
-      } else if (track.storageType === 'ipfs' && track.ipfsHash) {
-        console.log('Fetching from IPFS:', track.ipfsHash);
+      } else {
         const audioData = await getFileBuffer({
-          type: 'ipfs',
-          hash: track.ipfsHash
-        });
-        const blob = new Blob([audioData], { type: 'audio/mpeg' });
-        const url = URL.createObjectURL(blob);
-        audioRef.current.src = url;
-        await audioRef.current.load();
-      } else if (track.storageType === 'neofs' && track.neofsObjectId) {
-        console.log('Fetching from NeoFS:', track.neofsObjectId);
-        const audioData = await getFileBuffer({
-          type: 'neofs',
+          type: track.storageType,
+          hash: track.ipfsHash,
           objectId: track.neofsObjectId
         });
+
         const blob = new Blob([audioData], { type: 'audio/mpeg' });
         const url = URL.createObjectURL(blob);
         audioRef.current.src = url;
         await audioRef.current.load();
-      } else {
-        throw new Error('Invalid track source configuration');
       }
 
       await audioRef.current.play();
       console.log('Track playback started');
       setIsPlaying(true);
+
+      // Add to recent tracks
+      setRecentTracks(prev => {
+        const newTracks = prev.filter(t => t.id !== track.id);
+        return [track, ...newTracks].slice(0, 10);
+      });
     } catch (error) {
       console.error('Error playing track:', error);
       setIsPlaying(false);
@@ -257,7 +253,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         return playlistData.tracks.map(track => ({
           ...track,
           storageType: track.ipfsHash ? 'ipfs' : 'neofs'
-        }));
+        })) as DimensionalTrack[];
       } catch (error) {
         console.error('Error loading playlist:', error);
         return [];
@@ -294,7 +290,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       playlist,
       hasInteracted,
       switchToRadio,
-      isRadioMode
+      isRadioMode,
+      recentTracks
     }}>
       {children}
     </MusicPlayerContext.Provider>
