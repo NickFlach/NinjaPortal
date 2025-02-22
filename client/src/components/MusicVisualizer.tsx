@@ -3,9 +3,9 @@ import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { WaveformVisualizer } from "./WaveformVisualizer";
 
 export function MusicVisualizer() {
-  const { currentSong } = useMusicPlayer();
+  const { currentTrack } = useMusicPlayer();
 
-  if (!currentSong) return null;
+  if (!currentTrack) return null;
 
   return (
     <div className="relative h-full overflow-hidden">

@@ -16,6 +16,7 @@ interface DimensionalTrack {
 
 interface MusicPlayerContextType {
   currentTrack: DimensionalTrack | null;
+  currentSong: DimensionalTrack | null; // Added for backward compatibility
   isPlaying: boolean;
   isLoading: boolean;
   togglePlay: () => Promise<void>;
@@ -146,14 +147,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         throw new Error('Missing storage type');
       }
 
-      if (track.storageType === 'ipfs' && !track.ipfsHash) {
-        throw new Error('Missing IPFS hash');
-      }
-
-      if (track.storageType === 'neofs' && !track.neofsObjectId) {
-        throw new Error('Missing NeoFS object ID');
-      }
-
       setCurrentTrack(track);
 
       // Ensure audio context is ready
@@ -169,7 +162,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         const audioData = await getFileBuffer({
           type: track.storageType,
           hash: track.ipfsHash,
-          objectId: track.neofsObjectId
+          objectId: track.neofsObjectId,
+          streamUrl: track.streamUrl //Added streamUrl for completeness.  getFileBuffer likely handles this.
         });
 
         const blob = new Blob([audioData], { type: 'audio/mpeg' });
@@ -283,6 +277,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   return (
     <MusicPlayerContext.Provider value={{
       currentTrack,
+      currentSong: currentTrack, // Added for backward compatibility
       isPlaying,
       isLoading,
       togglePlay,

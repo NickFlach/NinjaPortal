@@ -43,7 +43,7 @@ export async function uploadFile(file: File, metadata: StorageMetadata) {
   }
 }
 
-export async function getFileBuffer(source: { type: 'ipfs' | 'neofs', hash?: string, objectId?: string }): Promise<ArrayBuffer> {
+export async function getFileBuffer(source: { type: 'ipfs' | 'neofs' | 'radio', hash?: string, objectId?: string, streamUrl?: string }): Promise<ArrayBuffer> {
   try {
     if (source.type === 'ipfs' && source.hash) {
       const ipfs = createIPFSManager('default'); // Use default for retrieval
@@ -52,6 +52,12 @@ export async function getFileBuffer(source: { type: 'ipfs' | 'neofs', hash?: str
       const response = await fetch(`/api/neo-storage/download/${source.objectId}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch from NeoFS: ${response.statusText}`);
+      }
+      return await response.arrayBuffer();
+    } else if (source.type === 'radio' && source.streamUrl) {
+      const response = await fetch(source.streamUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch radio stream: ${response.statusText}`);
       }
       return await response.arrayBuffer();
     } else {
@@ -64,7 +70,7 @@ export async function getFileBuffer(source: { type: 'ipfs' | 'neofs', hash?: str
 }
 
 // Helper to check file availability
-export async function checkFileAvailability(source: { type: 'ipfs' | 'neofs', hash?: string, objectId?: string }): Promise<boolean> {
+export async function checkFileAvailability(source: { type: 'ipfs' | 'neofs' | 'radio', hash?: string, objectId?: string, streamUrl?: string }): Promise<boolean> {
   try {
     if (source.type === 'ipfs' && source.hash) {
       const ipfs = createIPFSManager('default');
@@ -72,6 +78,9 @@ export async function checkFileAvailability(source: { type: 'ipfs' | 'neofs', ha
       return true;
     } else if (source.type === 'neofs' && source.objectId) {
       const response = await apiRequest('HEAD', `/api/neo-storage/check/${source.objectId}`);
+      return response.ok;
+    } else if (source.type === 'radio' && source.streamUrl) {
+      const response = await fetch(source.streamUrl, { method: 'HEAD' });
       return response.ok;
     }
     return false;
