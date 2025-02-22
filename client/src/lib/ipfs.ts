@@ -1,22 +1,25 @@
 import { create } from 'ipfs-http-client';
 import { Buffer } from 'buffer';
 
-// Simple wrapper for IPFS functionality
+// Simple wrapper for IPFS functionality through Neo X
 export class IPFSManager {
   private ipfs;
 
   constructor(walletAddress: string) {
-    // Connect to local IPFS node or infura
+    // Connect to Neo X IPFS node
     this.ipfs = create({
-      host: 'ipfs.infura.io',
+      host: 'ipfs.neo.org',
       port: 5001,
-      protocol: 'https'
+      protocol: 'https',
+      headers: {
+        'X-Wallet-Address': walletAddress
+      }
     });
   }
 
   async uploadFile(file: File): Promise<string> {
     try {
-      console.log('Starting IPFS upload...', {
+      console.log('Starting Neo X IPFS upload...', {
         fileName: file.name,
         fileSize: file.size,
         fileType: file.type
@@ -26,34 +29,27 @@ export class IPFSManager {
       const buffer = await file.arrayBuffer();
       const content = Buffer.from(buffer);
 
-      // Simple metadata
-      const metadata = {
-        name: file.name,
-        type: file.type,
-        size: file.size
-      };
-
-      // Add file to IPFS
+      // Add file to IPFS through Neo X
       const result = await this.ipfs.add({
         path: file.name,
         content: content
       });
 
-      console.log('IPFS upload successful:', {
+      console.log('Neo X IPFS upload successful:', {
         path: result.path,
         size: result.size
       });
 
       return result.path;
     } catch (error) {
-      console.error('IPFS upload error:', error);
+      console.error('Neo X IPFS upload error:', error);
       throw error;
     }
   }
 
   async getFile(cid: string): Promise<ArrayBuffer> {
     try {
-      console.log('Fetching from IPFS:', { cid });
+      console.log('Fetching from Neo X IPFS:', { cid });
 
       const chunks = [];
       for await (const chunk of this.ipfs.cat(cid)) {
@@ -62,7 +58,7 @@ export class IPFSManager {
 
       return new Uint8Array(Buffer.concat(chunks)).buffer;
     } catch (error) {
-      console.error('IPFS fetch error:', error);
+      console.error('Neo X IPFS fetch error:', error);
       throw error;
     }
   }
