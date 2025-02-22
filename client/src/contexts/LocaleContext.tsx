@@ -30,6 +30,7 @@ interface LumiraContextType {
   setLocale: (locale: LocaleType) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
   translate: (key: string, params?: Record<string, string | number>) => Promise<string>;
+  preloadTranslations: (keys: string[]) => Promise<void>;
   isLoading: boolean;
   translationState: TranslationState;
 }
@@ -62,69 +63,59 @@ export function LumiraProvider({ children }: { children: React.ReactNode }) {
     return typeof fallback === 'string' ? fallback : key;
   }, [locale]);
 
-  // Asynchronous translation function - updates state when translation arrives
-  const translate = useCallback(async (key: string, params?: Record<string, string | number>): Promise<string> => {
-    const cacheKey = `${locale}.${key}`;
+  // Batch translation preloading
+  const preloadTranslations = useCallback(async (keys: string[]) => {
+    const missingKeys = keys.filter(key => {
+      const cacheKey = `${locale}.${key}`;
+      const cached = translationCache[cacheKey];
+      return !cached || Date.now() - cached.timestamp > CACHE_DURATION;
+    });
+
+    if (missingKeys.length === 0) return;
 
     try {
-      setTranslationState(prev => ({
-        ...prev,
-        [key]: { loading: true }
-      }));
+      setIsLoading(true);
+      const promises = missingKeys.map(key =>
+        apiRequest<{
+          translation: string;
+          confidence: number;
+        }>('POST', '/api/lumira/translate', {
+          body: { key, targetLocale: locale }
+        }).then(response => ({ key, response }))
+      );
 
-      const response = await apiRequest<{
-        translation: string;
-        confidence: number;
-        metrics?: Record<string, number>;
-        error?: string;
-      }>('POST', '/api/lumira/translate', {
-        body: {
-          key,
-          targetLocale: locale,
-          params
+      const results = await Promise.all(promises);
+      const newCache: Record<string, LumiraTranslation> = {};
+      const newState: TranslationState = {};
+
+      results.forEach(({ key, response }) => {
+        const cacheKey = `${locale}.${key}`;
+        if (response.translation) {
+          newCache[cacheKey] = {
+            text: response.translation,
+            confidence: response.confidence,
+            timestamp: Date.now()
+          };
+          newState[key] = { loading: false, text: response.translation };
+        } else {
+          newState[key] = { loading: false, text: t(key) };
         }
       });
 
-      if (response.translation) {
-        // Cache successful translations
-        translationCache[cacheKey] = {
-          text: response.translation,
-          confidence: response.confidence,
-          timestamp: Date.now()
-        };
-
-        setTranslationState(prev => ({
-          ...prev,
-          [key]: { loading: false, text: response.translation }
-        }));
-
-        return response.translation;
-      }
-
-      // Fallback to static translations
-      const fallback = t(key, params);
-      setTranslationState(prev => ({
-        ...prev,
-        [key]: { loading: false, text: fallback }
-      }));
-
-      return fallback;
+      Object.assign(translationCache, newCache);
+      setTranslationState(prev => ({ ...prev, ...newState }));
     } catch (error) {
-      console.error('Translation error:', error);
-      const fallback = t(key, params);
-
-      setTranslationState(prev => ({
-        ...prev,
-        [key]: { 
-          loading: false, 
-          text: fallback,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      }));
-
-      return fallback;
+      console.error('Batch translation error:', error);
+    } finally {
+      setIsLoading(false);
     }
   }, [locale, t]);
+
+  // Single translation function
+  const translate = useCallback(async (key: string, params?: Record<string, string | number>): Promise<string> => {
+    await preloadTranslations([key]);
+    return t(key, params);
+  }, [preloadTranslations, t]);
 
   // Update locale with proper error handling
   const setLocale = useCallback((newLocale: LocaleType) => {
@@ -158,6 +149,7 @@ export function LumiraProvider({ children }: { children: React.ReactNode }) {
       setLocale,
       t,
       translate,
+      preloadTranslations,
       isLoading,
       translationState
     }}>
@@ -178,8 +170,8 @@ export function LumiraProvider({ children }: { children: React.ReactNode }) {
 
 export function useLumiraTranslation() {
   const context = useContext(LumiraContext);
-  if (context === undefined) {
-    throw new Error('useLumiraTranslation must be used within a LumiraProvider');
+  if (!context) {
+    throw new Error("useLumiraTranslation must be used within a LumiraProvider");
   }
   return context;
 }

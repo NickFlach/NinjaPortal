@@ -41,17 +41,65 @@ interface TranslatedContent {
 }
 
 export default function Whitepaper() {
-  const { t, isLoading: isTranslating } = useLumiraTranslation();
+  const { t, isLoading: isTranslating, preloadTranslations } = useLumiraTranslation();
   const [translatedContent, setTranslatedContent] = useState<TranslatedContent>({});
   const [isLoadingContent, setIsLoadingContent] = useState(true);
 
   useEffect(() => {
     window.scrollTo(0, 0);
 
+    const translationKeys = [
+      'whitepaper.title',
+      'whitepaper.summary',
+      'The Evolutionary AI-Powered Music & Intelligence Network',
+      'In an age where technology doesn\'t just reshape industries but the very core of human experience, we are forging a new evolutionary paradigm—where music, AI, and decentralized intelligence coalesce into a living system, validated through comprehensive testing and expert verification.',
+      'Core System Capabilities & Validation',
+      'whitepaper.ai.lumira',
+      'whitepaper.arch.title',
+      'whitepaper.roadmap.title',
+      'The Big Picture: Beyond Music, Toward Collective Intelligence',
+      'This is More Than Music—This is a Symphony of Intelligence. And you are part of it.',
+      'Rigorous Capability Testing',
+      'whitepaper.storage.ipfs.hybrid',
+      'whitepaper.contracts.treasury',
+      'whitepaper.cascade.description',
+      'whitepaper.sync.topology.mesh',
+      'whitepaper.challenges.election.raft',
+      'Technology serves human progress, rather than extracting from it',
+      'Economic models regenerate value rather than concentrating wealth',
+      'Community-driven governance ensures transparency, accountability, and autonomy',
+      'whitepaper.challenges.rate.title',
+      'whitepaper.challenges.rate.adaptive',
+      'whitepaper.challenges.rate.backoff',
+      'whitepaper.challenges.rate.jitter',
+      'whitepaper.challenges.election.title',
+      'whitepaper.challenges.election.raft',
+      'whitepaper.challenges.election.failover',
+      'whitepaper.challenges.election.transfer',
+      'whitepaper.sync.title',
+      'whitepaper.sync.topology.mesh',
+      'whitepaper.sync.topology.cluster',
+      'whitepaper.sync.topology.redundant',
+      'whitepaper.storage.neofs.redundancy',
+      'whitepaper.sync.state.timestamp',
+      'whitepaper.sync.state.election',
+      'whitepaper.sync.state.merkle',
+      'whitepaper.storage.neofs.integrity',
+      'whitepaper.cascade.description',
+      'whitepaper.cascade.inner.sync',
+      'whitepaper.cascade.outer.sync',
+      'whitepaper.cascade.inner.gain',
+      'whitepaper.cascade.outer.gain'
+    ];
+
     // Load all translations at once
     const loadTranslations = async () => {
       setIsLoadingContent(true);
       try {
+        // Preload all translations
+        await preloadTranslations(translationKeys);
+
+        // Now all translations are cached, we can use the synchronous t() function
         const translations = {
           title: t('whitepaper.title'),
           lead: t('whitepaper.summary'),
@@ -127,7 +175,7 @@ export default function Whitepaper() {
     };
 
     loadTranslations();
-  }, [t]);
+  }, [t, preloadTranslations]);
 
   if (isLoadingContent || isTranslating) {
     return (
