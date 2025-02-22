@@ -24,6 +24,7 @@ interface Song {
   uploadedBy: string | null;
   createdAt: string | null;
   votes: number | null;
+  storageType: 'ipfs' | 'neofs';
 }
 
 export default function Home() {
@@ -32,7 +33,7 @@ export default function Home() {
   const [pendingUpload, setPendingUpload] = useState<File>();
   const { toast } = useToast();
   const { address } = useAccount();
-  const { playSong, currentSong, recentSongs } = useMusicPlayer();
+  const { playTrack, currentTrack, recentTracks } = useMusicPlayer();
   const queryClient = useQueryClient();
 
   const handleBackgroundClick = () => {
@@ -76,10 +77,6 @@ export default function Home() {
       }
 
       try {
-        // Try to play the song first
-        //await playSong(song, context); // This line is causing error because 'song' and 'context' are not in scope here.
-
-        // Then record the play
         const response = await fetch(`/api/music/play/${songId}`, {
           method: 'POST',
           headers: {
@@ -122,7 +119,7 @@ export default function Home() {
 
     try {
       // First try to play the song
-      await playSong(song, context);
+      await playTrack(song);
 
       // Then record the play if successful
       await playMutation.mutate(song.id);
@@ -318,7 +315,7 @@ export default function Home() {
                         song={song}
                         onClick={() => handlePlaySong(song, 'library')}
                         showDelete={true}
-                        isPlaying={currentSong?.id === song.id}
+                        isPlaying={currentTrack?.id === song.id}
                       />
                     ))
                   )}
@@ -338,17 +335,17 @@ export default function Home() {
             </div>
 
             <div className="grid gap-2">
-              {recentSongs?.length === 0 ? (
+              {recentTracks?.length === 0 ? (
                 <p className="text-muted-foreground">
                   {t('app.noRecentSongs')}
                 </p>
               ) : (
-                recentSongs?.map((song) => (
+                recentTracks?.map((song) => (
                   <SongCard
                     key={song.id}
                     song={song}
                     onClick={() => handlePlaySong(song, 'feed')}
-                    isPlaying={currentSong?.id === song.id}
+                    isPlaying={currentTrack?.id === song.id}
                   />
                 ))
               )}
