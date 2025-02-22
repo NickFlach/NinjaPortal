@@ -20,7 +20,8 @@ interface Song {
   id: number;
   title: string;
   artist: string;
-  ipfsHash: string;
+  ipfsHash?: string;
+  neofsObjectId?: string;
   uploadedBy: string | null;
   createdAt: string | null;
   votes: number | null;
@@ -44,7 +45,6 @@ export default function Home() {
     window.location.href = redirectUrl;
   };
 
-  // Update library query to include wallet address in headers
   const { data: librarySongs, isLoading: libraryLoading, error: libraryError } = useQuery<Song[]>({
     queryKey: ["/api/music/library"],
     queryFn: async () => {
@@ -118,10 +118,18 @@ export default function Home() {
     }
 
     try {
-      // First try to play the song
-      await playTrack(song);
+      console.log('Playing song:', song); 
 
-      // Then record the play if successful
+      const track = {
+        id: song.id,
+        title: song.title,
+        artist: song.artist,
+        ipfsHash: song.ipfsHash,
+        neofsObjectId: song.neofsObjectId,
+        storageType: song.storageType || (song.ipfsHash ? 'ipfs' : 'neofs')
+      };
+
+      await playTrack(track);
       await playMutation.mutate(song.id);
     } catch (error) {
       console.error('Error playing song:', error);

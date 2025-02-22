@@ -120,7 +120,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   }, [isPlaying]);
 
   const playTrack = async (track: DimensionalTrack) => {
-    console.log('Playing track:', track);
+    console.log('Playing track:', track); // Debug log
 
     if (!hasInteracted) {
       await initializeAudio();
@@ -138,6 +138,19 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       if (audioRef.current.src) {
         audioRef.current.pause();
         URL.revokeObjectURL(audioRef.current.src);
+      }
+
+      // Validate track configuration
+      if (!track.storageType) {
+        throw new Error('Missing storage type');
+      }
+
+      if (track.storageType === 'ipfs' && !track.ipfsHash) {
+        throw new Error('Missing IPFS hash');
+      }
+
+      if (track.storageType === 'neofs' && !track.neofsObjectId) {
+        throw new Error('Missing NeoFS object ID');
       }
 
       setCurrentTrack(track);
