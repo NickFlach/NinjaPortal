@@ -2,9 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useQuery } from "@tanstack/react-query";
 import { playlistManager } from "@/lib/playlist";
 import { useAccount } from 'wagmi';
-import { useDimensionalMusic } from './DimensionalMusicContext';
 import { getFileBuffer, checkFileAvailability } from '@/lib/storage';
-import { useDimensionalTranslation } from './LocaleContext';
 
 interface DimensionalTrack {
   id: number;
@@ -12,8 +10,6 @@ interface DimensionalTrack {
   neofsObjectId?: string;
   title: string;
   artist: string;
-  dimensionalSignature?: string;
-  harmonicAlignment?: number;
   storageType: 'ipfs' | 'neofs' | 'radio';
   streamUrl?: string;
 }
@@ -26,7 +22,6 @@ interface MusicPlayerContextType {
   playTrack: (track: DimensionalTrack) => Promise<void>;
   playlist: DimensionalTrack[];
   hasInteracted: boolean;
-  harmonicAlignment: number;
   switchToRadio: () => Promise<void>;
   isRadioMode: boolean;
 }
@@ -34,17 +29,15 @@ interface MusicPlayerContextType {
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
 export function MusicPlayerProvider({ children }: { children: React.ReactNode }) {
+  // Basic state management
   const [currentTrack, setCurrentTrack] = useState<DimensionalTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
-  const [harmonicAlignment, setHarmonicAlignment] = useState(1);
   const [isRadioMode, setIsRadioMode] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { address } = useAccount();
-  const { dimensionalState, currentDimension, isDimensionallyAligned } = useDimensionalMusic();
-  const { t } = useDimensionalTranslation();
 
   // Initialize audio context
   useEffect(() => {
@@ -102,22 +95,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           URL.revokeObjectURL(audioRef.current.src);
           audioRef.current.src = '';
         }
-
-        // Handle dimensional proof if needed
-        if (currentTrack?.dimensionalSignature && isDimensionallyAligned) {
-          try {
-            const proof = await playlistManager.generateZKProof({
-              signature: currentTrack.dimensionalSignature,
-              dimension: currentDimension,
-              harmonicAlignment: currentTrack.harmonicAlignment || 1,
-              timestamp: Date.now(),
-              address
-            });
-            await playlistManager.submitPlaybackProof(proof);
-          } catch (error) {
-            console.error('Error submitting dimensional proof:', error);
-          }
-        }
       };
 
       // Add event listeners
@@ -141,7 +118,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         audio.pause();
       };
     }
-  }, [currentTrack, currentDimension, address, isDimensionallyAligned]);
+  }, [isPlaying]);
 
   const playTrack = async (track: DimensionalTrack) => {
     console.log('Playing track:', track);
@@ -180,12 +157,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         const source = track.storageType === 'ipfs'
           ? { type: 'ipfs' as const, hash: track.ipfsHash }
           : { type: 'neofs' as const, objectId: track.neofsObjectId };
-
-        // Verify availability before attempting to load
-        const isAvailable = await checkFileAvailability(source);
-        if (!isAvailable) {
-          throw new Error(t('app.errors.quantum'));
-        }
 
         console.log('Fetching audio data from', track.storageType);
         const audioData = await getFileBuffer(source);
@@ -243,22 +214,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
   const switchToRadio = async () => {
     setIsRadioMode(true);
-    // Radio implementation would go here
-    // For now, we'll just log that it's not implemented
     console.log('Radio mode switched on');
   };
-
-  // Fetch radio stations for fallback
-  const { data: radioStations } = useQuery({
-    queryKey: ["/api/radio/top"],
-    queryFn: async () => {
-      const response = await fetch("/api/radio/top");
-      if (!response.ok) throw new Error('Failed to fetch radio stations');
-      return response.json();
-    },
-    enabled: !currentTrack || isRadioMode,
-    staleTime: 60000
-  });
 
   // Fetch current playlist
   const { data: playlist = [] } = useQuery({
@@ -266,16 +223,17 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     queryFn: async () => {
       try {
         const playlistData = await playlistManager.loadCurrentPortal();
-        return playlistData.tracks;
+        return playlistData.tracks.map(track => ({
+          ...track,
+          storageType: track.ipfsHash ? 'ipfs' : 'neofs'
+        }));
       } catch (error) {
-        console.error('Error loading dimensional portal:', error);
+        console.error('Error loading playlist:', error);
         return [];
       }
     },
-    staleTime: 30000,
-    enabled: isDimensionallyAligned
+    staleTime: 30000
   });
-
 
   useEffect(() => {
     const handleInteraction = async () => {
@@ -295,7 +253,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     };
   }, [hasInteracted]);
 
-
   return (
     <MusicPlayerContext.Provider value={{
       currentTrack,
@@ -303,9 +260,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       isLoading,
       togglePlay,
       playTrack,
-      playlist, 
+      playlist,
       hasInteracted,
-      harmonicAlignment,
       switchToRadio,
       isRadioMode
     }}>
