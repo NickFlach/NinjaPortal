@@ -26,23 +26,6 @@ const languageFlags = {
   eo: "EU" // Esperanto uses EU flag as a fallback
 } as const;
 
-// Map of language codes to their full names
-const languageNames = {
-  en: "English",
-  fr: "Français",
-  es: "Español",
-  de: "Deutsch",
-  it: "Italiano",
-  pt: "Português",
-  ru: "Русский",
-  ja: "日本語",
-  ko: "한국어",
-  zh: "中文",
-  ar: "العربية",
-  uk: "Українська",
-  eo: "Esperanto"
-} as const;
-
 type LanguageCode = keyof typeof languageFlags;
 
 export function LanguageSwitcher() {
@@ -61,32 +44,28 @@ export function LanguageSwitcher() {
       onOpenChange={setIsOpen}
     >
       <SelectTrigger 
-        className={`w-[140px] flex items-center gap-1.5 transition-colors duration-200 ${
+        className={`w-[60px] flex items-center justify-center transition-colors duration-200 ${
           isOpen ? 'bg-accent' : ''
         }`}
       >
         <Flag 
-          code={languageFlags[safeLocale]} 
+          code="PFORK"
           height="12" 
           className="rounded-sm object-cover min-w-[16px]" 
         />
-        <SelectValue className="truncate">
-          {languageNames[safeLocale]}
-        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {(Object.keys(languageFlags) as LanguageCode[]).map((code) => (
           <SelectItem
             key={code}
             value={code}
-            className="flex items-center gap-1.5 cursor-pointer transition-colors duration-200 hover:bg-accent"
+            className="flex items-center justify-center transition-colors duration-200 hover:bg-accent"
           >
             <Flag 
               code={languageFlags[code]} 
               height="12" 
               className="rounded-sm object-cover min-w-[16px]" 
             />
-            <span className="truncate">{languageNames[code]}</span>
           </SelectItem>
         ))}
       </SelectContent>
