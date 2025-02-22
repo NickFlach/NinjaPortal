@@ -17,7 +17,8 @@ interface TranslationCache {
 const QUANTUM_STATES = {
   COHERENT: 'coherent',
   DECOHERENT: 'decoherent',
-  SUPERPOSED: 'superposed'
+  SUPERPOSED: 'superposed',
+  CLASSICAL: 'classical' // Added classical state for non-quantum operations
 } as const;
 
 interface DimensionalContextType {
@@ -26,6 +27,7 @@ interface DimensionalContextType {
   t: (key: string, params?: Record<string, string | number>) => string;
   currentDimension: string;
   quantumState: typeof QUANTUM_STATES[keyof typeof QUANTUM_STATES];
+  isQuantumEnabled: boolean;
 }
 
 const DimensionalContext = createContext<DimensionalContextType | undefined>(undefined);
@@ -37,56 +39,107 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 export function DimensionalProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<LocaleType>('en');
   const [currentDimension, setCurrentDimension] = useState('prime');
-  const [quantumState, setQuantumState] = useState<typeof QUANTUM_STATES[keyof typeof QUANTUM_STATES]>(QUANTUM_STATES.COHERENT);
+  const [quantumState, setQuantumState] = useState<typeof QUANTUM_STATES[keyof typeof QUANTUM_STATES]>(QUANTUM_STATES.CLASSICAL);
+  const [isQuantumEnabled, setIsQuantumEnabled] = useState(false);
 
-  // Translation function with quantum state awareness
+  // Initialize quantum capabilities
+  useEffect(() => {
+    const checkQuantumCapabilities = async () => {
+      try {
+        // Check if quantum computing is available
+        const hasQuantum = 'crypto' in window && 'subtle' in window.crypto;
+        setIsQuantumEnabled(hasQuantum);
+
+        // Set initial state based on quantum availability
+        setQuantumState(hasQuantum ? QUANTUM_STATES.COHERENT : QUANTUM_STATES.CLASSICAL);
+      } catch (error) {
+        console.warn('Quantum capabilities not available, falling back to classical mode');
+        setIsQuantumEnabled(false);
+        setQuantumState(QUANTUM_STATES.CLASSICAL);
+      }
+    };
+
+    checkQuantumCapabilities();
+  }, []);
+
+  // Translation function with quantum state awareness and classical fallback
   const t = useCallback((key: string, params?: Record<string, string | number>): string => {
-    const currentMessages = messages[locale];
-    if (!currentMessages) {
-      console.error(`Dimension error: No translations found for locale ${locale}`);
-      return key;
-    }
+    try {
+      const currentMessages = messages[locale];
+      if (!currentMessages) {
+        console.error(`Dimension error: No translations found for locale ${locale}`);
+        return key;
+      }
 
-    const translation = currentMessages[key as keyof typeof currentMessages];
-    if (!translation) {
-      console.error(`Quantum state error: Translation key "${key}" not found in dimension ${currentDimension}`);
-      return key;
-    }
+      const translation = currentMessages[key as keyof typeof currentMessages];
+      if (!translation) {
+        // Try to find translation in cache before failing
+        const cachedTranslation = translationCache[`${locale}.${key}`];
+        if (cachedTranslation && Date.now() - cachedTranslation.timestamp < CACHE_DURATION) {
+          return cachedTranslation.text;
+        }
 
-    // Handle parameter interpolation with quantum state verification
-    if (params) {
-      return Object.entries(params).reduce((acc: string, [param, value]) => {
-        return acc.replace(`{${param}}`, String(value));
-      }, translation as string);
-    }
+        console.warn(`Translation key "${key}" not found in dimension ${currentDimension}, using key as fallback`);
+        return key;
+      }
 
-    return translation as string;
-  }, [locale, currentDimension]);
+      // Handle parameter interpolation with state verification
+      if (params) {
+        return Object.entries(params).reduce((acc: string, [param, value]) => {
+          return acc.replace(`{${param}}`, String(value));
+        }, translation as string);
+      }
+
+      // Cache successful translations
+      translationCache[`${locale}.${key}`] = {
+        text: translation as string,
+        dimension: currentDimension,
+        quantumState: quantumState,
+        timestamp: Date.now()
+      };
+
+      return translation as string;
+    } catch (error) {
+      console.error('Translation error:', error);
+      return key; // Failsafe: return the key if everything fails
+    }
+  }, [locale, currentDimension, quantumState]);
 
   // Update locale with dimensional synchronization
   const setLocale = useCallback((newLocale: LocaleType) => {
-    setLocaleState(newLocale);
-    localStorage.setItem('preferred-locale', newLocale);
+    try {
+      setLocaleState(newLocale);
+      localStorage.setItem('preferred-locale', newLocale);
 
-    // Quantum state transition
-    setQuantumState(QUANTUM_STATES.SUPERPOSED);
-    setTimeout(() => {
-      setQuantumState(QUANTUM_STATES.COHERENT);
-    }, 100);
-  }, []);
+      // Quantum state transition only if quantum computing is enabled
+      if (isQuantumEnabled) {
+        setQuantumState(QUANTUM_STATES.SUPERPOSED);
+        setTimeout(() => {
+          setQuantumState(QUANTUM_STATES.COHERENT);
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Failed to update locale:', error);
+      // Fallback to classical state
+      setQuantumState(QUANTUM_STATES.CLASSICAL);
+    }
+  }, [isQuantumEnabled]);
 
   // Initialize with browser's dimensional coordinates
   useEffect(() => {
-    const savedLocale = localStorage.getItem('preferred-locale') as LocaleType;
-    if (savedLocale && messages[savedLocale]) {
-      setLocaleState(savedLocale);
-    } else {
-      const browserLocale = navigator.language.split('-')[0] as LocaleType;
-      setLocaleState(messages[browserLocale] ? browserLocale : 'en');
+    try {
+      const savedLocale = localStorage.getItem('preferred-locale') as LocaleType;
+      if (savedLocale && messages[savedLocale]) {
+        setLocaleState(savedLocale);
+      } else {
+        const browserLocale = navigator.language.split('-')[0] as LocaleType;
+        setLocaleState(messages[browserLocale] ? browserLocale : 'en');
+      }
+    } catch (error) {
+      console.error('Failed to initialize locale:', error);
+      setLocaleState('en'); // Fallback to English
+      setQuantumState(QUANTUM_STATES.CLASSICAL);
     }
-
-    // Initialize quantum state
-    setQuantumState(QUANTUM_STATES.COHERENT);
   }, []);
 
   const value = {
@@ -94,16 +147,20 @@ export function DimensionalProvider({ children }: { children: React.ReactNode })
     setLocale,
     t,
     currentDimension,
-    quantumState
+    quantumState,
+    isQuantumEnabled
   };
 
-  // Wrap children with IntlProvider using current locale messages
   return (
     <DimensionalContext.Provider value={value}>
       <IntlProvider
         messages={messages[locale]}
         locale={locale}
         defaultLocale="en"
+        onError={(err) => {
+          console.warn('IntlProvider error:', err);
+          // Don't throw errors, just log them
+        }}
       >
         {children}
       </IntlProvider>
