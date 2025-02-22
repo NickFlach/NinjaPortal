@@ -8,6 +8,7 @@ import adminRouter from './routes/admin';
 import neoStorageRouter from './routes/neo-storage';
 import translationRouter from './routes/translation';
 import lumiraRouter from './routes/lumira';
+import radioRouter from './routes/radio';
 
 export function registerRoutes(app: Express) {
   const httpServer = createServer(app);
@@ -37,6 +38,7 @@ export function registerRoutes(app: Express) {
   app.use('/api/translate', translationRouter);
   app.use('/api/lumira', lumiraRouter);
   app.use('/api/neo-storage', neoStorageRouter);
+  app.use('/api/radio', radioRouter); // Add radio routes
 
   return httpServer;
 }
