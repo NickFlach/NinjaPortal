@@ -36,6 +36,9 @@ const DimensionalContext = createContext<DimensionalContextType | undefined>(und
 const translationCache: TranslationCache = {};
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
+// Prime dimension translations are used as fallback
+const primeTranslations: Record<string, string> = {};
+
 export function DimensionalProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<LocaleType>('en');
   const [currentDimension, setCurrentDimension] = useState('prime');
@@ -62,7 +65,15 @@ export function DimensionalProvider({ children }: { children: React.ReactNode })
     checkQuantumCapabilities();
   }, []);
 
-  // Translation function with quantum state awareness and classical fallback
+  // Store key in prime dimension if not found
+  const addToPrimeDimension = useCallback((key: string, value: string) => {
+    if (!primeTranslations[key]) {
+      primeTranslations[key] = value;
+      console.log(`Added key "${key}" to prime dimension translations`);
+    }
+  }, []);
+
+  // Translation function with quantum state awareness and prime dimension fallback
   const t = useCallback((key: string, params?: Record<string, string | number>): string => {
     try {
       const currentMessages = messages[locale];
@@ -71,21 +82,27 @@ export function DimensionalProvider({ children }: { children: React.ReactNode })
         return key;
       }
 
-      const translation = currentMessages[key as keyof typeof currentMessages];
-      if (!translation) {
-        // Try to find translation in cache before failing
-        const cachedTranslation = translationCache[`${locale}.${key}`];
-        if (cachedTranslation && Date.now() - cachedTranslation.timestamp < CACHE_DURATION) {
-          return cachedTranslation.text;
-        }
+      let translation = currentMessages[key as keyof typeof currentMessages];
 
-        console.warn(`Translation key "${key}" not found in dimension ${currentDimension}, using key as fallback`);
-        return key;
+      // Check cache first
+      const cachedTranslation = translationCache[`${locale}.${key}`];
+      if (cachedTranslation && Date.now() - cachedTranslation.timestamp < CACHE_DURATION) {
+        translation = cachedTranslation.text;
       }
 
-      // Handle parameter interpolation with state verification
+      // If no translation found, use prime dimension
+      if (!translation) {
+        translation = primeTranslations[key] || key;
+
+        // Store the key itself as translation in prime dimension
+        if (!primeTranslations[key]) {
+          addToPrimeDimension(key, key);
+        }
+      }
+
+      // Handle parameter interpolation
       if (params) {
-        return Object.entries(params).reduce((acc: string, [param, value]) => {
+        translation = Object.entries(params).reduce((acc: string, [param, value]) => {
           return acc.replace(`{${param}}`, String(value));
         }, translation as string);
       }
@@ -103,7 +120,7 @@ export function DimensionalProvider({ children }: { children: React.ReactNode })
       console.error('Translation error:', error);
       return key; // Failsafe: return the key if everything fails
     }
-  }, [locale, currentDimension, quantumState]);
+  }, [locale, currentDimension, quantumState, addToPrimeDimension]);
 
   // Update locale with dimensional synchronization
   const setLocale = useCallback((newLocale: LocaleType) => {
