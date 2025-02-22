@@ -16,7 +16,7 @@ interface DimensionalTrack {
 
 interface MusicPlayerContextType {
   currentTrack: DimensionalTrack | null;
-  currentSong: DimensionalTrack | null; // Added for backward compatibility
+  currentSong: DimensionalTrack | null; 
   isPlaying: boolean;
   isLoading: boolean;
   togglePlay: () => Promise<void>;
@@ -41,7 +41,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { address } = useAccount();
 
-  // Initialize audio context
   useEffect(() => {
     if (!audioContextRef.current) {
       try {
@@ -54,14 +53,12 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
-  // Initialize audio element
   useEffect(() => {
     if (!audioRef.current) {
       const audio = new Audio();
       audio.preload = 'auto';
       audioRef.current = audio;
 
-      // Audio event handlers
       const handleCanPlay = () => {
         console.log('Audio can play');
         setIsLoading(false);
@@ -98,7 +95,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         }
       };
 
-      // Add event listeners
       audio.addEventListener('canplay', handleCanPlay);
       audio.addEventListener('error', handleError);
       audio.addEventListener('play', handlePlay);
@@ -106,7 +102,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       audio.addEventListener('ended', handleEnded);
 
       return () => {
-        // Clean up event listeners
         audio.removeEventListener('canplay', handleCanPlay);
         audio.removeEventListener('error', handleError);
         audio.removeEventListener('play', handlePlay);
@@ -136,20 +131,17 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     try {
       setIsLoading(true);
 
-      // Stop current playback and clear src
       if (audioRef.current.src) {
         audioRef.current.pause();
         URL.revokeObjectURL(audioRef.current.src);
       }
 
-      // Validate track configuration
       if (!track.storageType) {
         throw new Error('Missing storage type');
       }
 
       setCurrentTrack(track);
 
-      // Ensure audio context is ready
       if (audioContextRef.current?.state === 'suspended') {
         await audioContextRef.current.resume();
       }
@@ -163,7 +155,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
           type: track.storageType,
           hash: track.ipfsHash,
           objectId: track.neofsObjectId,
-          streamUrl: track.streamUrl //Added streamUrl for completeness.  getFileBuffer likely handles this.
+          streamUrl: track.streamUrl
         });
 
         const blob = new Blob([audioData], { type: 'audio/mpeg' });
@@ -176,7 +168,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       console.log('Track playback started');
       setIsPlaying(true);
 
-      // Add to recent tracks
       setRecentTracks(prev => {
         const newTracks = prev.filter(t => t.id !== track.id);
         return [track, ...newTracks].slice(0, 10);
@@ -238,7 +229,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     console.log('Radio mode switched on');
   };
 
-  // Fetch current playlist
   const { data: playlist = [] } = useQuery({
     queryKey: ["/api/playlists/current"],
     queryFn: async () => {
@@ -277,7 +267,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   return (
     <MusicPlayerContext.Provider value={{
       currentTrack,
-      currentSong: currentTrack, // Added for backward compatibility
+      currentSong: currentTrack, 
       isPlaying,
       isLoading,
       togglePlay,

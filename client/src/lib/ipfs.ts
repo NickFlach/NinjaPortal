@@ -1,13 +1,9 @@
 import { Buffer } from 'buffer';
 import axios from 'axios';
 
-// Simple wrapper for IPFS functionality through Infura
 export class IPFSManager {
   private readonly MAX_RETRIES = 3;
   private readonly RETRY_DELAY = 1000;
-  private readonly projectId = import.meta.env.VITE_INFURA_PROJECT_ID;
-  private readonly projectSecret = import.meta.env.VITE_INFURA_PROJECT_SECRET;
-  private readonly auth = 'Basic ' + Buffer.from(this.projectId + ':' + this.projectSecret).toString('base64');
   private walletAddress: string;
 
   constructor(walletAddress: string) {
@@ -34,11 +30,11 @@ export class IPFSManager {
     try {
       console.log('Fetching from IPFS:', { cid });
 
+      // Use the server-side proxy instead of direct Infura access
       const response = await this.retry(async () => {
-        const fetchResponse = await axios.get(`/api/v0/cat?arg=${cid}`, {
-          baseURL: 'https://ipfs.infura.io:5001',
+        const fetchResponse = await axios.get(`/api/ipfs/fetch/${cid}`, {
           headers: {
-            'Authorization': this.auth,
+            'X-Wallet-Address': this.walletAddress,
           },
           responseType: 'arraybuffer'
         });
@@ -66,18 +62,15 @@ export class IPFSManager {
         timestamp: new Date().toISOString()
       });
 
-      // Convert file to buffer
-      const buffer = await file.arrayBuffer();
       const formData = new FormData();
-      formData.append('path', file.name);
-      formData.append('file', new Blob([buffer]));
+      formData.append('file', file);
+      formData.append('wallet', this.walletAddress);
 
       const response = await this.retry(async () => {
-        const uploadResponse = await axios.post('/api/v0/add', formData, {
-          baseURL: 'https://ipfs.infura.io:5001',
+        const uploadResponse = await axios.post('/api/ipfs/upload', formData, {
           headers: {
-            'Authorization': this.auth,
-            'Content-Type': 'multipart/form-data'
+            'Content-Type': 'multipart/form-data',
+            'X-Wallet-Address': this.walletAddress,
           }
         });
 
