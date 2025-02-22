@@ -8,6 +8,7 @@ import { useAccount, useContractRead, useContractWrite } from 'wagmi';
 import { Coins, Send } from "lucide-react";
 import { useState } from "react";
 import { TREASURY_ADDRESS, TREASURY_ABI, PFORK_TOKEN_ADDRESS, PFORK_TOKEN_ABI } from "@/lib/contracts";
+import { useDimensionalTranslation } from "@/contexts/LocaleContext";
 
 interface TreasuryData {
   treasurerAddress: string;
@@ -19,6 +20,7 @@ interface TreasuryData {
 export default function Treasury() {
   const { toast } = useToast();
   const { address } = useAccount();
+  const { t } = useDimensionalTranslation();
   const [newTreasuryAddress, setNewTreasuryAddress] = useState("");
 
   // Read PFORK balance of Treasury contract
@@ -72,7 +74,7 @@ export default function Treasury() {
   const treasury: TreasuryData = {
     treasurerAddress: ownerAddress as string,
     pforkBalance: pforkBalance ? (Number(pforkBalance) / 1e18).toString() : "0",
-    gasBalance: "0", // We'll get this from the chain directly
+    gasBalance: "0",
     isCurrentManager: address === ownerAddress,
   };
 
@@ -83,21 +85,21 @@ export default function Treasury() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Treasury Contract</CardTitle>
+              <CardTitle>{t('treasury.title')}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground break-all">
                 {TREASURY_ADDRESS}
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                Smart contract that holds and distributes rewards
+                {t('treasury.description')}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>PFORK Balance</CardTitle>
+              <CardTitle>{t('treasury.balance.pfork')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
@@ -105,14 +107,14 @@ export default function Treasury() {
                 <p className="text-2xl font-bold">{treasury.pforkBalance}</p>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Available for reward distribution
+                {t('treasury.balance.pfork.description')}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>GAS Balance</CardTitle>
+              <CardTitle>{t('treasury.balance.gas')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
@@ -120,7 +122,7 @@ export default function Treasury() {
                 <p className="text-2xl font-bold">{treasury.gasBalance}</p>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Collected from NFT minting
+                {t('treasury.balance.gas.description')}
               </p>
             </CardContent>
           </Card>
@@ -130,36 +132,36 @@ export default function Treasury() {
         {treasury.isCurrentManager && (
           <Card>
             <CardHeader>
-              <CardTitle>Treasury Management</CardTitle>
+              <CardTitle>{t('treasury.management')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-end gap-4">
                 <div className="flex-1 space-y-2">
-                  <label className="text-sm font-medium">Current Treasurer</label>
+                  <label className="text-sm font-medium">{t('treasury.current')}</label>
                   <p className="text-sm text-muted-foreground break-all">
                     {treasury.treasurerAddress}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Address authorized to manage treasury operations
+                    {t('treasury.current.description')}
                   </p>
                 </div>
                 <div className="flex-1 space-y-2">
-                  <label className="text-sm font-medium">New Treasurer Address</label>
+                  <label className="text-sm font-medium">{t('treasury.new')}</label>
                   <Input
                     value={newTreasuryAddress}
                     onChange={(e) => setNewTreasuryAddress(e.target.value)}
-                    placeholder="Enter new treasurer address"
+                    placeholder={t('treasury.new')}
                   />
                 </div>
                 <Button
                   onClick={() => {
-                    if (window.confirm("Are you sure you want to transfer treasury control?")) {
+                    if (window.confirm(t('treasury.confirm'))) {
                       updateTreasuryMutation.mutate();
                     }
                   }}
                   disabled={!newTreasuryAddress || updateTreasuryMutation.isPending}
                 >
-                  Transfer Control
+                  {t('treasury.transfer')}
                 </Button>
               </div>
             </CardContent>
@@ -169,19 +171,19 @@ export default function Treasury() {
         {/* PFORK Distribution Rules */}
         <Card>
           <CardHeader>
-            <CardTitle>PFORK Token Distribution</CardTitle>
+            <CardTitle>{t('treasury.distribution')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <h3 className="font-semibold">One-time Rewards:</h3>
+              <h3 className="font-semibold">{t('treasury.rewards.title')}</h3>
               <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                <li>Upload a Song: 1 PFORK</li>
-                <li>Create a Playlist: 2 PFORK</li>
-                <li>Mint Playlist NFT: 3 PFORK</li>
+                <li>{t('treasury.rewards.upload')}</li>
+                <li>{t('treasury.rewards.playlist')}</li>
+                <li>{t('treasury.rewards.nft')}</li>
               </ul>
             </div>
             <p className="text-sm text-muted-foreground">
-              Note: These rewards are one-time only per wallet address.
+              {t('treasury.rewards.note')}
             </p>
           </CardContent>
         </Card>
