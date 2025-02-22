@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useQuery } from "@tanstack/react-query";
 import { playlistManager } from "@/lib/playlist";
 import { useAccount } from 'wagmi';
-import { getFileBuffer, checkFileAvailability } from '@/lib/storage';
+import { getFileBuffer } from '@/lib/storage';
 
 interface DimensionalTrack {
   id: number;
@@ -90,7 +90,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       const handleEnded = async () => {
         console.log('Audio ended');
         setIsPlaying(false);
-
         if (audioRef.current?.src) {
           URL.revokeObjectURL(audioRef.current.src);
           audioRef.current.src = '';
@@ -148,22 +147,32 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         await audioContextRef.current.resume();
       }
 
-      if (track.storageType === 'radio') {
+      if (track.storageType === 'radio' && track.streamUrl) {
         console.log('Playing radio stream:', track.streamUrl);
-        audioRef.current.src = track.streamUrl!;
+        audioRef.current.src = track.streamUrl;
         await audioRef.current.load();
-      } else {
-        // Get the audio data from appropriate storage
-        const source = track.storageType === 'ipfs'
-          ? { type: 'ipfs' as const, hash: track.ipfsHash }
-          : { type: 'neofs' as const, objectId: track.neofsObjectId };
-
-        console.log('Fetching audio data from', track.storageType);
-        const audioData = await getFileBuffer(source);
-        const blob = new Blob([audioData], { type: 'audio/mp3' });
+      } else if (track.storageType === 'ipfs' && track.ipfsHash) {
+        console.log('Fetching from IPFS:', track.ipfsHash);
+        const audioData = await getFileBuffer({
+          type: 'ipfs',
+          hash: track.ipfsHash
+        });
+        const blob = new Blob([audioData], { type: 'audio/mpeg' });
         const url = URL.createObjectURL(blob);
         audioRef.current.src = url;
         await audioRef.current.load();
+      } else if (track.storageType === 'neofs' && track.neofsObjectId) {
+        console.log('Fetching from NeoFS:', track.neofsObjectId);
+        const audioData = await getFileBuffer({
+          type: 'neofs',
+          objectId: track.neofsObjectId
+        });
+        const blob = new Blob([audioData], { type: 'audio/mpeg' });
+        const url = URL.createObjectURL(blob);
+        audioRef.current.src = url;
+        await audioRef.current.load();
+      } else {
+        throw new Error('Invalid track source configuration');
       }
 
       await audioRef.current.play();
