@@ -2,10 +2,91 @@ import { Router } from 'express';
 import { db } from '@db';
 import { sql } from 'drizzle-orm';
 import type { WebSocket } from 'ws';
-import type { StandardizedData, GpsData, PlaybackData } from '../types/lumira';
+import { 
+  StandardizedData, 
+  GpsData, 
+  PlaybackData,
+  TranslationRequest,
+  TranslationResponse,
+  ProcessedMetrics,
+  translationRequestSchema,
+  translationResponseSchema
+} from '../types/lumira';
 import { aiInterpreter } from '../services/ai-interpreter';
 
 const router = Router();
+
+// Add translation endpoint
+router.post('/translate', async (req, res) => {
+  try {
+    const result = translationRequestSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({
+        error: 'Invalid request format',
+        details: result.error.format()
+      });
+    }
+
+    const { key, targetLocale, params } = result.data;
+
+    // Process through AI interpreter
+    const standardizedData: StandardizedData = {
+      type: 'translation',
+      timestamp: new Date().toISOString(),
+      data: {
+        sourceLanguage: 'en',
+        targetLanguage: targetLocale,
+        success: true,
+        text: key
+      },
+      metadata: {
+        source: 'translation-service',
+        processed: false
+      }
+    };
+
+    try {
+      const interpretedMetrics = await aiInterpreter.interpretMetrics(standardizedData);
+
+      // Update translation metrics
+      await processMetricsPrivately(standardizedData);
+
+      const response: TranslationResponse = {
+        translation: interpretedMetrics.translation || key,
+        confidence: interpretedMetrics.confidence || 1,
+        metrics: interpretedMetrics.aggregates
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error('Translation error:', error);
+
+      // Update metrics with failure
+      await processMetricsPrivately({
+        ...standardizedData,
+        data: {
+          ...standardizedData.data,
+          success: false
+        }
+      });
+
+      // Return original key as fallback
+      const fallbackResponse: TranslationResponse = {
+        translation: key,
+        confidence: 0,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+
+      res.json(fallbackResponse);
+    }
+  } catch (error) {
+    console.error('Translation request error:', error);
+    res.status(500).json({
+      error: 'Failed to process translation',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
 
 // In-memory stores for experiential feedback and sentiment analysis
 const metricsStore = new Map<string, {

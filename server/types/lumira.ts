@@ -1,3 +1,6 @@
+import { z } from 'zod';
+
+// Base data types
 export interface GpsData {
   coordinates: {
     lat: number;
@@ -56,6 +59,7 @@ export interface TranslationMetricData {
   text: string;
 }
 
+// Standardized data structure with metadata
 export interface StandardizedData {
   type: 'gps' | 'playback' | 'reflection' | 'evolution' | 'experience' | 'code' | 'translation';
   timestamp: string;
@@ -74,6 +78,7 @@ export interface StandardizedData {
   };
 }
 
+// Metrics and aggregation types
 export interface LumiraMetrics {
   count: number;
   aggregates: Record<string, number>;
@@ -87,11 +92,42 @@ export interface AggregatedMetric {
   count: number;
 }
 
+// Translation specific types
+export interface TranslationRequest {
+  key: string;
+  targetLocale: string;
+  params?: Record<string, string | number>;
+}
+
+export interface TranslationResponse {
+  translation: string;
+  confidence: number;
+  metrics?: Record<string, number>;
+  error?: string;
+}
+
 export interface ProcessedMetrics {
   success: boolean;
+  translation?: string;
+  confidence?: number;
+  aggregates?: Record<string, number>;
   aggregatedMetrics: {
     count: number;
     aggregates: Record<string, number>;
     lastUpdated: Date;
   };
 }
+
+// Validation schemas
+export const translationRequestSchema = z.object({
+  key: z.string(),
+  targetLocale: z.string(),
+  params: z.record(z.union([z.string(), z.number()])).optional(),
+});
+
+export const translationResponseSchema = z.object({
+  translation: z.string(),
+  confidence: z.number(),
+  metrics: z.record(z.number()).optional(),
+  error: z.string().optional(),
+});
