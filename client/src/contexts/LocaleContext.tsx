@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { IntlProvider } from 'react-intl';
+import { IntlProvider, FormattedMessage } from 'react-intl';
 import { LocaleType, messages } from '../i18n';
 import { apiRequest } from '@/lib/queryClient';
 
@@ -7,6 +7,7 @@ interface LumiraTranslation {
   text: string;
   confidence: number;
   timestamp: number;
+  isFormatted?: boolean;
 }
 
 interface TranslationCache {
@@ -18,6 +19,7 @@ interface TranslationState {
     loading: boolean;
     error?: string;
     text?: string;
+    isFormatted?: boolean;
   };
 }
 
@@ -28,8 +30,8 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 interface LumiraContextType {
   locale: LocaleType;
   setLocale: (locale: LocaleType) => void;
-  t: (key: string, params?: Record<string, string | number>) => string;
-  translate: (key: string, params?: Record<string, string | number>) => Promise<string>;
+  t: (key: string, params?: Record<string, string | number>, options?: { formatted?: boolean }) => React.ReactNode;
+  translate: (key: string, params?: Record<string, string | number>, options?: { formatted?: boolean }) => Promise<React.ReactNode>;
   preloadTranslations: (keys: string[]) => Promise<void>;
   isLoading: boolean;
   translationState: TranslationState;
@@ -42,14 +44,31 @@ export function LumiraProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [translationState, setTranslationState] = useState<TranslationState>({});
 
-  // Synchronous translation function - returns immediately from cache or fallback
-  const t = useCallback((key: string, params?: Record<string, string | number>): string => {
+  // Enhanced translation function - returns React node for formatted text
+  const t = useCallback((
+    key: string, 
+    params?: Record<string, string | number>,
+    options?: { formatted?: boolean }
+  ): React.ReactNode => {
     const cacheKey = `${locale}.${key}`;
     const cachedTranslation = translationCache[cacheKey];
 
     // Use cached translation if valid
     if (cachedTranslation && Date.now() - cachedTranslation.timestamp < CACHE_DURATION) {
       let translation = cachedTranslation.text;
+
+      // Handle formatted text
+      if (options?.formatted || cachedTranslation.isFormatted) {
+        return (
+          <FormattedMessage
+            id={key}
+            defaultMessage={translation}
+            values={params}
+          />
+        );
+      }
+
+      // Handle regular text with parameter substitution
       if (params) {
         translation = Object.entries(params).reduce((acc: string, [param, value]) => {
           return acc.replace(`{${param}}`, String(value));
@@ -60,6 +79,15 @@ export function LumiraProvider({ children }: { children: React.ReactNode }) {
 
     // Fallback to static translations or key
     const fallback = messages[locale]?.[key as keyof typeof messages[typeof locale]] || key;
+    if (options?.formatted) {
+      return (
+        <FormattedMessage
+          id={key}
+          defaultMessage={typeof fallback === 'string' ? fallback : key}
+          values={params}
+        />
+      );
+    }
     return typeof fallback === 'string' ? fallback : key;
   }, [locale]);
 
@@ -77,8 +105,9 @@ export function LumiraProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       const promises = missingKeys.map(key =>
         apiRequest<{
-          translation: string;
+          text: string;
           confidence: number;
+          isFormatted: boolean;
         }>('POST', '/api/lumira/translate', {
           body: { key, targetLocale: locale }
         }).then(response => ({ key, response }))
@@ -90,15 +119,20 @@ export function LumiraProvider({ children }: { children: React.ReactNode }) {
 
       results.forEach(({ key, response }) => {
         const cacheKey = `${locale}.${key}`;
-        if (response.translation) {
+        if (response.text) {
           newCache[cacheKey] = {
-            text: response.translation,
+            text: response.text,
             confidence: response.confidence,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            isFormatted: response.isFormatted
           };
-          newState[key] = { loading: false, text: response.translation };
+          newState[key] = { 
+            loading: false, 
+            text: response.text,
+            isFormatted: response.isFormatted 
+          };
         } else {
-          newState[key] = { loading: false, text: t(key) };
+          newState[key] = { loading: false, text: t(key) as string };
         }
       });
 
@@ -111,10 +145,14 @@ export function LumiraProvider({ children }: { children: React.ReactNode }) {
     }
   }, [locale, t]);
 
-  // Single translation function
-  const translate = useCallback(async (key: string, params?: Record<string, string | number>): Promise<string> => {
+  // Enhanced translation function with formatting support
+  const translate = useCallback(async (
+    key: string, 
+    params?: Record<string, string | number>,
+    options?: { formatted?: boolean }
+  ): Promise<React.ReactNode> => {
     await preloadTranslations([key]);
-    return t(key, params);
+    return t(key, params, options);
   }, [preloadTranslations, t]);
 
   // Update locale with proper error handling

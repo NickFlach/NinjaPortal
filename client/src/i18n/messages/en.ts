@@ -61,7 +61,6 @@ const translations = {
   'nav.admin': 'Admin',
   'nav.lumira': 'Analytics',
 
-
   // Tour and dimensional translations - existing
   'tour.welcome': 'Welcome to Ninja-Portal! I\'ll be your guide.',
   'tour.connect': 'Connect your wallet to start exploring music.',
@@ -73,42 +72,9 @@ const translations = {
   'tour.dimensional.error': 'Dimensional sync lost, realigning...',
   'tour.dimensional.guide': 'Your guide through the musical dimensions',
 
-  // Dimensional states - existing
-  'dimensional.state.coherent': 'Quantum state coherent',
-  'dimensional.state.decoherent': 'Quantum state decoherent',
-  'dimensional.state.superposed': 'Quantum state superposed',
-  'dimensional.state.aligned': 'Dimensional alignment achieved',
-  'dimensional.state.sync': 'Syncing dimensional coordinates',
-
-  // Treasury translations - new
-  'treasury.title': 'Treasury Contract',
-  'treasury.description': 'Smart contract that holds and distributes rewards',
-  'treasury.balance.pfork': 'PFORK Balance',
-  'treasury.balance.pfork.description': 'Available for reward distribution',
-  'treasury.balance.gas': 'GAS Balance',
-  'treasury.balance.gas.description': 'Collected from NFT minting',
-  'treasury.management': 'Treasury Management',
-  'treasury.current': 'Current Treasurer',
-  'treasury.current.description': 'Address authorized to manage treasury operations',
-  'treasury.new': 'New Treasurer Address',
-  'treasury.transfer': 'Transfer Control',
-  'treasury.confirm': 'Are you sure you want to transfer treasury control?',
-  'treasury.distribution': 'PFORK Token Distribution',
-  'treasury.rewards.title': 'One-time Rewards:',
-  'treasury.rewards.upload': 'Upload a Song: 1 PFORK',
-  'treasury.rewards.playlist': 'Create a Playlist: 2 PFORK',
-  'treasury.rewards.nft': 'Mint Playlist NFT: 3 PFORK',
-  'treasury.rewards.note': 'Note: These rewards are one-time only per wallet address.',
-
-  // Player translations - new
-  'player.radio.mode': 'Switch to radio',
-  'player.radio.active': 'Currently in radio mode',
-  'player.sync.enable': 'Enable sync',
-  'player.sync.disable': 'Disable sync',
-  'player.live': 'Live Radio',
-
-  // Analytics translations - new
+  // Analytics translations - enhanced with formatting
   'analytics.title': 'Privacy-Preserving Analytics',
+  'analytics.metric.title': '<strong>{type}</strong> Analytics',
   'analytics.time.1h': 'Last Hour',
   'analytics.time.6h': 'Last 6 Hours',
   'analytics.time.24h': 'Last 24 Hours',

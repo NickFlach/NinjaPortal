@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useDimensionalTranslation } from "@/contexts/LocaleContext";
 
 interface AggregatedMetric {
   bucket: string;
@@ -48,16 +49,17 @@ function processMetrics(rawMetrics: AggregatedMetric[]) {
   }));
 }
 
-// Time range options
+// Time range options with translations
 const timeRanges = [
-  { value: '1h', label: 'Last Hour' },
-  { value: '6h', label: 'Last 6 Hours' },
-  { value: '24h', label: 'Last 24 Hours' },
-  { value: '7d', label: 'Last 7 Days' },
-  { value: '30d', label: 'Last 30 Days' }
+  { value: '1h', label: 'analytics.time.1h' },
+  { value: '6h', label: 'analytics.time.6h' },
+  { value: '24h', label: 'analytics.time.24h' },
+  { value: '7d', label: 'analytics.time.7d' },
+  { value: '30d', label: 'analytics.time.30d' }
 ];
 
 export default function LumiraData() {
+  const { t } = useDimensionalTranslation();
   const [selectedRange, setSelectedRange] = React.useState('24h');
 
   // Calculate start time based on selected range
@@ -104,12 +106,12 @@ export default function LumiraData() {
       <Layout>
         <div className="space-y-8">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">Privacy-Preserving Analytics</h1>
+            <h1 className="text-2xl font-bold">{t('analytics.title')}</h1>
             <Skeleton className="h-10 w-[180px]" />
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Aggregated Metrics</CardTitle>
+              <CardTitle>{t('analytics.title')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
@@ -133,14 +135,14 @@ export default function LumiraData() {
     <Layout>
       <div className="space-y-8">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Privacy-Preserving Analytics</h1>
+          <h1 className="text-2xl font-bold">{t('analytics.title')}</h1>
           <Select value={selectedRange} onValueChange={setSelectedRange}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select time range" />
+              <SelectValue placeholder={t('analytics.select.range')} />
             </SelectTrigger>
             <SelectContent>
               {timeRanges.map(({ value, label }) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
+                <SelectItem key={value} value={value}>{t(label)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -149,7 +151,7 @@ export default function LumiraData() {
         {metrics.length === 0 ? (
           <Card>
             <CardContent className="py-8">
-              <p className="text-center text-muted-foreground">No metrics available for the selected time range.</p>
+              <p className="text-center text-muted-foreground">{t('analytics.no.data')}</p>
             </CardContent>
           </Card>
         ) : (
@@ -157,9 +159,15 @@ export default function LumiraData() {
             {metrics.map((metric) => (
               <Card key={metric.name}>
                 <CardHeader>
-                  <CardTitle>{metric.name} Analytics</CardTitle>
+                  <CardTitle>
+                    {t('analytics.metric.title', { 
+                      type: metric.name 
+                    }, { 
+                      formatted: true 
+                    })}
+                  </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Showing aggregated, privacy-preserving metrics with no individual data stored
+                    {t('analytics.privacy.note')}
                   </p>
                 </CardHeader>
                 <CardContent>
