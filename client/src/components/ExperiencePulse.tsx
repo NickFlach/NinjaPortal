@@ -16,7 +16,7 @@ export function ExperiencePulse() {
   const [isActive, setIsActive] = useState(false);
   const controls = useAnimation();
   const intl = useIntl();
-  const { currentSong } = useMusicPlayer();
+  const { currentTrack } = useMusicPlayer();
 
   // Fetch current experience insights
   const { data: insights } = useQuery({
@@ -43,7 +43,7 @@ export function ExperiencePulse() {
           sentiment,
           intensity,
           context: window.location.pathname,
-          songId: currentSong?.id
+          songId: currentTrack?.id
         })
       });
 
