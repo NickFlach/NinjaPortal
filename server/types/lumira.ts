@@ -10,6 +10,8 @@ export interface GpsData {
   accuracy?: number;
   speed?: number;
   source?: string;
+  textLength?: number; // Added for translation metrics
+  mapData?: any; // Added for map translation
 }
 
 export interface PlaybackData {
@@ -57,6 +59,8 @@ export interface TranslationMetricData {
   targetLanguage: string;
   success: boolean;
   text: string;
+  textLength?: number;
+  mapData?: any;
 }
 
 // Standardized data structure with metadata
@@ -111,11 +115,8 @@ export interface ProcessedMetrics {
   translation?: string;
   confidence?: number;
   aggregates?: Record<string, number>;
-  aggregatedMetrics: {
-    count: number;
-    aggregates: Record<string, number>;
-    lastUpdated: Date;
-  };
+  aggregatedMetrics: LumiraMetrics;
+  data?: any; // Added for map data enrichment
 }
 
 // Validation schemas

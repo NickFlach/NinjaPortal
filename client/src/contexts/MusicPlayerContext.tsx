@@ -15,6 +15,7 @@ interface MusicPlayerContextType {
   currentTrack: Track | null;
   isPlaying: boolean;
   isLoading: boolean;
+  isSynced: boolean; // Added isSynced property
   togglePlay: () => Promise<void>;
   playTrack: (track: Track) => Promise<void>;
   playlist: Track[];
@@ -30,6 +31,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [isLoading, setIsLoading] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [recentTracks, setRecentTracks] = useState<Track[]>([]);
+  const [isSynced, setIsSynced] = useState(false); // Added isSynced state
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { address } = useAccount();
@@ -40,8 +42,10 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         audioContextRef.current = new AudioContextClass();
         console.log('Audio context initialized');
+        setIsSynced(true); // Set sync state after successful initialization
       } catch (error) {
         console.error('Failed to initialize audio context:', error);
+        setIsSynced(false);
       }
     }
   }, []);
@@ -232,6 +236,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       currentTrack,
       isPlaying,
       isLoading,
+      isSynced, // Added isSynced to the context value
       togglePlay,
       playTrack,
       playlist,

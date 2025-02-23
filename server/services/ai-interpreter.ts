@@ -2,7 +2,18 @@ import OpenAI from "openai";
 import type { StandardizedData, ProcessedMetrics } from '../types/lumira';
 import { dimensionalBalancer } from './dimension-balance';
 
-const openai = new OpenAI({ baseURL: "https://api.x.ai/v1", apiKey: process.env.XAI_API_KEY });
+if (!process.env.XAI_API_KEY) {
+  throw new Error('XAI_API_KEY environment variable is required');
+}
+
+if (!process.env.XAI_BASE_URL) {
+  throw new Error('XAI_BASE_URL environment variable is required');
+}
+
+const openai = new OpenAI({ 
+  baseURL: process.env.XAI_BASE_URL,
+  apiKey: process.env.XAI_API_KEY 
+});
 
 /**
  * AI Interpreter Service for processing system evolution metrics

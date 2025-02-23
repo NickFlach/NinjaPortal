@@ -53,25 +53,31 @@ const MapPage: FC = () => {
     queryKey: ['/api/music/map'],
     refetchInterval: 15000, // Poll every 15 seconds
     queryFn: async () => {
-      const headers: Record<string, string> = address
-        ? { 'x-wallet-address': address }
-        : { 'x-internal-token': 'landing-page' };
+      try {
+        const headers: Record<string, string> = address
+          ? { 'x-wallet-address': address }
+          : { 'x-internal-token': 'landing-page' };
 
-      const response = await fetch('/api/music/map', { headers });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch map data: ${response.statusText}`);
+        const response = await fetch('/api/music/map', { headers });
+        if (!response.ok) {
+          throw new Error(`Failed to fetch map data: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data as MapData;
+      } catch (error) {
+        console.error('Map data fetch error:', error);
+        throw error;
       }
-      return response.json();
     }
   });
 
-  // Process locations for heatmap and markers
+  // Process locations for heatmap and markers with proper type checking
   const locationData = useMemo(() => {
-    if (!mapData?.allLocations || !isSynced) return [];
+    if (!mapData?.allLocations || !isSynced) return testLocation;
     return mapData.allLocations;
   }, [mapData, isSynced]);
 
-  const hasNoData = !isLoading && (!mapData || mapData.totalListeners === 0);
+  const hasNoData = !isLoading && (!mapData || (mapData.totalListeners ?? 0) === 0);
 
   // Check for leaflet.heat availability
   useEffect(() => {
@@ -107,7 +113,7 @@ const MapPage: FC = () => {
           ) : (
             intl.formatMessage(
               { id: 'map.totalListeners' },
-              { count: mapData.totalListeners }
+              { count: mapData?.totalListeners ?? 0 }
             )
           )}
         </div>

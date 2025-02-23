@@ -4,6 +4,10 @@ import { lumiraService } from './lumira';
 
 const router = Router();
 
+if (!process.env.TRANSLATION_API_KEY) {
+  throw new Error('TRANSLATION_API_KEY environment variable is required');
+}
+
 // Initialize Google Translate with API key from environment variable
 const translate = new v2.Translate({
   key: process.env.TRANSLATION_API_KEY

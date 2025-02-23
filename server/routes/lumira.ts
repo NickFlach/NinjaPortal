@@ -9,6 +9,7 @@ import {
   TranslationRequest,
   TranslationResponse,
   ProcessedMetrics,
+  ExperienceData,
   translationRequestSchema,
   translationResponseSchema,
 } from '../types/lumira';
@@ -21,80 +22,129 @@ const router = Router();
 // Initialize RAG translator with our existing translations
 ragTranslator.initializeStore(messages);
 
-// Update translation endpoint
-router.post('/translate', async (req, res) => {
-  try {
-    const result = translationRequestSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({
-        error: 'Invalid request format',
-        details: result.error.format()
-      });
+// Process metrics while preserving privacy
+async function processMetricsPrivately(data: StandardizedData): Promise<ProcessedMetrics> {
+  const key = `${data.type}_${new Date().toISOString().split('T')[0]}`;
+  const current = metricsStore.get(key) || {
+    count: 0,
+    aggregates: {},
+    lastUpdated: new Date()
+  };
+
+  // Process standard metrics
+  current.count++;
+
+  if (data.type === 'gps') {
+    const gpsData = data.data as GpsData;
+    if (gpsData.accuracy !== undefined) {
+      current.aggregates.avgAccuracy = updateRunningAverage(
+        current.aggregates.avgAccuracy || 0,
+        gpsData.accuracy,
+        current.count
+      );
     }
+    if (gpsData.speed !== undefined) {
+      current.aggregates.avgSpeed = updateRunningAverage(
+        current.aggregates.avgSpeed || 0,
+        gpsData.speed,
+        current.count
+      );
+    }
+  } else if (data.type === 'playback') {
+    const playbackData = data.data as PlaybackData;
+    current.aggregates.playingPercentage = updateRunningAverage(
+      current.aggregates.playingPercentage || 0,
+      playbackData.isPlaying ? 1 : 0,
+      current.count
+    );
+  } else if (data.type === 'experience') {
+    const expData = data.data as ExperienceData;
+    const timeKey = new Date().toISOString();
 
-    const { key, targetLocale, params } = result.data;
+    const experiences = experienceStore.get(timeKey) || [];
+    experiences.push({
+      timestamp: new Date(),
+      type: expData.type,
+      sentiment: expData.sentiment,
+      intensity: expData.intensity,
+      context: expData.context,
+      location: expData.location,
+      songId: expData.songId
+    });
 
-    // First try RAG-based translation
-    const ragTranslation = await ragTranslator.findSimilarTranslation(key, targetLocale);
+    // Update running averages for the experience type
+    current.aggregates[`${expData.type}_sentiment`] = updateRunningAverage(
+      current.aggregates[`${expData.type}_sentiment`] || 0,
+      expData.sentiment,
+      current.count
+    );
 
-    // Process through AI interpreter for metrics
-    const standardizedData: StandardizedData = {
-      type: 'translation',
-      timestamp: new Date().toISOString(),
-      data: {
-        sourceLanguage: 'en',
-        targetLanguage: targetLocale,
-        success: true,
-        text: key
-      },
-      metadata: {
-        source: 'translation-service',
-        processed: false
-      }
+    current.aggregates[`${expData.type}_intensity`] = updateRunningAverage(
+      current.aggregates[`${expData.type}_intensity`] || 0,
+      expData.intensity,
+      current.count
+    );
+
+    experienceStore.set(timeKey, experiences);
+  } else if (data.type === 'translation') {
+    const translationData = data.data as any; // Assuming TranslationMetricData is defined elsewhere
+    const langKey = `${translationData.sourceLanguage}_${translationData.targetLanguage}`;
+    const storedData = translationStore.get(langKey) || {
+      usageCount: 0,
+      successRate: 1,
+      commonPhrases: {},
+      lastUpdated: new Date()
     };
 
-    try {
-      const interpretedMetrics = await aiInterpreter.interpretMetrics(standardizedData);
-      await processMetricsPrivately(standardizedData);
-
-      // Use RAG translation if available, otherwise fallback
-      const translation = ragTranslation || interpretedMetrics.translation || key;
-
-      const response: TranslationResponse = {
-        translation,
-        confidence: ragTranslation ? 0.95 : (interpretedMetrics.confidence || 1),
-        metrics: interpretedMetrics.aggregates
-      };
-
-      res.json(response);
-    } catch (error) {
-      console.error('Translation error:', error);
-
-      await processMetricsPrivately({
-        ...standardizedData,
-        data: {
-          ...standardizedData.data,
-          success: false
-        }
-      });
-
-      // Return original key as fallback
-      const fallbackResponse: TranslationResponse = {
-        translation: key,
-        confidence: 0,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-
-      res.json(fallbackResponse);
+    storedData.usageCount++;
+    if (!translationData.success) {
+      storedData.successRate =
+        (storedData.successRate * (storedData.usageCount - 1) + 0) / storedData.usageCount;
     }
-  } catch (error) {
-    console.error('Translation request error:', error);
-    res.status(500).json({
-      error: 'Failed to process translation',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+
+    if (translationData.text) {
+      const phraseLength = translationData.text.split(' ').length;
+      storedData.commonPhrases[phraseLength] =
+        (storedData.commonPhrases[phraseLength] || 0) + 1;
+    }
+
+    storedData.lastUpdated = new Date();
+    translationStore.set(langKey, storedData);
+  } else if (data.type === 'code') {
+    // Process code patterns
+    const { pattern, context, success, impact } = data.data;
+    const patternKey = `${pattern}_${context}`;
+
+    const existingPattern = codePatternStore.get(patternKey) || {
+      frequency: 0,
+      context,
+      success: true,
+      impact: 0,
+      lastUpdated: new Date()
+    };
+
+    existingPattern.frequency++;
+    existingPattern.success = success;
+    existingPattern.impact = (existingPattern.impact + impact) / 2;
+    existingPattern.lastUpdated = new Date();
+
+    codePatternStore.set(patternKey, existingPattern);
   }
-});
+
+
+  current.lastUpdated = new Date();
+  metricsStore.set(key, current);
+
+  // Return processed metrics
+  return {
+    success: true,
+    aggregatedMetrics: {
+      count: current.count,
+      aggregates: current.aggregates,
+      lastUpdated: current.lastUpdated
+    }
+  };
+}
 
 // In-memory stores for experiential feedback and sentiment analysis
 const metricsStore = new Map<string, {
@@ -137,128 +187,6 @@ const codePatternStore = new Map<string, {
   impact: number;
   lastUpdated: Date;
 }>();
-
-// Process metrics while preserving privacy
-async function processMetricsPrivately(data: StandardizedData) {
-  const key = `${data.type}_${new Date().toISOString().split('T')[0]}`;
-  const current = metricsStore.get(key) || {
-    count: 0,
-    aggregates: {},
-    lastUpdated: new Date()
-  };
-
-  // Process standard metrics
-  current.count++;
-
-  if (data.type === 'gps') {
-    const gpsData = data.data as GpsData;
-    current.aggregates.avgAccuracy = updateRunningAverage(
-      current.aggregates.avgAccuracy || 0,
-      gpsData.accuracy || 0,
-      current.count
-    );
-    current.aggregates.avgSpeed = updateRunningAverage(
-      current.aggregates.avgSpeed || 0,
-      gpsData.speed || 0,
-      current.count
-    );
-  } else if (data.type === 'playback') {
-    const playbackData = data.data as PlaybackData;
-    current.aggregates.playingPercentage = updateRunningAverage(
-      current.aggregates.playingPercentage || 0,
-      playbackData.isPlaying ? 1 : 0,
-      current.count
-    );
-  } else if (data.type === 'reflection' || data.type === 'evolution') {
-    // Process through AI interpreter
-    try {
-      const interpretedMetrics = await aiInterpreter.interpretMetrics(data);
-      Object.assign(current.aggregates, interpretedMetrics.aggregates);
-    } catch (error) {
-      console.error('Error processing metrics through AI:', error);
-    }
-  } else if (data.type === 'experience') {
-    const exp = data.data;
-    const timeKey = new Date().toISOString();
-
-    const experiences = experienceStore.get(timeKey) || [];
-    experiences.push({
-      timestamp: new Date(),
-      type: exp.type,
-      sentiment: exp.sentiment,
-      intensity: exp.intensity,
-      context: exp.context,
-      location: exp.location,
-      songId: exp.songId
-    });
-
-    // Update running averages for the experience type
-    current.aggregates[`${exp.type}_sentiment`] = updateRunningAverage(
-      current.aggregates[`${exp.type}_sentiment`] || 0,
-      exp.sentiment,
-      current.count
-    );
-
-    current.aggregates[`${exp.type}_intensity`] = updateRunningAverage(
-      current.aggregates[`${exp.type}_intensity`] || 0,
-      exp.intensity,
-      current.count
-    );
-
-    experienceStore.set(timeKey, experiences);
-  } else if (data.type === 'translation') {
-    const langKey = `${data.data.sourceLanguage}_${data.data.targetLanguage}`;
-    const translationData = translationStore.get(langKey) || {
-      usageCount: 0,
-      successRate: 1,
-      commonPhrases: {},
-      lastUpdated: new Date()
-    };
-
-    // Update translation metrics without storing actual translations
-    translationData.usageCount++;
-    if (data.data.success === false) {
-      translationData.successRate =
-        (translationData.successRate * (translationData.usageCount - 1) + 0) / translationData.usageCount;
-    }
-
-    // Store phrase patterns without actual content
-    const phraseLength = data.data.text.split(' ').length;
-    translationData.commonPhrases[phraseLength] =
-      (translationData.commonPhrases[phraseLength] || 0) + 1;
-
-    translationData.lastUpdated = new Date();
-    translationStore.set(langKey, translationData);
-  } else if (data.type === 'code') {
-    // Process code patterns
-    const { pattern, context, success, impact } = data.data;
-    const patternKey = `${pattern}_${context}`;
-
-    const existingPattern = codePatternStore.get(patternKey) || {
-      frequency: 0,
-      context,
-      success: true,
-      impact: 0,
-      lastUpdated: new Date()
-    };
-
-    existingPattern.frequency++;
-    existingPattern.success = success;
-    existingPattern.impact = (existingPattern.impact + impact) / 2;
-    existingPattern.lastUpdated = new Date();
-
-    codePatternStore.set(patternKey, existingPattern);
-  }
-
-
-  current.lastUpdated = new Date();
-  metricsStore.set(key, current);
-
-  // Cleanup old data
-  pruneOldMetrics();
-
-  return current;
-}
 
 // Update running average without storing individual values
 function updateRunningAverage(currentAvg: number, newValue: number, count: number): number {
@@ -308,7 +236,7 @@ function pruneOldMetrics() {
 // Record user experience feedback
 router.post('/experience', async (req, res) => {
   try {
-    const experienceData = {
+    const experienceData: StandardizedData = {
       type: 'experience',
       timestamp: new Date().toISOString(),
       data: req.body,
@@ -528,6 +456,81 @@ router.get('/metrics', async (req, res) => {
   } catch (error) {
     console.error('Error fetching metrics:', error);
     res.status(500).json({ error: 'Failed to fetch metrics' });
+  }
+});
+
+// Update translation endpoint
+router.post('/translate', async (req, res) => {
+  try {
+    const result = translationRequestSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({
+        error: 'Invalid request format',
+        details: result.error.format()
+      });
+    }
+
+    const { key, targetLocale, params } = result.data;
+
+    // First try RAG-based translation
+    const ragTranslation = await ragTranslator.findSimilarTranslation(key, targetLocale);
+
+    // Process through AI interpreter for metrics
+    const standardizedData: StandardizedData = {
+      type: 'translation',
+      timestamp: new Date().toISOString(),
+      data: {
+        sourceLanguage: 'en',
+        targetLanguage: targetLocale,
+        success: true,
+        text: key
+      },
+      metadata: {
+        source: 'translation-service',
+        processed: false
+      }
+    };
+
+    try {
+      const interpretedMetrics = await aiInterpreter.interpretMetrics(standardizedData);
+      await processMetricsPrivately(standardizedData);
+
+      // Use RAG translation if available, otherwise fallback
+      const translation = ragTranslation || interpretedMetrics.translation || key;
+
+      const response: TranslationResponse = {
+        translation,
+        confidence: ragTranslation ? 0.95 : (interpretedMetrics.confidence || 1),
+        metrics: interpretedMetrics.aggregates
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error('Translation error:', error);
+
+      await processMetricsPrivately({
+        ...standardizedData,
+        data: {
+          ...standardizedData.data,
+          success: false
+        }
+      });
+
+      // Return original key as fallback
+      const fallbackResponse: TranslationResponse = {
+        translation: key,
+        confidence: 0,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+
+      res.json(fallbackResponse);
+    }
+  } catch (error) {
+    console.error('Translation request error:', error);
+    res.status(500).json({
+      error: 'Failed to process translation',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 
