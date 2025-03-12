@@ -191,4 +191,85 @@ router.post('/test-connection', async (req, res) => {
   }
 });
 
+// Simple upload test endpoint with detailed logging
+router.post('/test-upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    // Log detailed information about the request
+    console.log('Test upload request received:', {
+      filename: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      fieldname: req.file.fieldname,
+      encoding: req.file.encoding,
+      bufferSize: req.file.buffer.length,
+      headers: req.headers
+    });
+
+    // Use form-data package for handling multipart uploads
+    const FormData = require('form-data');
+    const formData = new FormData();
+    
+    // Add the file directly to FormData from buffer
+    formData.append('file', req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype
+    });
+    
+    console.log('FormData created with file');
+    
+    // Get form headers
+    const formHeaders = formData.getHeaders();
+    console.log('Form headers:', formHeaders);
+    
+    // Add required Pinata headers
+    const headers = {
+      ...formHeaders,
+      'pinata_api_key': PINATA_API_KEY || '',
+      'pinata_secret_api_key': PINATA_API_SECRET || ''
+    };
+    
+    console.log('Sending request to Pinata test upload...');
+    
+    // Send request to Pinata
+    const response = await axios.post(
+      'https://api.pinata.cloud/pinning/pinFileToIPFS',
+      formData,
+      { headers }
+    );
+    
+    console.log('Pinata test upload response:', response.data);
+    
+    // Send success response
+    res.json({
+      success: true,
+      hash: response.data.IpfsHash,
+      pinataUrl: `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}`,
+      data: response.data
+    });
+    
+  } catch (error) {
+    console.error('Test upload error:', error);
+    
+    // Enhanced error reporting
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('Pinata API error details:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      });
+    }
+    
+    // Send error response
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      status: axios.isAxiosError(error) && error.response ? error.response.status : null
+    });
+  }
+});
+
 export default router;

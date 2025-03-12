@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { Map, BarChart2, Heart } from "lucide-react";
+import { Map, BarChart2, Heart, Upload } from "lucide-react";
 import { useCallback } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAccount } from "wagmi";
@@ -90,6 +90,16 @@ export function Navigation() {
         </span>
       ),
       show: location !== '/whitepaper'
+    },
+    {
+      href: "/ipfs-test",
+      label: (
+        <span className="flex items-center gap-2">
+          <Upload className="h-4 w-4" />
+          IPFS Test
+        </span>
+      ),
+      show: location !== '/ipfs-test'
     }
   ];
 
