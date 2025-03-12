@@ -36,9 +36,14 @@ export function IpfsUploadTest() {
       });
       
       console.log('Pinata connection test result:', response.data);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Pinata connection test error:', err);
       setError(err instanceof Error ? err.message : 'Unknown error testing connection');
+      
+      // Enhanced error reporting for Axios errors
+      if (axios.isAxiosError(err) && err.response) {
+        setError(`Connection failed (${err.response.status}): ${JSON.stringify(err.response.data)}`);
+      }
     } finally {
       setIsUploading(false);
     }
@@ -54,31 +59,62 @@ export function IpfsUploadTest() {
       setIsUploading(true);
       setError(null);
       
+      // Get file size in MB for logging
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      console.log(`Uploading file: ${file.name}, Size: ${fileSizeMB} MB, Type: ${file.type}`);
+      
       // Create form data
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('wallet', '0xTestWallet123'); // Test wallet address
       
-      // Make request to test endpoint
-      const response = await axios.post('/api/ipfs/test-upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'X-Wallet-Address': '0xTestWallet123'
-        }
-      });
+      // Make request to test endpoint with advanced error handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
       
-      console.log('IPFS upload test result:', response.data);
-      
-      setUploadResult({
-        type: 'upload',
-        data: response.data
-      });
-    } catch (err) {
+      try {
+        const response = await axios.post('/api/ipfs/test-upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'X-Wallet-Address': '0xTestWallet123'
+          },
+          signal: controller.signal,
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || file.size));
+            console.log(`Upload progress: ${percentCompleted}%`);
+          }
+        });
+        
+        clearTimeout(timeoutId);
+        console.log('IPFS upload test result:', response.data);
+        
+        setUploadResult({
+          type: 'upload',
+          data: response.data
+        });
+      } catch (uploadError) {
+        clearTimeout(timeoutId);
+        throw uploadError;
+      }
+    } catch (err: unknown) {
       console.error('IPFS upload test error:', err);
-      setError(err instanceof Error ? err.message : 'Unknown upload error');
       
-      if (axios.isAxiosError(err) && err.response) {
-        setError(`${err.message} - ${JSON.stringify(err.response.data)}`);
+      const error = err as any; // Type assertion for error handling
+      
+      if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+        setError('Upload timed out. The file might be too large or the server is busy.');
+      } else if (axios.isAxiosError(error)) {
+        if (error.response) {
+          // Server responded with an error
+          setError(`Server error (${error.response.status}): ${JSON.stringify(error.response.data)}`);
+        } else if (error.request) {
+          // Request made but no response received
+          setError('No response from server. Please check your network connection.');
+        } else {
+          // Error in setting up the request
+          setError(`Request error: ${error.message}`);
+        }
+      } else {
+        setError(error instanceof Error ? error.message : 'Unknown upload error');
       }
     } finally {
       setIsUploading(false);

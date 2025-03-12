@@ -81,49 +81,124 @@ export class IPFSManager {
   /**
    * Upload a file to IPFS through Pinata
    * @param file The file to upload
+   * @param onProgress Optional callback for upload progress updates (0-100)
    * @returns The IPFS hash (CID) of the uploaded file
    */
-  async uploadFile(file: File): Promise<string> {
+  async uploadFile(file: File, onProgress?: (percent: number) => void): Promise<string> {
     try {
-      console.log('Starting IPFS upload to Pinata...', {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      console.log(`Starting IPFS upload to Pinata... ${file.name} (${fileSizeMB} MB)`, {
         fileName: file.name,
         fileSize: file.size,
         fileType: file.type,
         timestamp: new Date().toISOString()
       });
 
+      // Validation check for file size
+      if (file.size > 100 * 1024 * 1024) { // 100MB limit
+        throw new Error('File too large: Maximum file size is 100MB');
+      }
+
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('wallet', this.walletAddress);
+      
+      // Add metadata to help with organization in Pinata
+      const metadata = JSON.stringify({
+        name: file.name,
+        keyvalues: {
+          app: 'neo-music-portal',
+          walletAddress: this.walletAddress,
+          fileType: file.type,
+          fileSize: file.size,
+          uploadDate: new Date().toISOString()
+        }
+      });
+      formData.append('pinataMetadata', metadata);
 
-      const response = await this.retry(async () => {
-        const uploadResponse = await axios.post('/api/ipfs/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'X-Wallet-Address': this.walletAddress,
-          },
-          // Add longer timeout for larger files
-          timeout: 60000
+      // Create a controller to allow aborting the upload if needed
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+
+      try {
+        const response = await this.retry(async () => {
+          const uploadResponse = await axios.post('/api/ipfs/upload', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              'X-Wallet-Address': this.walletAddress,
+            },
+            signal: controller.signal,
+            timeout: 120000, // 2 minute timeout
+            onUploadProgress: (progressEvent) => {
+              if (onProgress && progressEvent.total) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                onProgress(percentCompleted);
+                console.log(`IPFS upload progress: ${percentCompleted}%`);
+              }
+            }
+          });
+
+          if (!uploadResponse.data?.success) {
+            throw new Error('IPFS upload failed: Server returned unsuccessful status');
+          }
+
+          if (!uploadResponse.data?.Hash) {
+            throw new Error('Invalid IPFS upload response: No hash returned');
+          }
+
+          return uploadResponse.data;
         });
 
-        if (!uploadResponse.data?.Hash) {
-          throw new Error('Invalid IPFS upload response');
-        }
-
-        return uploadResponse.data;
-      });
-
-      console.log('IPFS upload successful:', response);
-      return response.Hash;
+        clearTimeout(timeoutId);
+        console.log('IPFS upload successful:', response);
+        
+        // Return IPFS content identifier (CID)
+        return response.Hash;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+      }
     } catch (error) {
       console.error('IPFS upload error:', error);
       
       // Enhanced error messages for better debugging
-      if (axios.isAxiosError(error) && error.response) {
-        throw new Error(`IPFS upload failed: ${error.response.status} - ${error.response.statusText}`);
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Upload timed out. The file might be too large or the connection is slow.');
+      } else if (axios.isAxiosError(error)) {
+        if (error.response) {
+          throw new Error(`IPFS upload failed (${error.response.status}): ${error.response.data?.error || error.response.statusText}`);
+        } else if (error.request) {
+          throw new Error('No response from server. Please check your network connection.');
+        } else {
+          throw new Error(`Request error: ${error.message}`);
+        }
       }
       
       throw error instanceof Error ? error : new Error('Unknown upload error');
+    }
+  }
+  
+  /**
+   * Test the connection to Pinata IPFS service
+   * @returns Connection status information
+   */
+  async testConnection(): Promise<{ success: boolean; message: string; data: any }> {
+    try {
+      const response = await axios.post('/api/ipfs/test-connection', null, {
+        headers: {
+          'X-Wallet-Address': this.walletAddress,
+        },
+        timeout: 10000
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('IPFS connection test error:', error);
+      
+      if (axios.isAxiosError(error) && error.response) {
+        throw new Error(`Connection test failed (${error.response.status}): ${error.response.data?.error || error.response.statusText}`);
+      }
+      
+      throw error instanceof Error ? error : new Error('Unknown connection error');
     }
   }
 }
