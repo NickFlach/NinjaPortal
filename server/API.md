@@ -150,3 +150,89 @@ Returns metadata for a specific song.
   "uploadedBy": "string",
   "createdAt": "timestamp"
 }
+```
+
+### IPFS Integration
+
+#### POST /api/ipfs/test-connection
+Tests the connection to Pinata IPFS service.
+
+**Request Headers:**
+- `x-wallet-address`: Ethereum wallet address (optional)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Pinata connection successful",
+  "credentials": {
+    "keyProvided": true,
+    "secretProvided": true
+  },
+  "data": {
+    "message": "Congratulations! You are communicating with the Pinata API!"
+  }
+}
+```
+
+#### POST /api/ipfs/test-upload
+Test endpoint for uploading a file to IPFS via Pinata.
+
+**Request Headers:**
+- `x-wallet-address`: Ethereum wallet address (optional)
+- `Content-Type`: multipart/form-data
+
+**Request Body:**
+- `file`: File to upload (form-data)
+
+**Response:**
+```json
+{
+  "success": true,
+  "hash": "QmHash...",
+  "pinataUrl": "https://gateway.pinata.cloud/ipfs/QmHash...",
+  "data": {
+    "IpfsHash": "QmHash...",
+    "PinSize": 123456,
+    "Timestamp": "2025-03-12T02:18:11.693Z",
+    "Name": "example.mp3",
+    "NumberOfFiles": 1,
+    "MimeType": "audio/mpeg",
+    "Keyvalues": {
+      "app": "neo-music-portal",
+      "timestamp": "2025-03-12T02:18:08.947Z",
+      "uploadedBy": "0xAddress",
+      "contentType": "audio/mpeg"
+    }
+  }
+}
+```
+
+#### POST /api/ipfs/upload
+Uploads a file to IPFS via Pinata. This is the production endpoint used by the application.
+
+**Request Headers:**
+- `x-wallet-address`: Ethereum wallet address (required)
+- `Content-Type`: multipart/form-data
+
+**Request Body:**
+- `file`: File to upload (form-data)
+- Additional metadata can be included as form fields
+
+**Response:**
+```json
+{
+  "success": true,
+  "Hash": "QmHash...",
+  "pinataUrl": "https://gateway.pinata.cloud/ipfs/QmHash..."
+}
+```
+
+#### GET /api/ipfs/fetch/:cid
+Fetches a file from IPFS using its content identifier (CID).
+
+**Parameters:**
+- `cid`: IPFS content identifier (string)
+
+**Response:**
+Binary file data with appropriate Content-Type header
