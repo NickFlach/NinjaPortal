@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import axios, { AxiosRequestConfig } from 'axios';
-import { db } from '@db';
+import { db } from '../../db';
 import { eq } from 'drizzle-orm';
 import { WebSocket } from 'ws';
 

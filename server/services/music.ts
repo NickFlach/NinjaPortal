@@ -1,5 +1,5 @@
-import { db } from '@db';
-import { listeners, songs } from '@db/schema';
+import { db } from '../../db';
+import { listeners, songs } from '../../db/schema';
 import { sql, eq } from 'drizzle-orm';
 import { desc } from 'drizzle-orm/expressions';
 import { lumiraService } from '../routes/lumira';

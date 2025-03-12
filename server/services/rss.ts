@@ -1,5 +1,5 @@
 import RSS from 'rss';
-import { type Song } from '@db/schema';
+import { type Song } from '../../db/schema';
 
 export function generateRSSFeed(songs: Song[], baseUrl: string) {
   const feed = new RSS({

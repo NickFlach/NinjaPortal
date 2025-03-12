@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { db } from '@db';
-import { songs, recentlyPlayed, playlistSongs, loves, users } from '@db/schema';
+import { db } from '../../db';
+import { songs, recentlyPlayed, playlistSongs, loves, users } from '../../db/schema';
 import { eq, desc, and, count } from 'drizzle-orm';
 import { incrementListenCount } from '../services/music';
 import { lumiraService } from './lumira';
