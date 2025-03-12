@@ -17,11 +17,25 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file provided' });
     }
 
+    console.log('Processing file upload:', {
+      filename: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      uploadedBy: req.headers['x-wallet-address'] || 'anonymous'
+    });
+
+    // Use FormData from 'form-data' package which is compatible with Node.js
+    const FormData = require('form-data');
     const formData = new FormData();
-    formData.append('file', new Blob([req.file.buffer]), req.file.originalname);
+    
+    // Add the file to FormData with the buffer
+    formData.append('file', req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype
+    });
     
     // Add metadata for better organization in Pinata
-    const metadata = {
+    const metadata = JSON.stringify({
       name: req.file.originalname,
       keyvalues: {
         app: 'neo-music-portal',
@@ -29,20 +43,25 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         uploadedBy: req.headers['x-wallet-address'] || 'anonymous',
         timestamp: new Date().toISOString()
       }
-    };
-    formData.append('pinataMetadata', JSON.stringify(metadata));
+    });
+    formData.append('pinataMetadata', metadata);
 
     // Optional pinning options
-    const pinataOptions = {
+    const pinataOptions = JSON.stringify({
       cidVersion: 0
-    };
-    formData.append('pinataOptions', JSON.stringify(pinataOptions));
+    });
+    formData.append('pinataOptions', pinataOptions);
 
+    console.log('Sending request to Pinata...');
+    
+    // Get the form headers from the FormData object
+    const formHeaders = formData.getHeaders();
+    
     const response = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', formData, {
       headers: {
+        ...formHeaders, // Use headers from FormData
         'pinata_api_key': PINATA_API_KEY,
         'pinata_secret_api_key': PINATA_API_SECRET,
-        'Content-Type': 'multipart/form-data',
       },
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
@@ -52,9 +71,20 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     res.json({ Hash: response.data.IpfsHash });
   } catch (error) {
     console.error('IPFS upload error:', error);
+    
+    // Enhanced error logging
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('Pinata API error response:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      });
+    }
+    
     res.status(500).json({ 
       error: 'Failed to upload to IPFS',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'Unknown error',
+      status: axios.isAxiosError(error) && error.response ? error.response.status : null
     });
   }
 });
@@ -105,6 +135,58 @@ router.get('/fetch/:cid', async (req, res) => {
     res.status(500).json({
       error: 'Failed to fetch from IPFS',
       details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Test endpoint to check Pinata connectivity
+router.post('/test-connection', async (req, res) => {
+  try {
+    console.log('Testing Pinata connection with credentials:', {
+      keyProvided: !!PINATA_API_KEY,
+      keyLength: PINATA_API_KEY ? PINATA_API_KEY.length : 0,
+      secretProvided: !!PINATA_API_SECRET,
+      secretLength: PINATA_API_SECRET ? PINATA_API_SECRET.length : 0
+    });
+    
+    const response = await axios.get('https://api.pinata.cloud/data/testAuthentication', {
+      headers: {
+        'pinata_api_key': PINATA_API_KEY || '',
+        'pinata_secret_api_key': PINATA_API_SECRET || ''
+      }
+    });
+    
+    console.log('Pinata test authentication response:', response.data);
+    res.json({ 
+      success: true, 
+      message: 'Pinata connection successful',
+      credentials: {
+        keyProvided: !!PINATA_API_KEY,
+        secretProvided: !!PINATA_API_SECRET
+      },
+      data: response.data
+    });
+  } catch (error) {
+    console.error('Pinata test authentication error:', error);
+    
+    // Enhanced error logging
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('Pinata API error details:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Pinata connection failed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      credentials: {
+        keyProvided: !!PINATA_API_KEY,
+        secretProvided: !!PINATA_API_SECRET
+      },
+      status: axios.isAxiosError(error) && error.response ? error.response.status : null
     });
   }
 });
